@@ -6,6 +6,7 @@ const cors = require('cors');
 const mongoSanitize = require('express-mongo-sanitize');
 
 const app = express();
+app.set('trust proxy', 1);
 const PORT = process.env.PORT || 5000;
 
 const allowedOrigins = [
