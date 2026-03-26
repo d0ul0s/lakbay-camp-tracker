@@ -7,7 +7,6 @@ module.exports = function (req, res, next) {
     return res.status(401).json({ message: 'No token, authorization denied' });
   }
 
-  // Expect format: "Bearer <token>"
   const token = authHeader.split(' ')[1];
 
   if (!token) {
@@ -19,9 +18,6 @@ module.exports = function (req, res, next) {
     req.user = decoded.user;
     next();
   } catch (err) {
-    if (err.name === 'TokenExpiredError') {
-      return res.status(401).json({ message: 'Token expired. Please log in again.' });
-    }
     res.status(401).json({ message: 'Token is not valid' });
   }
 };
