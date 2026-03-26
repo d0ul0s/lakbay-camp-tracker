@@ -7,13 +7,15 @@ import { PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer } from 'recha
 import type { Registrant, Expense, AppSettings, Solicitation } from '../types';
 
 export default function Dashboard() {
-  const { currentUser, setLoading } = useAppStore();
+  const { currentUser } = useAppStore();
   const [registrants, setRegistrants] = useState<Registrant[]>([]);
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [solicitations, setSolicitations] = useState<Solicitation[]>([]);
   const [settings, setSettings] = useState<AppSettings>({ churches: [], merchCosts: { tshirt: 0, bag: 0, notebook: 0, pen: 0 } } as any);
 
   useEffect(() => {
+    if (!currentUser) return;
+
     const fetchData = async () => {
       try {
         const [regRes, expRes, setRes, solRes] = await Promise.all([
@@ -22,12 +24,14 @@ export default function Dashboard() {
           axios.get(`${import.meta.env.VITE_API_URL}/api/settings`),
           axios.get(`${import.meta.env.VITE_API_URL}/api/solicitations`).catch(() => ({ data: [] }))
         ]);
+
         setRegistrants(regRes.data);
         setExpenses(expRes.data);
         setSolicitations(solRes.data);
+
         if (setRes.data) {
-          setSettings({ 
-            ...setRes.data, 
+          setSettings({
+            ...setRes.data,
             churches: setRes.data.churchList || [],
             merchCosts: setRes.data.merchCosts || { tshirt: 0, bag: 0, notebook: 0, pen: 0 }
           });
@@ -36,13 +40,14 @@ export default function Dashboard() {
         console.error("Dashboard fetch error", err);
       }
     };
+
     fetchData();
-  }, [setLoading]);
-  
+  }, [currentUser?._id]); // 👈 BEST PRACTICE
+
   const isAdmin = currentUser?.role === 'admin';
   const isTreasurer = currentUser?.role === 'treasurer';
   const canViewFinancials = isAdmin || isTreasurer;
-  
+
   // Filter data based on role
   // All roles now see global stats on dashboard
   const visibleRegistrants = registrants;
@@ -50,7 +55,7 @@ export default function Dashboard() {
   // Financial stats
   const expectedCollection = visibleRegistrants.reduce((sum, r) => sum + (r.feeType === 'Early Bird' ? 350 : 500), 0);
   const totalCollected = visibleRegistrants.reduce((sum, r) => sum + r.amountPaid, 0);
-  
+
   // Merch stats
   const totalItemsExpected = totalRegistrants * 4;
   const totalItemsClaimed = visibleRegistrants.reduce((sum, r) => {
@@ -61,13 +66,13 @@ export default function Dashboard() {
     if (r.merchClaims.pen) claimed++;
     return sum + claimed;
   }, 0);
-  
-  const totalMerchProductionCost = 
+
+  const totalMerchProductionCost =
     ((settings.merchCosts?.tshirt || 0) * totalRegistrants) +
     ((settings.merchCosts?.bag || 0) * totalRegistrants) +
     ((settings.merchCosts?.notebook || 0) * totalRegistrants) +
     ((settings.merchCosts?.pen || 0) * totalRegistrants);
-  
+
   // Expenses stats
   const campExpenses = expenses.reduce((sum, e) => sum + e.amount, 0) + totalMerchProductionCost;
 
@@ -80,7 +85,7 @@ export default function Dashboard() {
     if (totalMerchProductionCost > 0) {
       map.set('Merch Production', (map.get('Merch Production') || 0) + totalMerchProductionCost);
     }
-    
+
     return Array.from(map.entries())
       .map(([name, value]) => ({ name, value }))
       .filter(item => item.value > 0)
@@ -120,7 +125,7 @@ export default function Dashboard() {
         <h2 className="text-3xl font-display text-brand-brown tracking-wide mb-2 md:mb-0">
           Dashboard Overview
         </h2>
-        
+
         <div className="flex flex-wrap gap-3">
           <Link to="/registrants" className="flex items-center gap-2 bg-brand-brown text-white px-4 py-2 rounded-lg font-medium hover:bg-brand-light-brown transition-colors">
             <PlusCircle size={18} /> Add Registrant
@@ -135,7 +140,7 @@ export default function Dashboard() {
           )}
         </div>
       </div>
-      
+
       {/* KPI Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         {/* Total Registrants */}
@@ -148,7 +153,7 @@ export default function Dashboard() {
             <h3 className="text-3xl font-bold text-gray-800 mt-1">{totalRegistrants}</h3>
           </div>
         </div>
-        
+
         {/* Registration Income */}
         <div className="bg-white p-6 rounded-2xl shadow-sm border border-brand-beige flex items-start gap-4 hover:shadow-md transition-shadow">
           <div className="p-3 bg-green-50 text-green-600 rounded-xl">
@@ -173,7 +178,7 @@ export default function Dashboard() {
             <h3 className="text-3xl font-bold text-gray-800 mt-1">₱{totalSolicitations.toLocaleString()}</h3>
           </div>
         </div>
-        
+
         {/* Total Income */}
         <div className="bg-white p-6 rounded-2xl shadow-sm border border-brand-beige flex items-start gap-4 hover:shadow-md transition-shadow">
           <div className="p-3 bg-brand-brown/10 text-brand-brown rounded-xl">
@@ -185,7 +190,7 @@ export default function Dashboard() {
             <p className="text-xs text-gray-400 mt-1">Reg + Solicitations</p>
           </div>
         </div>
-        
+
         {/* Merch Claims */}
         <div className="bg-white p-6 rounded-2xl shadow-sm border border-brand-beige flex items-start gap-4 hover:shadow-md transition-shadow">
           <div className="p-3 bg-purple-50 text-purple-600 rounded-xl">
@@ -195,41 +200,41 @@ export default function Dashboard() {
             <p className="text-sm text-gray-500 font-medium">Delegates Completed</p>
             <h3 className="text-3xl font-bold text-gray-800 mt-1">{totalItemsClaimed} <span className="text-lg text-gray-400 font-normal">/ {totalItemsExpected}</span></h3>
             <div className="w-full bg-gray-100 h-1.5 rounded-full mt-2">
-              <div 
-                className="bg-purple-500 h-1.5 rounded-full transition-all duration-500" 
+              <div
+                className="bg-purple-500 h-1.5 rounded-full transition-all duration-500"
                 style={{ width: totalItemsExpected ? `${(totalItemsClaimed / totalItemsExpected) * 100}%` : '0%' }}
               ></div>
             </div>
           </div>
         </div>
       </div>
-      
+
       {/* Financial Summary & Breakdown (Admin/Treasurer) */}
-          <div className="lg:col-span-3 bg-white rounded-2xl shadow-sm border border-brand-beige overflow-hidden">
-            <div className="p-6 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
-              <h3 className="font-display text-2xl text-brand-brown tracking-wide">Camp Financial Summary</h3>
-              <Link to="/reports" className="text-sm text-brand-light-brown hover:underline flex items-center gap-1 font-medium">
-                View full report <ArrowRight size={16}/>
-              </Link>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-3 divide-y md:divide-y-0 md:divide-x divide-gray-100 h-full">
-              <div className="p-8 text-center bg-white flex flex-col justify-center">
-                <p className="text-gray-500 text-sm font-medium uppercase tracking-wider">Total Income</p>
-                <p className="text-4xl font-bold text-green-600 mt-3">₱{totalIncome.toLocaleString()}</p>
-              </div>
-              <div className="p-8 text-center bg-white flex flex-col justify-center">
-                <p className="text-gray-500 text-sm font-medium uppercase tracking-wider">Total Expenses</p>
-                <p className="text-4xl font-bold text-red-500 mt-3">₱{campExpenses.toLocaleString()}</p>
-              </div>
-              <div className="p-8 text-center bg-white flex flex-col justify-center">
-                <p className="text-gray-500 text-sm font-medium uppercase tracking-wider">Net Balance</p>
-                <p className={`text-4xl font-bold mt-3 ${(totalIncome - campExpenses) >= 0 ? 'text-brand-brown' : 'text-red-500'}`}>
-                  ₱{(totalIncome - campExpenses).toLocaleString()}
-                </p>
-              </div>
-            </div>
+      <div className="lg:col-span-3 bg-white rounded-2xl shadow-sm border border-brand-beige overflow-hidden">
+        <div className="p-6 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
+          <h3 className="font-display text-2xl text-brand-brown tracking-wide">Camp Financial Summary</h3>
+          <Link to="/reports" className="text-sm text-brand-light-brown hover:underline flex items-center gap-1 font-medium">
+            View full report <ArrowRight size={16} />
+          </Link>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-3 divide-y md:divide-y-0 md:divide-x divide-gray-100 h-full">
+          <div className="p-8 text-center bg-white flex flex-col justify-center">
+            <p className="text-gray-500 text-sm font-medium uppercase tracking-wider">Total Income</p>
+            <p className="text-4xl font-bold text-green-600 mt-3">₱{totalIncome.toLocaleString()}</p>
           </div>
-        
+          <div className="p-8 text-center bg-white flex flex-col justify-center">
+            <p className="text-gray-500 text-sm font-medium uppercase tracking-wider">Total Expenses</p>
+            <p className="text-4xl font-bold text-red-500 mt-3">₱{campExpenses.toLocaleString()}</p>
+          </div>
+          <div className="p-8 text-center bg-white flex flex-col justify-center">
+            <p className="text-gray-500 text-sm font-medium uppercase tracking-wider">Net Balance</p>
+            <p className={`text-4xl font-bold mt-3 ${(totalIncome - campExpenses) >= 0 ? 'text-brand-brown' : 'text-red-500'}`}>
+              ₱{(totalIncome - campExpenses).toLocaleString()}
+            </p>
+          </div>
+        </div>
+      </div>
+
 
       {/* Financial Charts (All Roles) */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">

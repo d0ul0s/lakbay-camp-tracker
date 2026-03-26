@@ -4,6 +4,7 @@ import axios from 'axios';
 import { useAppStore } from '../store';
 
 export default function Login() {
+  console.log(import.meta.env.VITE_API_URL);
   const [pin, setPin] = useState('');
   const [error, setError] = useState(false);
   const login = useAppStore(state => state.login);
@@ -17,6 +18,7 @@ export default function Login() {
     try {
       const res = await axios.post(`${import.meta.env.VITE_API_URL}/api/auth/login`, { pin });
       login(res.data);
+      localStorage.setItem("token", res.data.token);
       navigate('/');
     } catch (err) {
       console.error(err);
