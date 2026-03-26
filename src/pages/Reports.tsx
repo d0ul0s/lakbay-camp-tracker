@@ -1,0 +1,202 @@
+import { useState, useEffect } from 'react';
+import axios from 'axios';
+import { useAppStore } from '../store';
+import Papa from 'papaparse';
+import { Download, FileBox, Users, Receipt, HeartHandshake } from 'lucide-react';
+import { format } from 'date-fns';
+import type { Registrant, Expense, Solicitation } from '../types';
+
+export default function Reports() {
+  const { currentUser, setLoading } = useAppStore();
+  const [registrants, setRegistrants] = useState<Registrant[]>([]);
+  const [expenses, setExpenses] = useState<Expense[]>([]);
+  const [solicitations, setSolicitations] = useState<Solicitation[]>([]);
+  
+  const isAdmin = currentUser?.role === 'admin';
+  const isTreasurer = currentUser?.role === 'treasurer';
+  const canViewFinancials = isAdmin || isTreasurer;
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const [regRes, expRes, solRes] = await Promise.all([
+          axios.get(`${import.meta.env.VITE_API_URL}/api/registrants`),
+          axios.get(`${import.meta.env.VITE_API_URL}/api/expenses`).catch(() => ({ data: [] })),
+          axios.get(`${import.meta.env.VITE_API_URL}/api/solicitations`).catch(() => ({ data: [] }))
+        ]);
+        setRegistrants(regRes.data);
+        setExpenses(expRes.data);
+        setSolicitations(solRes.data);
+      } catch (err) {
+        console.error(err);
+      }
+    };
+    fetchData();
+  }, [setLoading]);
+  
+  const downloadCSV = (data: any[], filename: string) => {
+    const csv = Papa.unparse(data);
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = filename;
+    link.click();
+  };
+
+  const exportRegistrants = () => {
+    const data = (isAdmin || isTreasurer ? registrants : registrants.filter(r => r.church === currentUser?.church)).map(r => ({
+      'Full Name': r.fullName,
+      'Age': r.age,
+      'Sex': r.sex || 'Male',
+      'Ministry': r.ministry && r.ministry.length > 0 ? r.ministry.join(', ') : 'None',
+      'Shirt Size': r.shirtSize,
+      'Church': r.church,
+      'Fee Type': r.feeType,
+      'Payment Status': r.paymentStatus,
+      'Payment Method': r.paymentMethod || 'N/A',
+      'GCash Ref': r.gcRef || 'N/A',
+      'Amount Paid': r.amountPaid,
+      'Verified': r.verifiedByTreasurer ? 'Yes' : 'No',
+      'Date Registered': format(new Date(r.dateRegistered), 'MMM d, yyyy'),
+      'T-Shirt Claimed': r.merchClaims.tshirt ? `Yes (${r.merchClaimDates?.tshirt ? format(new Date(r.merchClaimDates.tshirt), 'MMM d, h:mm a') : 'Legacy'})` : 'No',
+      'Bag Claimed': r.merchClaims.bag ? `Yes (${r.merchClaimDates?.bag ? format(new Date(r.merchClaimDates.bag), 'MMM d, h:mm a') : 'Legacy'})` : 'No',
+      'Notebook Claimed': r.merchClaims.notebook ? `Yes (${r.merchClaimDates?.notebook ? format(new Date(r.merchClaimDates.notebook), 'MMM d, h:mm a') : 'Legacy'})` : 'No',
+      'Pen Claimed': r.merchClaims.pen ? `Yes (${r.merchClaimDates?.pen ? format(new Date(r.merchClaimDates.pen), 'MMM d, h:mm a') : 'Legacy'})` : 'No',
+    }));
+    downloadCSV(data, `LAKBAY_Registrants_${format(new Date(), 'yyyy-MM-dd')}.csv`);
+  };
+
+  const exportExpenses = () => {
+    if (!canViewFinancials) return;
+    const data = expenses.map(e => ({
+      'Date': format(new Date(e.date), 'MMM d, yyyy'),
+      'Description': e.description,
+      'Category': e.category,
+      'Amount': e.amount,
+      'Paid By': e.paidBy,
+      'Method': e.method,
+      'Verified': e.verifiedByTreasurer ? 'Yes' : 'No'
+    }));
+    downloadCSV(data, `LAKBAY_Expenses_${format(new Date(), 'yyyy-MM-dd')}.csv`);
+  };
+
+  const exportSolicitations = () => {
+    if (!canViewFinancials) return;
+    const data = solicitations.map(s => ({
+      'Source Name': s.sourceName,
+      'Type': s.type,
+      'Amount': s.amount,
+      'Payment Method': s.paymentMethod,
+      'Date Received': format(new Date(s.dateReceived), 'MMM d, yyyy'),
+      'Notes': s.notes || '',
+      'Verified': s.verifiedByTreasurer ? 'Yes' : 'No'
+    }));
+    downloadCSV(data, `LAKBAY_Solicitations_${format(new Date(), 'yyyy-MM-dd')}.csv`);
+  };
+
+  const printMerchSheet = () => {
+    window.print();
+  };
+
+  return (
+    <div className="space-y-6">
+      <h2 className="text-3xl font-display text-brand-brown tracking-wide mb-6">Reports & Export</h2>
+      
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {/* Registrants Export */}
+        <div className="bg-white p-6 rounded-2xl shadow-sm border border-brand-beige flex flex-col items-center text-center">
+          <div className="p-4 bg-brand-cream text-brand-brown rounded-full mb-4">
+            <Users size={32} />
+          </div>
+          <h3 className="text-xl font-bold text-gray-800 mb-2">Registrant Database</h3>
+          <p className="text-gray-500 text-sm mb-6 flex-1">Export a complete spreadsheet of all registrants, payment statuses, and merch claims.</p>
+          <button 
+            onClick={exportRegistrants}
+            className="w-full flex items-center justify-center gap-2 bg-brand-brown text-white py-3 rounded-xl font-bold hover:bg-brand-light-brown transition-colors"
+          >
+            <Download size={18} /> Export to CSV
+          </button>
+        </div>
+        
+        {/* Expenses Export */}
+        {canViewFinancials && (
+          <div className="bg-white p-6 rounded-2xl shadow-sm border border-brand-beige flex flex-col items-center text-center">
+            <div className="p-4 bg-gray-50 text-gray-600 rounded-full mb-4">
+              <Receipt size={32} />
+            </div>
+            <h3 className="text-xl font-bold text-gray-800 mb-2">Financial Log</h3>
+            <p className="text-gray-500 text-sm mb-6 flex-1">Export all camp-wide expenses, categories, and payment details for accounting.</p>
+            <button 
+              onClick={exportExpenses}
+              className="w-full flex items-center justify-center gap-2 bg-gray-800 text-white py-3 rounded-xl font-bold hover:bg-gray-700 transition-colors"
+            >
+              <Download size={18} /> Export to CSV
+            </button>
+          </div>
+        )}
+
+        {/* Solicitations Export */}
+        {canViewFinancials && (
+          <div className="bg-white p-6 rounded-2xl shadow-sm border border-brand-beige flex flex-col items-center text-center">
+            <div className="p-4 bg-green-50 text-green-700 rounded-full mb-4">
+              <HeartHandshake size={32} />
+            </div>
+            <h3 className="text-xl font-bold text-gray-800 mb-2">Solicitations Log</h3>
+            <p className="text-gray-500 text-sm mb-6 flex-1">Export all donor contributions and solicitation records including verification status.</p>
+            <button 
+              onClick={exportSolicitations}
+              className="w-full flex items-center justify-center gap-2 bg-green-700 text-white py-3 rounded-xl font-bold hover:bg-green-800 transition-colors"
+            >
+              <Download size={18} /> Export to CSV
+            </button>
+          </div>
+        )}
+        
+        {/* Printable Merch Sheet */}
+        <div className="bg-white p-6 rounded-2xl shadow-sm border border-brand-beige flex flex-col items-center text-center">
+          <div className="p-4 bg-brand-sand/20 text-brand-brown rounded-full mb-4">
+            <FileBox size={32} />
+          </div>
+          <h3 className="text-xl font-bold text-gray-800 mb-2">Printable Claim Sheet</h3>
+          <p className="text-gray-500 text-sm mb-6 flex-1">Generate a printable view of registrants and their merch claims for physical check-in.</p>
+          <button 
+            onClick={printMerchSheet}
+            className="w-full flex items-center justify-center gap-2 bg-brand-sand text-brand-brown py-3 rounded-xl font-bold shadow-sm hover:opacity-90 transition-opacity print:hidden"
+          >
+            <FileBox size={18} /> Print View
+          </button>
+        </div>
+      </div>
+      
+      {/* Hidden print payload that only shows during print */}
+      <div className="hidden print:block absolute inset-0 bg-white p-8">
+        <h1 className="text-3xl font-bold text-center mb-6 border-b pb-4">LAKBAY Camp 2026 - Merch Claim Sheet</h1>
+        <table className="w-full text-left text-sm border-collapse border border-gray-300">
+          <thead>
+            <tr>
+              <th className="border border-gray-300 p-2">Name</th>
+              <th className="border border-gray-300 p-2">Church</th>
+              <th className="border border-gray-300 p-2 text-center w-12">Size</th>
+              <th className="border border-gray-300 p-2 text-center w-16">T-Shirt</th>
+              <th className="border border-gray-300 p-2 text-center w-16">Bag</th>
+              <th className="border border-gray-300 p-2 text-center w-16">Note</th>
+              <th className="border border-gray-300 p-2 text-center w-16">Pen</th>
+            </tr>
+          </thead>
+          <tbody>
+            {(isAdmin ? registrants : registrants.filter(r => r.church === currentUser?.church)).map(r => (
+              <tr key={r.id}>
+                <td className="border border-gray-300 p-2 font-medium">{r.fullName}</td>
+                <td className="border border-gray-300 p-2">{r.church}</td>
+                <td className="border border-gray-300 p-2 text-center">{r.shirtSize}</td>
+                <td className="border border-gray-300 p-2 text-center">{r.merchClaims.tshirt ? '✓' : ''}</td>
+                <td className="border border-gray-300 p-2 text-center">{r.merchClaims.bag ? '✓' : ''}</td>
+                <td className="border border-gray-300 p-2 text-center">{r.merchClaims.notebook ? '✓' : ''}</td>
+                <td className="border border-gray-300 p-2 text-center">{r.merchClaims.pen ? '✓' : ''}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
