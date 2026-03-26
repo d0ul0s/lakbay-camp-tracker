@@ -68,6 +68,7 @@ export default function Users() {
     if (!confirmModal.id) return;
     try {
       await api.delete(`/api/auth/users/${confirmModal.id}`);
+      setConfirmModal({ isOpen: false, id: null });
       fetchData();
     } catch (err) {
       console.error(err);

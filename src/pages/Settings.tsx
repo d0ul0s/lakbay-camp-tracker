@@ -340,7 +340,10 @@ export default function Settings() {
         title="Confirm Action"
         message={confirmModal.message}
         onCancel={() => setConfirmModal({ ...confirmModal, isOpen: false })}
-        onConfirm={confirmModal.action}
+        onConfirm={() => {
+          confirmModal.action();
+          setConfirmModal({ ...confirmModal, isOpen: false });
+        }}
       />
     </div>
   );
