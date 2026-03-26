@@ -18,11 +18,21 @@ export default function Dashboard() {
 
     const fetchData = async () => {
       try {
+        const token = currentUser?.token;
+
         const [regRes, expRes, setRes, solRes] = await Promise.all([
-          axios.get(`${import.meta.env.VITE_API_URL}/api/registrants`),
-          axios.get(`${import.meta.env.VITE_API_URL}/api/expenses`).catch(() => ({ data: [] })),
-          axios.get(`${import.meta.env.VITE_API_URL}/api/settings`),
-          axios.get(`${import.meta.env.VITE_API_URL}/api/solicitations`).catch(() => ({ data: [] }))
+          axios.get(`${import.meta.env.VITE_API_URL}/api/registrants`, {
+
+          }),
+          axios.get(`${import.meta.env.VITE_API_URL}/api/expenses`, {
+
+          }).catch(() => ({ data: [] })),
+          axios.get(`${import.meta.env.VITE_API_URL}/api/settings`, {
+
+          }),
+          axios.get(`${import.meta.env.VITE_API_URL}/api/solicitations`, {
+
+          }).catch(() => ({ data: [] }))
         ]);
 
         setRegistrants(regRes.data);
@@ -33,16 +43,22 @@ export default function Dashboard() {
           setSettings({
             ...setRes.data,
             churches: setRes.data.churchList || [],
-            merchCosts: setRes.data.merchCosts || { tshirt: 0, bag: 0, notebook: 0, pen: 0 }
+            merchCosts: setRes.data.merchCosts || {
+              tshirt: 0,
+              bag: 0,
+              notebook: 0,
+              pen: 0
+            }
           });
         }
+
       } catch (err) {
         console.error("Dashboard fetch error", err);
       }
     };
 
     fetchData();
-  }, [currentUser?._id]); // 👈 BEST PRACTICE
+  }, [currentUser?._id]);
 
   const isAdmin = currentUser?.role === 'admin';
   const isTreasurer = currentUser?.role === 'treasurer';

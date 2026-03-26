@@ -21,10 +21,21 @@ export const useAppStore = create<AppState>()((set) => {
   const savedSession = sessionStorage.getItem('lakbay_auth');
   const initialUser = savedSession ? JSON.parse(savedSession) : null;
 
-  // Set auth header synchronously so it's present before any component useEffect fires
   if (initialUser?.token) {
     axios.defaults.headers.common['Authorization'] = `Bearer ${initialUser.token}`;
   }
+
+  axios.defaults.baseURL = import.meta.env.VITE_API_URL;
+
+  axios.interceptors.request.use((config) => {
+    const token = useAppStore.getState().currentUser?.token;
+
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+
+    return config;
+  });
 
   return {
     currentUser: initialUser,
