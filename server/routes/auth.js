@@ -62,4 +62,61 @@ router.get('/users', auth, async (req, res) => {
   }
 });
 
+// REGISTER (Admin only)
+router.post('/register', auth, async (req, res) => {
+  if (req.user.role !== 'admin') return res.status(403).json({ message: 'Unauthorized' });
+  const { church, pin, role } = req.body;
+
+  try {
+    let user = new User({ church, pin, role });
+    await user.save();
+    res.status(201).json({ message: 'User registered successfully', _id: user._id });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
+// UPDATE USER (Admin only)
+router.put('/users/:id', auth, async (req, res) => {
+  if (req.user.role !== 'admin') return res.status(403).json({ message: 'Unauthorized' });
+  const { church, pin, role } = req.body;
+
+  try {
+    const user = await User.findById(req.params.id);
+    if (!user) return res.status(404).json({ message: 'User not found' });
+
+    if (church) user.church = church;
+    if (role) user.role = role;
+    if (pin) user.pin = pin; // Will be hashed by pre-save hook
+
+    await user.save();
+    res.json({ message: 'User updated successfully' });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
+// DELETE USER (Admin only)
+router.delete('/users/:id', auth, async (req, res) => {
+  if (req.user.role !== 'admin') return res.status(403).json({ message: 'Unauthorized' });
+
+  try {
+    const user = await User.findById(req.params.id);
+    if (!user) return res.status(404).json({ message: 'User not found' });
+
+    // Prevent deleting the last admin
+    if (user.role === 'admin') {
+      const adminCount = await User.countDocuments({ role: 'admin' });
+      if (adminCount <= 1) {
+        return res.status(400).json({ message: 'Cannot delete the only administrative account.' });
+      }
+    }
+
+    await User.findByIdAndDelete(req.params.id);
+    res.json({ message: 'User deleted successfully' });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
 module.exports = router;
