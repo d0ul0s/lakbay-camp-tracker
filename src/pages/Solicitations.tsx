@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import axios from 'axios';
+import api from '../api/axios';
 import { useAppStore } from '../store';
 import { PlusCircle, Edit2, Trash2, Search, X, ShieldAlert, CheckCircle, Clock } from 'lucide-react';
 import ConfirmModal from '../components/ConfirmModal';
@@ -30,8 +30,8 @@ export default function Solicitations() {
   const fetchData = async () => {
     try {
       const [solRes, setRes] = await Promise.all([
-        axios.get(`${import.meta.env.VITE_API_URL}/api/solicitations`),
-        axios.get(`${import.meta.env.VITE_API_URL}/api/settings`)
+        api.get('/api/solicitations'),
+        api.get('/api/settings')
       ]);
       setSolicitations(solRes.data);
       setSettings(setRes.data);
@@ -64,7 +64,7 @@ export default function Solicitations() {
       message: 'Are you sure you want to delete this solicitation record? This will alter financial reports.',
       action: async () => {
         try {
-          await axios.delete(`/api/solicitations/${id}`);
+          await api.delete(`/api/solicitations/${id}`);
           fetchData();
         } catch (err) {
           console.error(err);
@@ -81,7 +81,7 @@ export default function Solicitations() {
       message: `Are you sure you want to mark this as ${isNowVerified ? 'verified' : 'unverified'}? This affects the financial summary.`,
       action: async () => {
         try {
-          await axios.put(`/api/solicitations/${solicitation.id || (solicitation as any)._id}`, {
+          await api.put(`/api/solicitations/${solicitation.id || (solicitation as any)._id}`, {
             verifiedByTreasurer: isNowVerified,
             verifiedAt: isNowVerified ? new Date().toISOString() : null
           });
@@ -123,9 +123,9 @@ export default function Solicitations() {
         dateReceived: new Date(formData.dateReceived).toISOString()
       };
       if (editingId) {
-        await axios.put(`/api/solicitations/${editingId}`, payload);
+        await api.put(`/api/solicitations/${editingId}`, payload);
       } else {
-        await axios.post(`/api/solicitations`, payload);
+        await api.post(`/api/solicitations`, payload);
       }
       setIsModalOpen(false);
       fetchData();

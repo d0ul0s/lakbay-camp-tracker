@@ -1,5 +1,5 @@
 import React, { useRef, useState, useEffect } from 'react';
-import axios from 'axios';
+import api from '../api/axios';
 import { useAppStore } from '../store';
 import { Database, Download, Upload, AlertTriangle, Plus, Trash2, Image as ImageIcon } from 'lucide-react';
 import ConfirmModal from '../components/ConfirmModal';
@@ -28,7 +28,7 @@ export default function Settings() {
 
   const fetchSettings = async () => {
     try {
-      const res = await axios.get(`${import.meta.env.VITE_API_URL}/api/settings`);
+      const res = await api.get('/api/settings');
       setSettings(res.data);
     } catch (err) {
       console.error(err);
@@ -42,7 +42,7 @@ export default function Settings() {
   const handleExport = async () => {
     try {
       setImportStatus({ type: null, msg: '' });
-      const res = await axios.get(`${import.meta.env.VITE_API_URL}/api/backup/export`);
+      const res = await api.get('/api/backup/export');
       const dataString = JSON.stringify(res.data, null, 2);
       const blob = new Blob([dataString], { type: 'application/json' });
       const link = document.createElement('a');
@@ -68,7 +68,7 @@ export default function Settings() {
           try {
             const jsonString = event.target?.result as string;
             const parsed = JSON.parse(jsonString);
-            await axios.post(`${import.meta.env.VITE_API_URL}/api/backup/import`, parsed);
+            await api.post('/api/backup/import', parsed);
             setImportStatus({
               type: 'success',
               msg: 'Data restored successfully. The system will reload in 3 seconds to apply changes.'
@@ -88,7 +88,7 @@ export default function Settings() {
   const updateArrayField = async (field: string, newArray: string[]) => {
     try {
       if (!settings) return;
-      const res = await axios.put(`${import.meta.env.VITE_API_URL}/api/settings`, {
+      const res = await api.put('/api/settings', {
         [field]: newArray
       });
       setSettings(res.data);
@@ -139,7 +139,7 @@ export default function Settings() {
     reader.onload = async (event) => {
       try {
         const base64 = event.target?.result as string;
-        const res = await axios.put(`${import.meta.env.VITE_API_URL}/api/settings`, {
+        const res = await api.put('/api/settings', {
           shirtSizePhoto: base64
         });
         setSettings(res.data);

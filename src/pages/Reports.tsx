@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import axios from 'axios';
+import api from '../api/axios';
 import { useAppStore } from '../store';
 import Papa from 'papaparse';
 import { Download, FileBox, Users, Receipt, HeartHandshake } from 'lucide-react';
@@ -19,9 +19,9 @@ export default function Reports() {
     const fetchData = async () => {
       try {
         const [regRes, expRes, solRes] = await Promise.all([
-          axios.get(`${import.meta.env.VITE_API_URL}/api/registrants`),
-          axios.get(`${import.meta.env.VITE_API_URL}/api/expenses`).catch(() => ({ data: [] })),
-          axios.get(`${import.meta.env.VITE_API_URL}/api/solicitations`).catch(() => ({ data: [] }))
+          api.get('/api/registrants'),
+          api.get('/api/expenses').catch(() => ({ data: [] })),
+          api.get('/api/solicitations').catch(() => ({ data: [] }))
         ]);
         setRegistrants(regRes.data);
         setExpenses(expRes.data);

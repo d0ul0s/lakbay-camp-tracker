@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import axios from 'axios';
+import api from '../api/axios';
 import { useAppStore } from '../store';
 import { Users, DollarSign, ShoppingBag, PlusCircle, ArrowRight, HeartHandshake, ShieldCheck } from 'lucide-react';
 import { Link } from 'react-router-dom';
@@ -18,21 +18,11 @@ export default function Dashboard() {
 
     const fetchData = async () => {
       try {
-        const token = currentUser?.token;
-
         const [regRes, expRes, setRes, solRes] = await Promise.all([
-          axios.get(`${import.meta.env.VITE_API_URL}/api/registrants`, {
-
-          }),
-          axios.get(`${import.meta.env.VITE_API_URL}/api/expenses`, {
-
-          }).catch(() => ({ data: [] })),
-          axios.get(`${import.meta.env.VITE_API_URL}/api/settings`, {
-
-          }),
-          axios.get(`${import.meta.env.VITE_API_URL}/api/solicitations`, {
-
-          }).catch(() => ({ data: [] }))
+          api.get('/api/registrants'),
+          api.get('/api/expenses').catch(() => ({ data: [] })),
+          api.get('/api/settings'),
+          api.get('/api/solicitations').catch(() => ({ data: [] }))
         ]);
 
         setRegistrants(regRes.data);

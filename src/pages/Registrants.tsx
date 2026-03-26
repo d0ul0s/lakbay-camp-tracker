@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect } from 'react';
-import axios from 'axios';
+import api from '../api/axios';
 import { useAppStore } from '../store';
 import type { Registrant, ShirtSize, PaymentStatus, PaymentMethod, AppSettings } from '../types';
 import { PlusCircle, Search, Edit2, Trash2, X, Filter, Info, CheckSquare, Square, CheckCircle, Clock } from 'lucide-react';
@@ -17,8 +17,8 @@ export default function Registrants() {
   const fetchRegistrants = async () => {
     try {
       const [regRes, setRes] = await Promise.all([
-        axios.get(`${import.meta.env.VITE_API_URL}/api/registrants`),
-        axios.get(`${import.meta.env.VITE_API_URL}/api/settings`)
+        api.get('/api/registrants'),
+        api.get('/api/settings')
       ]);
       setRegistrants(regRes.data);
       if (setRes.data) {
@@ -129,9 +129,9 @@ export default function Registrants() {
 
     try {
       if (editingId) {
-        await axios.put(`/api/registrants/${editingId}`, formData);
+        await api.put(`/api/registrants/${editingId}`, formData);
       } else {
-        await axios.post(`/api/registrants`, formData);
+        await api.post(`/api/registrants`, formData);
       }
       closeModal();
       fetchRegistrants();
@@ -167,7 +167,7 @@ export default function Registrants() {
   const confirmDelete = async () => {
     if (!confirmModal.id) return;
     try {
-      await axios.delete(`/api/registrants/${confirmModal.id}`);
+      await api.delete(`/api/registrants/${confirmModal.id}`);
       setConfirmModal({ isOpen: false, id: null });
       fetchRegistrants();
     } catch (err) {
@@ -183,7 +183,7 @@ export default function Registrants() {
     const reg = verifyConfirm.reg;
     const nowVerified = !reg.verifiedByTreasurer;
     try {
-      await axios.put(`/api/registrants/${(reg as any)._id || reg.id}`, {
+      await api.put(`/api/registrants/${(reg as any)._id || reg.id}`, {
         verifiedByTreasurer: nowVerified,
         verifiedAt: nowVerified ? new Date().toISOString() : null
       });

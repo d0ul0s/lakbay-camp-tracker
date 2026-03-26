@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect } from 'react';
-import axios from 'axios';
+import api from '../api/axios';
 import { useAppStore } from '../store';
 import { Search, Filter, Check, Shirt, Briefcase, Book, PenTool } from 'lucide-react';
 import type { Registrant, AppSettings } from '../types';
@@ -14,8 +14,8 @@ export default function MerchClaims() {
   const fetchData = async () => {
     try {
       const [regRes, setRes] = await Promise.all([
-        axios.get(`/api/registrants`),
-        axios.get(`/api/settings`)
+        api.get('/api/registrants'),
+        api.get('/api/settings')
       ]);
       setRegistrants(regRes.data);
       if (setRes.data && setRes.data.churchList) {
@@ -59,7 +59,7 @@ export default function MerchClaims() {
     
     const isClaimed = reg.merchClaims[item];
     try {
-      await axios.put(`/api/registrants/${regId}`, {
+      await api.put(`/api/registrants/${regId}`, {
         merchClaims: { ...reg.merchClaims, [item]: !isClaimed },
         merchClaimDates: { ...reg.merchClaimDates, [item]: !isClaimed ? new Date().toISOString() : null }
       });

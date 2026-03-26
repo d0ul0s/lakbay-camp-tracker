@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import axios from 'axios';
+import api from '../api/axios';
 import { useAppStore } from '../store';
 import { Activity, Filter, ShieldAlert } from 'lucide-react';
 import { format } from 'date-fns';
@@ -31,7 +31,7 @@ export default function ActivityLogs() {
       if (filterRole !== 'All') params.append('role', filterRole);
       if (filterDate) params.append('date', filterDate);
 
-      const res = await axios.get(`${import.meta.env.VITE_API_URL}/api/activity-logs?${params.toString()}`);
+      const res = await api.get(`/api/activity-logs?${params.toString()}`);
       setLogs(res.data);
     } catch (err) {
       console.error(err);

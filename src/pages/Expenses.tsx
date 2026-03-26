@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import axios from 'axios';
+import api from '../api/axios';
 import { useAppStore } from '../store';
 import type { Expense, Registrant, AppSettings } from '../types';
 import { PlusCircle, Filter, Trash2, Edit2, X, DollarSign, TrendingDown, TrendingUp, Info, CheckCircle, Clock } from 'lucide-react';
@@ -25,10 +25,10 @@ export default function Expenses() {
   const fetchData = async () => {
     try {
       const [expRes, regRes, setRes, solRes] = await Promise.all([
-        axios.get(`${import.meta.env.VITE_API_URL}/api/expenses`).catch(() => ({ data: [] })),
-        axios.get(`${import.meta.env.VITE_API_URL}/api/registrants`),
-        axios.get(`${import.meta.env.VITE_API_URL}/api/settings`),
-        axios.get(`${import.meta.env.VITE_API_URL}/api/solicitations`).catch(() => ({ data: [] }))
+        api.get('/api/expenses').catch(() => ({ data: [] })),
+        api.get('/api/registrants'),
+        api.get('/api/settings'),
+        api.get('/api/solicitations').catch(() => ({ data: [] }))
       ]);
       setExpenses(expRes.data);
       setRegistrants(regRes.data);
@@ -72,7 +72,7 @@ export default function Expenses() {
     const exp = verifyConfirm.expense;
     const nowVerified = !exp.verifiedByTreasurer;
     try {
-      await axios.put(`/api/expenses/${(exp as any)._id || exp.id}`, {
+      await api.put(`/api/expenses/${(exp as any)._id || exp.id}`, {
         verifiedByTreasurer: nowVerified,
         verifiedAt: nowVerified ? new Date().toISOString() : null
       });
@@ -140,9 +140,9 @@ export default function Expenses() {
     };
     try {
       if (editingId) {
-        await axios.put(`/api/expenses/${editingId}`, savePayload);
+        await api.put(`/api/expenses/${editingId}`, savePayload);
       } else {
-        await axios.post(`/api/expenses`, savePayload);
+        await api.post(`/api/expenses`, savePayload);
       }
       closeModal();
       fetchData();
@@ -158,7 +158,7 @@ export default function Expenses() {
   const confirmDelete = async () => {
     if (!confirmModal.id) return;
     try {
-      await axios.delete(`/api/expenses/${confirmModal.id}`);
+      await api.delete(`/api/expenses/${confirmModal.id}`);
       setConfirmModal({ isOpen: false, id: null });
       fetchData();
     } catch (err) {
@@ -192,7 +192,7 @@ export default function Expenses() {
 
   const handleMerchCostChange = async (item: string, value: number) => {
     try {
-      await axios.put(`/api/settings`, {
+      await api.put(`/api/settings`, {
         merchCosts: { ...settings.merchCosts, [item]: value }
       });
       fetchData();

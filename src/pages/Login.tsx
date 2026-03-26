@@ -1,10 +1,9 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import axios from 'axios';
+import api from '../api/axios';
 import { useAppStore } from '../store';
 
 export default function Login() {
-  console.log(import.meta.env.VITE_API_URL);
   const [pin, setPin] = useState('');
   const [error, setError] = useState(false);
   const login = useAppStore(state => state.login);
@@ -16,7 +15,7 @@ export default function Login() {
     setLoading(true);
     setError(false);
     try {
-      const res = await axios.post(`${import.meta.env.VITE_API_URL}/api/auth/login`, { pin });
+      const res = await api.post('/api/auth/login', { pin });
       login(res.data);
       localStorage.setItem("token", res.data.token);
       navigate('/');

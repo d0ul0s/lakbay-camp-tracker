@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import axios from 'axios';
+import api from '../api/axios';
 import { useAppStore } from '../store';
 import { PlusCircle, Edit2, Trash2, X, ShieldAlert } from 'lucide-react';
 import ConfirmModal from '../components/ConfirmModal';
@@ -32,8 +32,8 @@ export default function Users() {
   const fetchData = async () => {
     try {
       const [usrRes, setRes] = await Promise.all([
-        axios.get(`${import.meta.env.VITE_API_URL}/api/auth/users`),
-        axios.get(`${import.meta.env.VITE_API_URL}/api/settings`)
+        api.get('/api/auth/users'),
+        api.get('/api/settings')
       ]);
       setUsers(usrRes.data);
       if (setRes.data && setRes.data.churchList) {
@@ -67,7 +67,7 @@ export default function Users() {
   const confirmDelete = async () => {
     if (!confirmModal.id) return;
     try {
-      await axios.delete(`/api/auth/users/${confirmModal.id}`);
+      await api.delete(`/api/auth/users/${confirmModal.id}`);
       fetchData();
     } catch (err) {
       console.error(err);
@@ -105,10 +105,10 @@ export default function Users() {
 
     try {
       if (editingId) {
-        await axios.put(`/api/auth/users/${editingId}`, payload);
+        await api.put(`/api/auth/users/${editingId}`, payload);
       } else {
         if (!payload.pin) throw new Error("PIN is required for new users.");
-        await axios.post(`/api/auth/register`, payload);
+        await api.post(`/api/auth/register`, payload);
       }
       closeModal();
       fetchData();
