@@ -1,14 +1,13 @@
 const express = require('express');
 const router = express.Router();
 const ActivityLog = require('../models/ActivityLog');
+const { attachPermissions, requirePermission } = require('../middleware/permissions');
+
+router.use(attachPermissions);
 
 // GET /api/activity-logs
-router.get('/', async (req, res) => {
+router.get('/', requirePermission('activitylogs', 'view'), async (req, res) => {
   try {
-    // Only Admin and Treasurer can view logs
-    if (req.user.role !== 'admin' && req.user.role !== 'treasurer') {
-      return res.status(403).json({ message: 'Access denied.' });
-    }
 
     const { action, role, date } = req.query;
     let query = {};

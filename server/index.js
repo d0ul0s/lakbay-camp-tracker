@@ -11,11 +11,22 @@ const PORT = process.env.PORT || 5000;
 
 const allowedOrigins = [
   'http://localhost:5173',
-  'https://lakbay-camp-tracker.vercel.app'
+  'https://lakbay-camp-tracker.vercel.app',
+  'https://lakbay-camp-tracker.onrender.com'
 ];
 
 app.use(cors({
-  origin: allowedOrigins,
+  origin: (origin, callback) => {
+    // Allow if no origin (like mobile apps or curl) or if in allowed list
+    if (!origin || allowedOrigins.includes(origin)) {
+      return callback(null, true);
+    }
+    // Allow any local network IP (e.g., http://192.168.x.x:5173)
+    if (origin.startsWith('http://192.168.') || origin.startsWith('http://10.') || origin.startsWith('http://172.')) {
+      return callback(null, true);
+    }
+    callback(new Error('Not allowed by CORS'));
+  },
   credentials: true
 }));
 app.use(express.json({ limit: '10mb' }));

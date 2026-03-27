@@ -44,6 +44,7 @@ export interface Expense {
   method: string;
   verifiedByTreasurer: boolean;
   verifiedAt: string | null;
+  createdBy?: string;
 }
 
 export interface Solicitation {
@@ -56,6 +57,7 @@ export interface Solicitation {
   notes: string;
   verifiedByTreasurer: boolean;
   verifiedAt: string | null;
+  createdBy?: string;
 }
 
 export interface AppSettings {
@@ -71,6 +73,26 @@ export interface AppSettings {
   paymentMethods: string[];
   solicitationTypes: string[];
   shirtSizePhoto: string | null;
+  permissionMatrix?: PermissionMatrix;
 }
 
 export type UserRole = 'admin' | 'coordinator' | 'treasurer';
+
+export interface PermissionMatrixRole {
+  dashboard: { view: boolean };
+  registrants: { view: boolean; viewAll: boolean; add: boolean; editOwn: boolean; editAny: boolean; deleteOwn: boolean; deleteAny: boolean };
+  merch: { view: boolean; toggleOwn: boolean; toggleAll: boolean };
+  expenses: { view: boolean; viewAll: boolean; add: boolean; editOwn: boolean; editAny: boolean; deleteOwn: boolean; deleteAny: boolean };
+  solicitations: { view: boolean; add: boolean; edit: boolean; delete: boolean; verify: boolean };
+  reports: { view: boolean; exportCsv: boolean };
+  activitylogs: { view: boolean };
+}
+
+export type PermissionMatrix = Record<string, PermissionMatrixRole>;
+
+export interface AppUser {
+  _id: string;
+  pin: string;
+  role: UserRole;
+  church: string;
+}

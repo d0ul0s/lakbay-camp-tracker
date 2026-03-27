@@ -8,7 +8,8 @@ const SolicitationSchema = new mongoose.Schema({
   paymentMethod: { type: String },
   notes: { type: String },
   verifiedByTreasurer: { type: Boolean, default: false },
-  verifiedAt: { type: Date }
+  verifiedAt: { type: Date },
+  createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null }
 }, { timestamps: true });
 
 module.exports = mongoose.model('Solicitation', SolicitationSchema);

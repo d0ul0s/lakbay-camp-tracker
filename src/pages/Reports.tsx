@@ -12,9 +12,11 @@ export default function Reports() {
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [solicitations, setSolicitations] = useState<Solicitation[]>([]);
   
-  const isAdmin = currentUser?.role === 'admin';
-  const isTreasurer = currentUser?.role === 'treasurer';
-  const canViewFinancials = isAdmin || isTreasurer;
+  const isAdmin = currentUser?.role?.toLowerCase().trim() === 'admin';
+  const isTreasurer = currentUser?.role?.toLowerCase().trim() === 'treasurer';
+  const rolePerms = currentUser?.permissionMatrix?.[currentUser.role!];
+  const canViewExpenses = isAdmin || isTreasurer || (rolePerms?.expenses?.view === true);
+  const canViewSolicitations = isAdmin || isTreasurer || (rolePerms?.solicitations?.view === true);
   useEffect(() => {
     const fetchData = async () => {
       try {
@@ -66,7 +68,7 @@ export default function Reports() {
   };
 
   const exportExpenses = () => {
-    if (!canViewFinancials) return;
+    if (!canViewExpenses) return;
     const data = expenses.map(e => ({
       'Date': format(new Date(e.date), 'MMM d, yyyy'),
       'Description': e.description,
@@ -80,7 +82,7 @@ export default function Reports() {
   };
 
   const exportSolicitations = () => {
-    if (!canViewFinancials) return;
+    if (!canViewSolicitations) return;
     const data = solicitations.map(s => ({
       'Source Name': s.sourceName,
       'Type': s.type,
@@ -98,71 +100,71 @@ export default function Reports() {
   };
 
   return (
-    <div className="space-y-6">
-      <h2 className="text-3xl font-display text-brand-brown tracking-wide mb-6">Reports & Export</h2>
+    <div className="space-y-4 md:space-y-6">
+      <h2 className="text-2xl md:text-3xl font-display text-brand-brown tracking-wide mb-1 md:mb-6">Reports & Export</h2>
       
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {/* Registrants Export */}
-        <div className="bg-white p-6 rounded-2xl shadow-sm border border-brand-beige flex flex-col items-center text-center">
-          <div className="p-4 bg-brand-cream text-brand-brown rounded-full mb-4">
-            <Users size={32} />
+        <div className="bg-white p-4 md:p-6 rounded-xl shadow-sm border border-brand-beige flex flex-col items-center text-center">
+          <div className="p-3 md:p-4 bg-brand-cream text-brand-brown rounded-full mb-3 md:mb-4">
+            <Users size={24} className="md:w-8 md:h-8" />
           </div>
-          <h3 className="text-xl font-bold text-gray-800 mb-2">Registrant Database</h3>
-          <p className="text-gray-500 text-sm mb-6 flex-1">Export a complete spreadsheet of all registrants, payment statuses, and merch claims.</p>
+          <h3 className="text-lg font-bold text-gray-800 mb-1">Registrants</h3>
+          <p className="text-gray-400 text-[11px] md:text-sm mb-4 md:mb-6 flex-1">Complete spreadsheet of all registrants, payments, and claims.</p>
           <button 
             onClick={exportRegistrants}
-            className="w-full flex items-center justify-center gap-2 bg-brand-brown text-white py-3 rounded-xl font-bold hover:bg-brand-light-brown transition-colors"
+            className="w-full flex items-center justify-center gap-2 bg-brand-brown text-white py-2.5 rounded-xl font-bold hover:bg-brand-light-brown transition-colors text-sm"
           >
-            <Download size={18} /> Export to CSV
+            <Download size={16} /> Export CSV
           </button>
         </div>
         
         {/* Expenses Export */}
-        {canViewFinancials && (
-          <div className="bg-white p-6 rounded-2xl shadow-sm border border-brand-beige flex flex-col items-center text-center">
-            <div className="p-4 bg-gray-50 text-gray-600 rounded-full mb-4">
-              <Receipt size={32} />
+        {canViewExpenses && (
+          <div className="bg-white p-4 md:p-6 rounded-xl shadow-sm border border-brand-beige flex flex-col items-center text-center">
+            <div className="p-3 md:p-4 bg-gray-50 text-gray-600 rounded-full mb-3 md:mb-4">
+              <Receipt size={24} className="md:w-8 md:h-8" />
             </div>
-            <h3 className="text-xl font-bold text-gray-800 mb-2">Financial Log</h3>
-            <p className="text-gray-500 text-sm mb-6 flex-1">Export all camp-wide expenses, categories, and payment details for accounting.</p>
+            <h3 className="text-lg font-bold text-gray-800 mb-1">Financials</h3>
+            <p className="text-gray-400 text-[11px] md:text-sm mb-4 md:mb-6 flex-1">Camp-wide expenses and payment details for accounting.</p>
             <button 
               onClick={exportExpenses}
-              className="w-full flex items-center justify-center gap-2 bg-gray-800 text-white py-3 rounded-xl font-bold hover:bg-gray-700 transition-colors"
+              className="w-full flex items-center justify-center gap-2 bg-gray-800 text-white py-2.5 rounded-xl font-bold hover:bg-gray-700 transition-colors text-sm"
             >
-              <Download size={18} /> Export to CSV
+              <Download size={16} /> Export CSV
             </button>
           </div>
         )}
 
         {/* Solicitations Export */}
-        {canViewFinancials && (
-          <div className="bg-white p-6 rounded-2xl shadow-sm border border-brand-beige flex flex-col items-center text-center">
-            <div className="p-4 bg-green-50 text-green-700 rounded-full mb-4">
-              <HeartHandshake size={32} />
+        {canViewSolicitations && (
+          <div className="bg-white p-4 md:p-6 rounded-xl shadow-sm border border-brand-beige flex flex-col items-center text-center">
+            <div className="p-3 md:p-4 bg-green-50 text-green-700 rounded-full mb-3 md:mb-4">
+              <HeartHandshake size={24} className="md:w-8 md:h-8" />
             </div>
-            <h3 className="text-xl font-bold text-gray-800 mb-2">Solicitations Log</h3>
-            <p className="text-gray-500 text-sm mb-6 flex-1">Export all donor contributions and solicitation records including verification status.</p>
+            <h3 className="text-lg font-bold text-gray-800 mb-1">Solicitations</h3>
+            <p className="text-gray-400 text-[11px] md:text-sm mb-4 md:mb-6 flex-1">Donor contributions and verification records.</p>
             <button 
               onClick={exportSolicitations}
-              className="w-full flex items-center justify-center gap-2 bg-green-700 text-white py-3 rounded-xl font-bold hover:bg-green-800 transition-colors"
+              className="w-full flex items-center justify-center gap-2 bg-green-700 text-white py-2.5 rounded-xl font-bold hover:bg-green-800 transition-colors text-sm"
             >
-              <Download size={18} /> Export to CSV
+              <Download size={16} /> Export CSV
             </button>
           </div>
         )}
         
         {/* Printable Merch Sheet */}
-        <div className="bg-white p-6 rounded-2xl shadow-sm border border-brand-beige flex flex-col items-center text-center">
-          <div className="p-4 bg-brand-sand/20 text-brand-brown rounded-full mb-4">
-            <FileBox size={32} />
+        <div className="bg-white p-4 md:p-6 rounded-xl shadow-sm border border-brand-beige flex flex-col items-center text-center">
+          <div className="p-3 md:p-4 bg-brand-sand/20 text-brand-brown rounded-full mb-3 md:mb-4">
+            <FileBox size={24} className="md:w-8 md:h-8" />
           </div>
-          <h3 className="text-xl font-bold text-gray-800 mb-2">Printable Claim Sheet</h3>
-          <p className="text-gray-500 text-sm mb-6 flex-1">Generate a printable view of registrants and their merch claims for physical check-in.</p>
+          <h3 className="text-lg font-bold text-gray-800 mb-1">Print Claim Sheet</h3>
+          <p className="text-gray-400 text-[11px] md:text-sm mb-4 md:mb-6 flex-1">Generate a printable view for physical check-in desks.</p>
           <button 
             onClick={printMerchSheet}
-            className="w-full flex items-center justify-center gap-2 bg-brand-sand text-brand-brown py-3 rounded-xl font-bold shadow-sm hover:opacity-90 transition-opacity print:hidden"
+            className="w-full flex items-center justify-center gap-2 bg-brand-sand text-brand-brown py-2.5 rounded-xl font-bold shadow-sm hover:opacity-90 transition-opacity print:hidden text-sm"
           >
-            <FileBox size={18} /> Print View
+            <FileBox size={16} /> Print View
           </button>
         </div>
       </div>

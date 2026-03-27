@@ -1,7 +1,7 @@
 import { useState, useMemo, useEffect } from 'react';
 import api from '../api/axios';
 import { useAppStore } from '../store';
-import { Search, Filter, Check, Shirt, Briefcase, Book, PenTool } from 'lucide-react';
+import { Search, Filter, Check, Shirt, Briefcase, Book, PenTool, ShieldAlert, ShoppingBag } from 'lucide-react';
 import type { Registrant, AppSettings } from '../types';
 
 export default function MerchClaims() {
@@ -9,7 +9,20 @@ export default function MerchClaims() {
   const [registrants, setRegistrants] = useState<Registrant[]>([]);
   const [settings, setSettings] = useState<AppSettings>({ churches: [], merchCosts: {} } as any);
   
-  const isAdmin = currentUser?.role === 'admin';
+  const isAdmin = currentUser?.role?.toLowerCase().trim() === 'admin';
+  const merchPerms = currentUser?.permissionMatrix?.[currentUser.role]?.merch;
+  
+  if (!isAdmin && !merchPerms?.view) {
+    return (
+      <div className="flex flex-col items-center justify-center h-full min-h-[50vh] text-center px-4">
+        <div className="bg-white p-8 rounded-2xl shadow-sm border border-brand-beige max-w-md w-full">
+          <ShieldAlert size={48} className="mx-auto text-red-400 mb-4" />
+          <h2 className="text-2xl font-display text-brand-brown mb-2">Restricted Access</h2>
+          <p className="text-gray-500">You do not have permission to access Merch Claims.</p>
+        </div>
+      </div>
+    );
+  }
   
   const fetchData = async () => {
     try {
@@ -61,19 +74,51 @@ export default function MerchClaims() {
     });
   }, [baseRegistrants, searchTerm, filterChurch, filterStatus]);
 
-  const toggleClaim = async (regId: string, item: keyof Registrant['merchClaims']) => {
-    const reg = registrants.find(r => r.id === regId);
+  const toggleClaim = async (regId: string, item: keyof typeof registrants[0]['merchClaims']) => {
+    const reg = registrants.find(r => (r.id === regId || (r as any)._id === regId));
     if (!reg) return;
+
+    const canToggleAll = isAdmin || merchPerms?.toggleAll;
+    const canToggleOwn = merchPerms?.toggleOwn && reg.church === currentUser?.church;
+
+    if (!canToggleAll && !canToggleOwn) return;
     
     const isClaimed = reg.merchClaims[item];
+    const newValue = !isClaimed;
+
+    // 1. Optimistic UI Update
+    setRegistrants(prev => prev.map(r => {
+      if ((r.id === regId || (r as any)._id === regId)) {
+        return {
+          ...r,
+          merchClaims: { ...r.merchClaims, [item]: newValue },
+          merchClaimDates: { ...r.merchClaimDates, [item]: newValue ? new Date().toISOString() : null }
+        };
+      }
+      return r;
+    }));
+
     try {
-      await api.put(`/api/registrants/${regId}`, {
-        merchClaims: { ...reg.merchClaims, [item]: !isClaimed },
-        merchClaimDates: { ...reg.merchClaimDates, [item]: !isClaimed ? new Date().toISOString() : null }
+      // 2. Atomic Patch Update
+      await api.patch(`/api/registrants/${regId}/merch`, {
+        item: item,
+        value: newValue
       });
-      fetchData();
+      // No need to fetchData(); optimistic state is already correct
     } catch (err) {
-      console.error(err);
+      console.error('Failed to toggle merch claim:', err);
+      // 3. Revert on failure
+      setRegistrants(prev => prev.map(r => {
+        if ((r.id === regId || (r as any)._id === regId)) {
+          return {
+            ...r,
+            merchClaims: { ...r.merchClaims, [item]: isClaimed },
+            merchClaimDates: { ...r.merchClaimDates, [item]: reg.merchClaimDates[item] }
+          };
+        }
+        return r;
+      }));
+      // Alert the user? Optional
     }
   };
 
@@ -96,26 +141,30 @@ export default function MerchClaims() {
   }, [baseRegistrants]);
 
   return (
-    <div className="space-y-6">
-      <h2 className="text-3xl font-display text-brand-brown tracking-wide">Merch Claims Tracker</h2>
+    <div className="space-y-4 md:space-y-6">
+      <h2 className="text-2xl md:text-3xl font-display text-brand-brown tracking-wide">Merch Claims</h2>
       
       {/* Stats Summary */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-4 md:grid-cols-4 gap-2 md:gap-4 overflow-x-auto pb-1 md:pb-0">
         {[
-          { label: 'T-Shirts', icon: Shirt, stats: stats.tshirts, color: 'text-blue-500', bg: 'bg-blue-50' },
-          { label: 'Drawstring Bags', icon: Briefcase, stats: stats.bags, color: 'text-orange-500', bg: 'bg-orange-50' },
-          { label: 'Notebooks', icon: Book, stats: stats.notebooks, color: 'text-green-500', bg: 'bg-green-50' },
+          { label: 'Shirts', icon: Shirt, stats: stats.tshirts, color: 'text-blue-500', bg: 'bg-blue-50' },
+          { label: 'Bags', icon: Briefcase, stats: stats.bags, color: 'text-orange-500', bg: 'bg-orange-50' },
+          { label: 'Notes', icon: Book, stats: stats.notebooks, color: 'text-green-500', bg: 'bg-green-50' },
           { label: 'Pens', icon: PenTool, stats: stats.pens, color: 'text-purple-500', bg: 'bg-purple-50' },
         ].map(item => (
-          <div key={item.label} className="bg-white p-5 rounded-xl shadow-sm border border-brand-beige hover:shadow-md transition-shadow">
-            <div className={`p-2 w-10 h-10 ${item.bg} ${item.color} rounded-xl flex items-center justify-center mb-3`}>
-              <item.icon size={20} />
+          <div key={item.label} className="bg-white p-2 md:p-5 rounded-xl shadow-sm border border-brand-beige hover:shadow-md transition-shadow min-w-[70px] md:min-w-0">
+            <div className="flex items-center gap-1.5 md:gap-2 mb-1 md:mb-2">
+              <div className={`p-1 md:p-1.5 ${item.bg} ${item.color} rounded-lg`}>
+                <item.icon size={12} className="md:w-3.5 md:h-3.5" />
+              </div>
+              <p className="font-bold text-gray-400 uppercase tracking-tighter text-[8px] md:text-[10px] truncate">{item.label}</p>
             </div>
-            <p className="font-bold text-gray-700">{item.label}</p>
-            <p className="text-2xl font-bold mt-1 text-gray-900">{item.stats.claimed} <span className="text-sm font-normal text-gray-400">/ {item.stats.total}</span></p>
-            <div className="w-full bg-gray-100 h-1.5 rounded-full mt-3">
+            <p className="text-sm md:text-xl font-black text-gray-900 leading-none">
+              {item.stats.claimed} <span className="text-[8px] md:text-[10px] font-normal text-gray-400 lowercase">/ {item.stats.total}</span>
+            </p>
+            <div className="w-full bg-gray-100 h-0.5 md:h-1 rounded-full mt-1.5 md:mt-2">
               <div 
-                className="bg-brand-brown h-1.5 rounded-full transition-all duration-500" 
+                className="bg-brand-brown h-0.5 md:h-1 rounded-full transition-all duration-500" 
                 style={{ width: item.stats.total ? `${(item.stats.claimed / item.stats.total) * 100}%` : '0%' }}
               ></div>
             </div>
@@ -163,8 +212,58 @@ export default function MerchClaims() {
           </div>
         </div>
 
-        {/* Table */}
-        <div className="overflow-x-auto">
+        {/* Mobile Card View */}
+        <div className="md:hidden space-y-2 px-1">
+          {filteredRegistrants.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage).length > 0 ? filteredRegistrants.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage).map((reg) => (
+            <div key={reg.id || (reg as any)._id} className="mobile-card flex flex-col gap-2">
+              <div className="flex justify-between items-start border-b border-gray-50 pb-1.5 -mx-1 px-1">
+                <div className="flex-1 min-w-0">
+                  <p className="font-black text-brand-brown text-base leading-tight truncate">{reg.fullName}</p>
+                  <p className="text-[9px] text-gray-400 font-bold uppercase tracking-wider mt-0.5 truncate">{reg.church} • Size {reg.shirtSize}</p>
+                </div>
+              </div>
+ 
+              <div className="grid grid-cols-4 gap-2">
+                {[
+                  { id: 'tshirt', label: 'Shirt', icon: Shirt },
+                  { id: 'bag', label: 'Bag', icon: Briefcase },
+                  { id: 'notebook', label: 'Note', icon: Book },
+                  { id: 'pen', label: 'Pen', icon: PenTool },
+                ].map((item) => {
+                  const isClaimed = reg.merchClaims[item.id as keyof Registrant['merchClaims']];
+                  const canToggleAll = isAdmin || merchPerms?.toggleAll;
+                  const canToggleOwn = merchPerms?.toggleOwn && reg.church === currentUser?.church;
+                  const isDisabled = !canToggleAll && !canToggleOwn;
+ 
+                  return (
+                    <button
+                      key={item.id}
+                      disabled={isDisabled}
+                      onClick={() => toggleClaim(reg.id || (reg as any)._id, item.id as keyof typeof reg.merchClaims)}
+                      className={`flex flex-col items-center justify-center p-2 rounded-xl border transition-all active:scale-95 relative ${
+                        isClaimed
+                          ? 'bg-green-50 border-green-500 text-green-700 shadow-sm'
+                          : 'bg-gray-50 border-gray-100 text-gray-300'
+                      } ${isDisabled ? 'opacity-40 grayscale cursor-not-allowed' : ''}`}
+                    >
+                      <item.icon size={18} className={isClaimed ? 'text-green-600' : 'text-gray-300'} />
+                      <span className="text-[8px] font-black uppercase mt-1 tracking-tighter">{item.label}</span>
+                      {isClaimed && <div className="absolute top-1 right-1 text-green-600"><Check size={8} strokeWidth={4} /></div>}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )) : (
+            <div className="mobile-card py-12 text-center text-gray-400">
+              <ShoppingBag size={48} className="mx-auto opacity-10 mb-2" />
+              <p className="text-sm">No registrants found.</p>
+            </div>
+          )}
+        </div>
+
+        {/* Desktop Table */}
+        <div className="hidden md:block overflow-x-auto">
           <table className="w-full text-left text-sm text-gray-600">
             <thead className="text-xs text-gray-400 uppercase bg-gray-50/80 border-b border-gray-100">
               <tr>
@@ -188,13 +287,17 @@ export default function MerchClaims() {
                     return (
                       <td key={item} className="px-6 py-4 text-center">
                         <button
-                          disabled={currentUser?.role === 'coordinator'}
-                          onClick={() => toggleClaim(reg.id, item as keyof typeof reg.merchClaims)}
+                          disabled={(() => {
+                            const canToggleAll = isAdmin || merchPerms?.toggleAll;
+                            const canToggleOwn = merchPerms?.toggleOwn && reg.church === currentUser?.church;
+                            return !canToggleAll && !canToggleOwn;
+                          })()}
+                          onClick={() => toggleClaim(reg.id || (reg as any)._id, item as keyof typeof reg.merchClaims)}
                           className={`w-12 h-12 rounded-xl flex items-center justify-center mx-auto transition-all transform active:scale-95 ${
                             isClaimed 
                               ? 'bg-green-100 text-green-600 ring-2 ring-green-500 ring-offset-2' 
                               : 'bg-gray-100 text-gray-300 hover:bg-gray-200 hover:text-gray-500'
-                          } ${currentUser?.role === 'coordinator' ? 'opacity-80 cursor-not-allowed' : ''}`}
+                          } ${((!isAdmin && !merchPerms?.toggleAll) && (!merchPerms?.toggleOwn || reg.church !== currentUser?.church)) ? 'opacity-50 cursor-not-allowed' : ''}`}
                         >
                           {isClaimed && <Check size={24} className="stroke-[3]" />}
                         </button>

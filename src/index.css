@@ -16,5 +16,26 @@
     background-color: var(--color-brand-cream);
     color: var(--color-brand-brown);
     font-family: var(--font-sans);
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  /* Improve touch targets for mobile */
+  button, a, select, input {
+    min-height: 44px;
+    touch-action: manipulation;
+  }
+}
+
+@layer components {
+  .mobile-card {
+    @apply bg-white p-2.5 rounded-xl shadow-sm border border-brand-beige active:scale-[0.98] transition-transform;
+  }
+
+  .bottom-nav-item {
+    @apply flex flex-col items-center justify-center flex-1 py-1 text-[10px] font-bold uppercase tracking-tighter transition-all;
+  }
+
+  .safe-area-bottom {
+    padding-bottom: env(safe-area-inset-bottom);
   }
 }

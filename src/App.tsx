@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { createBrowserRouter, RouterProvider, Navigate } from 'react-router-dom';
 import Layout from './components/Layout';
 import { ProtectedRoute, AdminRoute } from './components/ProtectedRoute';
 
@@ -15,32 +15,46 @@ import ActivityLogs from './pages/ActivityLogs';
 import AxiosInterceptor from './components/AxiosInterceptor';
 import ColdStartLoader from './components/ColdStartLoader';
 
+const router = createBrowserRouter([
+  {
+    path: "/login",
+    element: <Login />,
+  },
+  {
+    element: <ProtectedRoute />,
+    children: [
+      {
+        element: <Layout />,
+        children: [
+          { path: "/", element: <Dashboard /> },
+          { path: "/registrants", element: <Registrants /> },
+          { path: "/merch", element: <MerchClaims /> },
+          { path: "/expenses", element: <Expenses /> },
+          { path: "/solicitations", element: <Solicitations /> },
+          { path: "/activity-logs", element: <ActivityLogs /> },
+          { path: "/reports", element: <Reports /> },
+          {
+            element: <AdminRoute />,
+            children: [
+              { path: "/settings", element: <Settings /> },
+              { path: "/users", element: <Users /> },
+            ]
+          },
+        ]
+      }
+    ]
+  },
+  {
+    path: "*",
+    element: <Navigate to="/" replace />,
+  }
+]);
+
 export default function App() {
   return (
     <AxiosInterceptor>
       <ColdStartLoader />
-      <BrowserRouter>
-        <Routes>
-          <Route path="/login" element={<Login />} />
-          
-          <Route element={<ProtectedRoute />}>
-            <Route element={<Layout />}>
-              <Route path="/" element={<Dashboard />} />
-              <Route path="/registrants" element={<Registrants />} />
-              <Route path="/merch" element={<MerchClaims />} />
-              <Route path="/expenses" element={<Expenses />} />
-              <Route path="/solicitations" element={<Solicitations />} />
-              <Route path="/activity-logs" element={<ActivityLogs />} />
-              <Route path="/reports" element={<Reports />} />
-              
-              <Route element={<AdminRoute />}>
-                <Route path="/settings" element={<Settings />} />
-                <Route path="/users" element={<Users />} />
-              </Route>
-            </Route>
-          </Route>
-        </Routes>
-      </BrowserRouter>
+      <RouterProvider router={router} />
     </AxiosInterceptor>
   );
 }

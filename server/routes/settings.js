@@ -4,11 +4,35 @@ const Settings = require('../models/Settings');
 
 router.get('/', async (req, res) => {
   try {
-    let settings = await Settings.findOne();
+    let settings = await Settings.findOne({}, null, { strict: false }).lean();
     if (!settings) {
-      settings = new Settings({ churchList: [], merchCosts: {} });
-      await settings.save();
+      const doc = await Settings.create({ churchList: [], merchCosts: {} });
+      settings = doc.toObject();
     }
+
+    // Use pure JS object defaults to avoid Mongoose internal proxies breaking Object.keys()
+    const { DEFAULT_MATRIX } = require('../models/Settings');
+    const mergePermissions = (defaults, saved) => {
+      const result = JSON.parse(JSON.stringify(defaults));
+      if (!saved || typeof saved !== 'object') return result;
+      
+      Object.keys(defaults).forEach(role => {
+        if (!saved[role] || typeof saved[role] !== 'object') {
+          result[role] = defaults[role];
+        } else {
+          Object.keys(defaults[role]).forEach(page => {
+            if (!saved[role][page] || typeof saved[role][page] !== 'object') {
+              result[role][page] = defaults[role][page];
+            } else {
+              result[role][page] = { ...defaults[role][page], ...saved[role][page] };
+            }
+          });
+        }
+      });
+      return result;
+    };
+
+    settings.permissionMatrix = mergePermissions(DEFAULT_MATRIX, settings.permissionMatrix);
     res.json(settings);
   } catch (err) {
     res.status(500).json({ message: err.message });
@@ -17,21 +41,28 @@ router.get('/', async (req, res) => {
 
 router.put('/', async (req, res) => {
   try {
-    let settings = await Settings.findOne();
-    if (!settings) {
-      settings = new Settings(req.body);
-      await settings.save();
-      return res.json(settings);
-    }
-    settings.churchList = req.body.churchList !== undefined ? req.body.churchList : settings.churchList;
-    settings.merchCosts = req.body.merchCosts !== undefined ? req.body.merchCosts : settings.merchCosts;
-    settings.ministries = req.body.ministries !== undefined ? req.body.ministries : settings.ministries;
-    settings.expenseCategories = req.body.expenseCategories !== undefined ? req.body.expenseCategories : settings.expenseCategories;
-    settings.paymentMethods = req.body.paymentMethods !== undefined ? req.body.paymentMethods : settings.paymentMethods;
-    settings.shirtSizePhoto = req.body.shirtSizePhoto !== undefined ? req.body.shirtSizePhoto : settings.shirtSizePhoto;
-    const updatedSettings = await settings.save();
-    res.json(updatedSettings);
+    const update = {};
+    const fields = [
+      'churchList', 'merchCosts', 'ministries', 
+      'expenseCategories', 'paymentMethods', 
+      'solicitationTypes', 'shirtSizePhoto', 'permissionMatrix'
+    ];
+    
+    fields.forEach(field => {
+      if (req.body[field] !== undefined) {
+        update[field] = req.body[field];
+      }
+    });
+
+    const settings = await Settings.findOneAndUpdate(
+      {}, 
+      { $set: update },
+      { new: true, upsert: true, runValidators: true, strict: false }
+    );
+    
+    res.json(settings);
   } catch (err) {
+    console.error('Settings update error:', err);
     res.status(400).json({ message: err.message });
   }
 });

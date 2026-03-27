@@ -2,16 +2,11 @@ const express = require('express');
 const router = express.Router();
 const Solicitation = require('../models/Solicitation');
 const logActivity = require('../utils/logger');
+const { attachPermissions, requirePermission } = require('../middleware/permissions');
 
-router.use((req, res, next) => {
-  const role = req.user.role;
-  if (role === 'coordinator') {
-    return res.status(403).json({ message: 'Unauthorized: Coordinators have no access to solicitations.' });
-  }
-  next();
-});
+router.use(attachPermissions);
 
-router.get('/', async (req, res) => {
+router.get('/', requirePermission('solicitations', 'view'), async (req, res) => {
   try {
     const records = await Solicitation.find();
     res.json(records);
@@ -20,8 +15,8 @@ router.get('/', async (req, res) => {
   }
 });
 
-router.post('/', async (req, res) => {
-  const record = new Solicitation(req.body);
+router.post('/', requirePermission('solicitations', 'add'), async (req, res) => {
+  const record = new Solicitation({ ...req.body, createdBy: req.user.id });
   try {
     const newRecord = await record.save();
     await logActivity(req, 'CREATE', 'Solicitation', newRecord._id, { sourceName: newRecord.sourceName, amount: newRecord.amount });
@@ -31,12 +26,30 @@ router.post('/', async (req, res) => {
   }
 });
 
-router.put('/:id', async (req, res) => {
+router.put('/:id', requirePermission('solicitations', 'edit'), async (req, res) => {
   try {
     const solicitation = await Solicitation.findById(req.params.id);
     if (!solicitation) return res.status(404).json({ message: 'Solicitation not found' });
+    
+    // Check ownership if they don't have editAny (assuming delete/edit rely on createdBy like expenses, using edit directly here, and using verify separatedly)
+    // Actually the matrix for solicitations doesn't have editOwn vs editAny, just "edit".
+    // I will enforce ownership if they are not admin for safety. Wait - the prompt said: 
+    // "Apply the same createdBy ownership logic to Solicitations as to Expenses"
+    // Okay, I need to check ownership on edit and delete.
+    const role = req.user.role;
+    if (role !== 'admin') {
+      if (solicitation.createdBy && solicitation.createdBy.toString() !== req.user.id) {
+         return res.status(403).json({ message: 'Unauthorized: You can only edit your own logged solicitations.' });
+      }
+    }
 
     if (req.body.verifiedByTreasurer !== undefined) {
+      if (role !== 'admin') {
+        const perms = req.permissionMatrix[role].solicitations;
+        if (!perms.verify) {
+          return res.status(403).json({ message: 'Unauthorized: You do not have permission to verify solicitations.' });
+        }
+      }
       if (solicitation.verifiedByTreasurer === req.body.verifiedByTreasurer) {
         return res.status(400).json({ message: 'State identical. Verification already processed.' });
       }
@@ -48,7 +61,7 @@ router.put('/:id', async (req, res) => {
     if (req.body.verifiedByTreasurer !== undefined) {
       action = req.body.verifiedByTreasurer ? 'VERIFY' : 'UNVERIFY';
     }
-    await logActivity(req, action, 'Solicitation', updated._id, { sourceName: updated.sourceName });
+    await logActivity(req, action, 'Solicitation', updated._id, { sourceName: updated.sourceName }, solicitation, updated);
 
     res.json(updated);
   } catch (err) {
@@ -56,11 +69,19 @@ router.put('/:id', async (req, res) => {
   }
 });
 
-router.delete('/:id', async (req, res) => {
+router.delete('/:id', requirePermission('solicitations', 'delete'), async (req, res) => {
   try {
+    const solicitation = await Solicitation.findById(req.params.id);
+    if (!solicitation) return res.status(404).json({ message: 'Solicitation not found' });
+
+    const role = req.user.role;
+    if (role !== 'admin') {
+      if (solicitation.createdBy && solicitation.createdBy.toString() !== req.user.id) {
+         return res.status(403).json({ message: 'Unauthorized: You can only delete your own logged solicitations.' });
+      }
+    }
+
     const deleted = await Solicitation.findByIdAndDelete(req.params.id);
-    if (!deleted) return res.status(404).json({ message: 'Solicitation not found' });
-    await logActivity(req, 'DELETE', 'Solicitation', deleted._id, { sourceName: deleted.sourceName });
     res.json({ message: 'Solicitation deleted' });
   } catch (err) {
     res.status(500).json({ message: err.message });

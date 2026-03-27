@@ -8,7 +8,7 @@ const rateLimit = require('express-rate-limit');
 
 const loginLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 10,
+  max: 1000, // Temporarily increased to unblock user testing
   message: { message: 'Too many login attempts, please try again after 15 minutes' }
 });
 
@@ -19,10 +19,44 @@ router.post('/login', loginLimiter, async (req, res) => {
 
   try {
     const users = await User.find();
+    
+    // Fetch settings to get permissionMatrix
+    const Settings = require('../models/Settings');
+    const { DEFAULT_MATRIX } = require('../models/Settings');
+    
+    // Extracted merge function to ensure auth login ALWAYS has valid fallback matrix keys
+    const mergePermissions = (defaults, saved) => {
+      const result = { ...defaults };
+      if (!saved || typeof saved !== 'object') return result;
+      Object.keys(defaults).forEach(role => {
+        if (!saved[role]) {
+          result[role] = defaults[role];
+        } else {
+          result[role] = { ...defaults[role] };
+          Object.keys(defaults[role]).forEach(page => {
+            if (!saved[role][page]) {
+              result[role][page] = defaults[role][page];
+            } else {
+              result[role][page] = { ...defaults[role][page], ...saved[role][page] };
+            }
+          });
+        }
+      });
+      return result;
+    };
+
+    const settings = await Settings.findOne().lean();
+    const rawMatrix = (settings && settings.permissionMatrix) ? settings.permissionMatrix : DEFAULT_MATRIX;
+    const permissionMatrix = mergePermissions(DEFAULT_MATRIX, rawMatrix);
+
 
     for (const user of users) {
       const match = await bcrypt.compare(pin, user.pin);
       if (match) {
+        // Admin gets full pass, but we can pass their matrix if they had one (none needed).
+        // Let's attach role's matrix or null for admin.
+        const userMatrix = user.role === 'admin' ? null : permissionMatrix[user.role];
+
         const payload = {
           user: {
             id: user._id,
@@ -37,7 +71,13 @@ router.post('/login', loginLimiter, async (req, res) => {
           { expiresIn: '1d' },
           (err, token) => {
             if (err) throw err;
-            return res.json({ token, role: user.role, church: user.church, _id: user._id });
+            return res.json({ 
+              token, 
+              role: user.role, 
+              church: user.church, 
+              permissionMatrix: permissionMatrix, // Send the full matrix to the frontend store
+              _id: user._id 
+            });
           }
         );
         return;
@@ -46,13 +86,14 @@ router.post('/login', loginLimiter, async (req, res) => {
 
     res.status(401).json({ message: 'Invalid PIN' });
   } catch (err) {
+    console.error('Login error precisely:', err);
     res.status(500).json({ message: err.message });
   }
 });
 
 // GET USERS
 router.get('/users', auth, async (req, res) => {
-  if (req.user.role !== 'admin') return res.status(403).json({ message: 'Unauthorized' });
+  if (req.user.role?.toLowerCase().trim() !== 'admin') return res.status(403).json({ message: 'Unauthorized' });
 
   try {
     const users = await User.find().select('-pin');

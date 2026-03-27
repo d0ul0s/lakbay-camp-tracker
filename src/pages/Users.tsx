@@ -3,12 +3,13 @@ import api from '../api/axios';
 import { useAppStore } from '../store';
 import { PlusCircle, Edit2, Trash2, X, ShieldAlert } from 'lucide-react';
 import ConfirmModal from '../components/ConfirmModal';
+import PermissionMatrix from '../components/PermissionMatrix';
 import type { AppSettings } from '../types';
 
 interface AppUser {
   _id: string;
   pin: string;
-  role: 'admin' | 'coordinator';
+  role: 'admin' | 'coordinator' | 'treasurer';
   church: string;
 }
 
@@ -48,7 +49,7 @@ export default function Users() {
     fetchData();
   }, [setLoading]);
 
-  if (currentUser?.role !== 'admin') {
+  if (currentUser?.role?.toLowerCase().trim() !== 'admin') {
     return (
       <div className="flex flex-col items-center justify-center h-full min-h-[50vh] text-center px-4">
         <div className="bg-white p-8 rounded-2xl shadow-sm border border-brand-beige max-w-md w-full">
@@ -132,7 +133,49 @@ export default function Users() {
       </div>
 
       <div className="bg-white p-6 rounded-2xl shadow-sm border border-brand-beige overflow-hidden">
-        <div className="overflow-x-auto">
+        {/* Mobile Card View */}
+        <div className="md:hidden space-y-3 px-1">
+          {users.map((usr) => (
+            <div key={usr._id} className="mobile-card flex flex-col gap-3">
+              <div className="flex justify-between items-start">
+                <div className="flex-1 min-w-0">
+                  <p className="font-black text-brand-brown text-lg leading-tight truncate">
+                    {usr.role?.toLowerCase().trim() === 'admin' ? 'System Administrator' : usr.church}
+                  </p>
+                  <div className="flex items-center gap-2 mt-1">
+                    <span className={`px-2 py-0.5 rounded-lg text-[10px] font-black uppercase tracking-widest border ${
+                      usr.role?.toLowerCase().trim() === 'admin' ? 'bg-brand-brown text-white border-brand-brown' : 'bg-gray-100 text-gray-500 border-gray-200'
+                    }`}>
+                      {usr.role}
+                    </span>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button onClick={() => openModalForEdit(usr)} className="p-2.5 bg-gray-50 text-gray-400 hover:text-brand-brown rounded-xl border border-gray-100 active:bg-brand-sand/20 transition-all">
+                    <Edit2 size={18} />
+                  </button>
+                  <button 
+                    onClick={() => handleDelete(usr._id)} 
+                    disabled={usr.role?.toLowerCase().trim() === 'admin' && users.filter(u => u.role?.toLowerCase().trim() === 'admin').length === 1}
+                    className="p-2.5 bg-red-50 text-red-300 hover:text-red-500 rounded-xl border border-red-100 active:bg-red-100 transition-all disabled:opacity-30"
+                  >
+                    <Trash2 size={18} />
+                  </button>
+                </div>
+              </div>
+              
+              <div className="mt-1 pt-2 border-t border-gray-50 flex items-center justify-between">
+                <span className="text-[10px] text-gray-400 font-bold uppercase tracking-tighter">Access Context</span>
+                <span className="text-[10px] font-black text-gray-700 uppercase tracking-tighter">
+                  {usr.role?.toLowerCase().trim() === 'admin' ? 'Global Access' : `Church Restricted: ${usr.church}`}
+                </span>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* Desktop Table View */}
+        <div className="hidden md:block overflow-x-auto">
           <table className="w-full text-left text-sm text-gray-600">
             <thead className="text-xs text-gray-400 uppercase bg-gray-50/80 border-b border-gray-100">
               <tr>
@@ -146,13 +189,13 @@ export default function Users() {
                 <tr key={usr._id} className="hover:bg-brand-cream/30 transition-colors">
                   <td className="px-6 py-4">
                     <span className={`px-2.5 py-1 rounded-full text-xs font-bold uppercase ${
-                      usr.role === 'admin' ? 'bg-brand-brown text-white' : 'bg-gray-100 text-gray-700'
+                      usr.role?.toLowerCase().trim() === 'admin' ? 'bg-brand-brown text-white' : 'bg-gray-100 text-gray-700'
                     }`}>
                       {usr.role}
                     </span>
                   </td>
                   <td className="px-6 py-4 font-medium text-gray-800">
-                    {usr.role === 'admin' ? 'Global Access (Admin HQ)' : usr.church}
+                    {usr.role?.toLowerCase().trim() === 'admin' ? 'Global Access (Admin HQ)' : usr.church}
                   </td>
                   <td className="px-6 py-4 text-right">
                     <div className="flex items-center justify-end gap-2">
@@ -161,9 +204,9 @@ export default function Users() {
                       </button>
                       <button 
                         onClick={() => handleDelete(usr._id)} 
-                        disabled={usr.role === 'admin' && users.filter(u => u.role === 'admin').length === 1}
+                        disabled={usr.role?.toLowerCase().trim() === 'admin' && users.filter(u => u.role?.toLowerCase().trim() === 'admin').length === 1}
                         className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:text-gray-400"
-                        title={usr.role === 'admin' && users.filter(u => u.role === 'admin').length === 1 ? "Cannot delete the only admin" : "Delete user"}
+                        title={usr.role?.toLowerCase().trim() === 'admin' && users.filter(u => u.role?.toLowerCase().trim() === 'admin').length === 1 ? "Cannot delete the only admin" : "Delete user"}
                       >
                         <Trash2 size={16} />
                       </button>
@@ -174,6 +217,10 @@ export default function Users() {
             </tbody>
           </table>
         </div>
+      </div>
+
+      <div className="pt-10 border-t border-brand-beige">
+        <PermissionMatrix />
       </div>
 
       {isModalOpen && (
@@ -217,7 +264,7 @@ export default function Users() {
 
               <div>
                 <label className="block text-sm text-gray-600 mb-1">Role</label>
-                {editingId && formData.role === 'admin' ? (
+                {editingId && formData.role?.toLowerCase().trim() === 'admin' ? (
                   <input 
                     type="text" 
                     disabled 
@@ -236,6 +283,8 @@ export default function Users() {
                 )}
                 <p className="text-xs text-brand-light-brown mt-1">Warning: System allows only ONE active treasurer at a time.</p>
               </div>
+
+
 
               <div className="mt-8 pt-6 border-t border-brand-beige flex justify-end gap-3 sticky bottom-0 bg-white pb-2 z-10">
                 <button 

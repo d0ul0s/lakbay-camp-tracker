@@ -8,7 +8,8 @@ const expenseSchema = new mongoose.Schema({
   paidBy: { type: String },
   method: { type: String },
   verifiedByTreasurer: { type: Boolean, default: false },
-  verifiedAt: { type: Date, default: null }
+  verifiedAt: { type: Date, default: null },
+  createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null }
 });
 
 expenseSchema.set('toJSON', {

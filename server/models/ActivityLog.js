@@ -16,7 +16,7 @@ const ActivityLogSchema = new mongoose.Schema({
   action: {
     type: String,
     required: true,
-    enum: ['CREATE', 'UPDATE', 'DELETE', 'VERIFY', 'UNVERIFY', 'LOGIN', 'BACKUP_EXPORT', 'BACKUP_IMPORT']
+    enum: ['CREATE', 'UPDATE', 'DELETE', 'VERIFY', 'UNVERIFY', 'LOGIN', 'BACKUP_EXPORT', 'BACKUP_IMPORT', 'CLAIM_MERCH', 'UNCLAIM_MERCH', 'MERCH_UPDATE']
   },
   entityType: {
     type: String,
