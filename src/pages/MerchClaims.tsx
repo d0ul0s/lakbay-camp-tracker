@@ -34,6 +34,14 @@ export default function MerchClaims() {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterChurch, setFilterChurch] = useState('All');
   const [filterStatus, setFilterStatus] = useState('All'); // All, Fully Claimed, Partial, Unclaimed
+
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 10;
+
+  // Reset pagination on filter change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, filterChurch, filterStatus]);
   
   // All roles now see global registrants
   const baseRegistrants = registrants;
@@ -168,7 +176,7 @@ export default function MerchClaims() {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
-              {filteredRegistrants.length > 0 ? filteredRegistrants.map((reg) => (
+              {filteredRegistrants.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage).length > 0 ? filteredRegistrants.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage).map((reg) => (
                 <tr key={reg.id} className="hover:bg-brand-cream/30 transition-colors">
                   <td className="px-6 py-4">
                     <p className="font-bold text-brand-brown text-base">{reg.fullName}</p>
@@ -204,6 +212,31 @@ export default function MerchClaims() {
             </tbody>
           </table>
         </div>
+
+        {/* Pagination Controls */}
+        {Math.ceil(filteredRegistrants.length / itemsPerPage) > 1 && (
+          <div className="px-6 py-4 border-t border-gray-100 flex items-center justify-between bg-gray-50/30">
+            <span className="text-sm text-gray-500">
+              Showing {(currentPage - 1) * itemsPerPage + 1} to {Math.min(currentPage * itemsPerPage, filteredRegistrants.length)} of {filteredRegistrants.length}
+            </span>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                disabled={currentPage === 1}
+                className="px-3 py-1.5 rounded-lg border border-gray-200 text-sm font-medium disabled:opacity-50"
+              >
+                Previous
+              </button>
+              <button
+                onClick={() => setCurrentPage(p => Math.min(Math.ceil(filteredRegistrants.length / itemsPerPage), p + 1))}
+                disabled={currentPage === Math.ceil(filteredRegistrants.length / itemsPerPage)}
+                className="px-3 py-1.5 rounded-lg border border-brand-brown text-brand-brown text-sm font-bold disabled:opacity-50"
+              >
+                Next
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

@@ -47,7 +47,7 @@ export default function Registrants() {
   const [filterMinistry, setFilterMinistry] = useState<string>('All');
 
   const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 50;
+  const itemsPerPage = 10;
 
   // Modal state
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -67,7 +67,7 @@ export default function Registrants() {
     sex: 'Male',
     ministry: [],
     shirtSize: 'M',
-    church: currentUser?.role === 'coordinator' && currentUser.church ? currentUser.church : '',
+    church: (currentUser?.role === 'coordinator' || currentUser?.role === 'treasurer') && currentUser.church ? currentUser.church : '',
     feeType: 'Regular',
     paymentStatus: 'Unpaid',
     paymentMethod: null,
@@ -143,7 +143,7 @@ export default function Registrants() {
   const openModalForNew = () => {
     setFormData({
       ...initialForm,
-      church: currentUser?.role === 'coordinator' && currentUser.church ? currentUser.church : settings.churches[0]
+      church: (currentUser?.role === 'coordinator' || currentUser?.role === 'treasurer') && currentUser.church ? currentUser.church : (settings.churches[0] || '')
     });
     setEditingId(null);
     setIsModalOpen(true);

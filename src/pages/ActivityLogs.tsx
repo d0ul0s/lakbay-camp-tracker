@@ -23,6 +23,9 @@ export default function ActivityLogs() {
   const [filterRole, setFilterRole] = useState('All');
   const [filterDate, setFilterDate] = useState('');
 
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 10;
+
   const fetchLogs = async () => {
     if (currentUser?.role === 'coordinator') return; // Not allowed
     try {
@@ -40,6 +43,7 @@ export default function ActivityLogs() {
 
   useEffect(() => {
     fetchLogs();
+    setCurrentPage(1);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filterAction, filterRole, filterDate]);
 
@@ -158,7 +162,7 @@ export default function ActivityLogs() {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
-              {logs.map((log) => (
+              {logs.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage).map((log) => (
                 <tr key={log._id} className="hover:bg-brand-cream/30 transition-colors">
                   <td className="px-6 py-4 font-medium text-gray-500 whitespace-nowrap">
                     {format(new Date(log.timestamp), 'MMM d, yyyy h:mm a')}
@@ -189,7 +193,7 @@ export default function ActivityLogs() {
 
         {/* Mobile View */}
         <div className="md:hidden divide-y divide-gray-100">
-          {logs.map((log) => (
+          {logs.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage).map((log) => (
             <div key={log._id} className="p-4 flex flex-col gap-3">
               <div className="flex justify-between items-start">
                 <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-widest shrink-0 ${getActionColor(log.action)}`}>
@@ -214,6 +218,31 @@ export default function ActivityLogs() {
             <div className="py-12 text-center text-gray-400 text-sm">No activity logs found.</div>
           )}
         </div>
+
+        {/* Pagination Controls */}
+        {Math.ceil(logs.length / itemsPerPage) > 1 && (
+          <div className="px-6 py-4 border-t border-gray-100 flex items-center justify-between bg-gray-50/30">
+            <span className="text-sm text-gray-500">
+              Showing {(currentPage - 1) * itemsPerPage + 1} to {Math.min(currentPage * itemsPerPage, logs.length)} of {logs.length}
+            </span>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                disabled={currentPage === 1}
+                className="px-3 py-1.5 rounded-lg border border-gray-200 text-sm font-medium disabled:opacity-50"
+              >
+                Previous
+              </button>
+              <button
+                onClick={() => setCurrentPage(p => Math.min(Math.ceil(logs.length / itemsPerPage), p + 1))}
+                disabled={currentPage === Math.ceil(logs.length / itemsPerPage)}
+                className="px-3 py-1.5 rounded-lg border border-brand-brown text-brand-brown text-sm font-bold disabled:opacity-50"
+              >
+                Next
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

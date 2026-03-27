@@ -55,17 +55,15 @@ export default function Layout() {
               </Link>
             );
           })}
-        </nav>
-        
-        <div className="p-6 border-t border-brand-light-brown mt-auto">
+
           <button 
             onClick={logout}
-            className="flex items-center justify-center gap-2 px-4 py-3 w-full rounded-xl hover:bg-white/10 text-white/90 transition-colors font-medium"
+            className="flex items-center gap-3 px-4 py-3 w-full rounded-xl text-brand-beige/90 hover:bg-brand-light-brown transition-all text-left mt-2"
           >
-            <LogOut size={18} />
+            <LogOut size={20} className="opacity-80" />
             <span>Logout</span>
           </button>
-        </div>
+        </nav>
       </aside>
 
       {/* Mobile Header */}
@@ -98,13 +96,15 @@ export default function Layout() {
                   </Link>
                  )
               })}
-            </nav>
-            <div className="p-4 border-t border-white/10">
-              <button onClick={logout} className="flex items-center justify-center gap-3 px-4 py-4 w-full rounded-xl bg-white/10 text-white font-medium">
-                <LogOut size={20} />
+
+              <button 
+                onClick={logout} 
+                className="flex items-center gap-4 px-4 py-4 w-full rounded-xl text-lg text-white hover:bg-white/10 text-left mt-2"
+              >
+                <LogOut size={24} className="opacity-80" />
                 <span>Logout</span>
               </button>
-            </div>
+            </nav>
           </div>
         )}
 

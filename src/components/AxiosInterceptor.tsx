@@ -12,10 +12,15 @@ export default function AxiosInterceptor({ children }: { children: React.ReactNo
         setLoading(false);
         const status = error.response?.status;
         const message = error.response?.data?.message || '';
+        const isTimeout = error.code === 'ECONNABORTED' || error.message?.toLowerCase().includes('timeout');
 
-        if (status === 502 || status === 503 || error.code === 'ERR_NETWORK') {
+        // Handle cold start related errors (including health check timeouts) silently
+        if (status === 502 || status === 503 || error.code === 'ERR_NETWORK' || isTimeout) {
           setServerAwake(false);
-          return Promise.reject(error);
+          if (error.config?.url?.includes('/api/health')) {
+            return Promise.reject(error); // Silently reject health checks without global error
+          }
+          return Promise.reject(error); // The ColdStartLoader will handle the UI
         }
 
         if (status === 401 && message.toLowerCase().includes('token')) {

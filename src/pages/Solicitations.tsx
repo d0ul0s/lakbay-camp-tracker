@@ -10,6 +10,13 @@ export default function Solicitations() {
   const [solicitations, setSolicitations] = useState<Solicitation[]>([]);
   const [settings, setSettings] = useState<AppSettings | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 10;
+  
+  // Reset pagination on search change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm]);
   
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -178,7 +185,7 @@ export default function Solicitations() {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
-              {filtered.map(sol => (
+              {filtered.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage).map(sol => (
                 <tr key={sol.id || (sol as any)._id} className="hover:bg-brand-cream/30 transition-colors">
                   <td className="px-4 py-4 font-medium text-gray-800">{sol.sourceName}</td>
                   <td className="px-4 py-4"><span className="px-2.5 py-1 rounded-full text-xs font-bold uppercase bg-brand-sand/50 text-brand-brown">{sol.type}</span></td>
@@ -213,7 +220,7 @@ export default function Solicitations() {
 
         {/* Mobile Card View */}
         <div className="md:hidden space-y-4">
-          {filtered.map(sol => (
+          {filtered.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage).map(sol => (
             <div key={sol.id || (sol as any)._id} className="bg-white border border-gray-100 shadow-sm rounded-xl p-4 flex flex-col gap-3 relative">
               <div className="flex justify-between items-start">
                 <div>
@@ -244,6 +251,31 @@ export default function Solicitations() {
           ))}
           {filtered.length === 0 && <div className="text-center py-8 text-gray-400 text-sm">No solicitations match your search.</div>}
         </div>
+
+        {/* Pagination Controls */}
+        {Math.ceil(filtered.length / itemsPerPage) > 1 && (
+          <div className="mt-4 pt-4 border-t border-gray-100 flex items-center justify-between">
+            <span className="text-sm text-gray-500">
+              Showing {(currentPage - 1) * itemsPerPage + 1} to {Math.min(currentPage * itemsPerPage, filtered.length)} of {filtered.length}
+            </span>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                disabled={currentPage === 1}
+                className="px-3 py-1.5 rounded-lg border border-gray-200 text-sm font-medium disabled:opacity-50 text-gray-600 hover:bg-gray-50"
+              >
+                Previous
+              </button>
+              <button
+                onClick={() => setCurrentPage(p => Math.min(Math.ceil(filtered.length / itemsPerPage), p + 1))}
+                disabled={currentPage === Math.ceil(filtered.length / itemsPerPage)}
+                className="px-3 py-1.5 rounded-lg border border-brand-brown text-brand-brown text-sm font-bold disabled:opacity-50 hover:bg-brand-sand/20"
+              >
+                Next
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       {isModalOpen && (

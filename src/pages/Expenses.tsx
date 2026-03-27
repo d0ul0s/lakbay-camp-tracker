@@ -57,6 +57,13 @@ export default function Expenses() {
   const canVerify = isAdmin || isTreasurer;
 
   const [filterCategory, setFilterCategory] = useState<string>('All');
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 10;
+
+  // Reset pagination on filter change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [filterCategory]);
 
   // Modal state
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -320,7 +327,7 @@ export default function Expenses() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
-                {filteredExpenses.length > 0 ? filteredExpenses.map((exp) => (
+                {filteredExpenses.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage).length > 0 ? filteredExpenses.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage).map((exp) => (
                   <tr key={exp.id} className="hover:bg-brand-cream/30 transition-colors">
                     <td className="px-6 py-4 whitespace-nowrap">{format(parseISO(exp.date), 'MMM d, yyyy')}</td>
                     <td className="px-6 py-4">
@@ -368,6 +375,31 @@ export default function Expenses() {
               </tbody>
             </table>
           </div>
+
+          {/* Pagination Controls */}
+          {Math.ceil(filteredExpenses.length / itemsPerPage) > 1 && (
+            <div className="px-6 py-4 border-t border-gray-100 flex items-center justify-between bg-gray-50/30">
+              <span className="text-sm text-gray-500">
+                Showing {(currentPage - 1) * itemsPerPage + 1} to {Math.min(currentPage * itemsPerPage, filteredExpenses.length)} of {filteredExpenses.length}
+              </span>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                  disabled={currentPage === 1}
+                  className="px-3 py-1.5 rounded-lg border border-gray-200 text-sm font-medium disabled:opacity-50"
+                >
+                  Previous
+                </button>
+                <button
+                  onClick={() => setCurrentPage(p => Math.min(Math.ceil(filteredExpenses.length / itemsPerPage), p + 1))}
+                  disabled={currentPage === Math.ceil(filteredExpenses.length / itemsPerPage)}
+                  className="px-3 py-1.5 rounded-lg border border-brand-brown text-brand-brown text-sm font-bold disabled:opacity-50"
+                >
+                  Next
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       </div>
 

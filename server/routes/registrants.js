@@ -15,8 +15,16 @@ router.get('/', async (req, res) => {
 
 // POST new registrant
 router.post('/', async (req, res) => {
-  const registrant = new Registrant(req.body);
   try {
+    const role = req.user.role;
+    const userChurch = req.user.church;
+
+    // Secure backend: enforce own church for coordinator and treasurer
+    if ((role === 'coordinator' || role === 'treasurer') && userChurch) {
+      req.body.church = userChurch;
+    }
+
+    const registrant = new Registrant(req.body);
     const newRegistrant = await registrant.save();
     await logActivity(req, 'CREATE', 'Registrant', newRegistrant._id, { name: newRegistrant.fullName });
     res.status(201).json(newRegistrant);
@@ -44,6 +52,17 @@ router.put('/:id', async (req, res) => {
       if (req.body.merchClaims || req.body.merchClaimDates) {
         return res.status(403).json({ message: 'Unauthorized: Coordinators cannot update merch claims.' });
       }
+    }
+
+    if (role === 'treasurer') {
+      if (registrant.church !== userChurch) {
+        return res.status(403).json({ message: 'Unauthorized: Treasurers can only edit registrants from their own church.' });
+      }
+    }
+
+    // Secure backend: enforce own church for coordinator and treasurer
+    if ((role === 'coordinator' || role === 'treasurer') && userChurch) {
+      req.body.church = userChurch;
     }
 
     // Idempotent Verification Check
@@ -74,12 +93,12 @@ router.delete('/:id', async (req, res) => {
     const role = req.user.role;
     const userChurch = req.user.church;
 
-    if (role === 'coordinator') {
+    if (role === 'coordinator' || role === 'treasurer') {
       const registrant = await Registrant.findById(req.params.id);
       if (!registrant) return res.status(404).json({ message: 'Registrant not found' });
       
       if (registrant.church !== userChurch) {
-        return res.status(403).json({ message: 'Unauthorized: You can only delete registrants from your own church.' });
+        return res.status(403).json({ message: `Unauthorized: You can only delete registrants from your own church.` });
       }
     }
 
