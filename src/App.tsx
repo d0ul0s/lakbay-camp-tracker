@@ -13,10 +13,12 @@ import Users from './pages/Users';
 import Solicitations from './pages/Solicitations';
 import ActivityLogs from './pages/ActivityLogs';
 import AxiosInterceptor from './components/AxiosInterceptor';
+import ColdStartLoader from './components/ColdStartLoader';
 
 export default function App() {
   return (
     <AxiosInterceptor>
+      <ColdStartLoader />
       <BrowserRouter>
         <Routes>
           <Route path="/login" element={<Login />} />

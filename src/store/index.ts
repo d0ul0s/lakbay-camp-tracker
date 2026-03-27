@@ -14,6 +14,10 @@ interface AppState {
   // Global Error State
   globalError: string | null;
   setGlobalError: (error: string | null) => void;
+
+  // Cold Start State
+  isServerAwake: boolean;
+  setServerAwake: (awake: boolean) => void;
 }
 
 export const useAppStore = create<AppState>()((set) => {
@@ -24,9 +28,11 @@ export const useAppStore = create<AppState>()((set) => {
     currentUser: initialUser,
     isLoading: false,
     globalError: null,
+    isServerAwake: false,
 
     setLoading: (loading: boolean) => set({ isLoading: loading }),
     setGlobalError: (error: string | null) => set({ globalError: error }),
+    setServerAwake: (awake: boolean) => set({ isServerAwake: awake }),
 
     login: (user) => {
       sessionStorage.setItem('lakbay_auth', JSON.stringify(user));

@@ -3,7 +3,7 @@ import api from '../api/axios';
 import { useAppStore } from '../store';
 
 export default function AxiosInterceptor({ children }: { children: React.ReactNode }) {
-  const { setGlobalError, setLoading, logout } = useAppStore();
+  const { setGlobalError, setLoading, logout, setServerAwake } = useAppStore();
 
   useEffect(() => {
     const resInterceptor = api.interceptors.response.use(
@@ -12,6 +12,11 @@ export default function AxiosInterceptor({ children }: { children: React.ReactNo
         setLoading(false);
         const status = error.response?.status;
         const message = error.response?.data?.message || '';
+
+        if (status === 502 || status === 503 || error.code === 'ERR_NETWORK') {
+          setServerAwake(false);
+          return Promise.reject(error);
+        }
 
         if (status === 401 && message.toLowerCase().includes('token')) {
           logout();

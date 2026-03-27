@@ -23,6 +23,11 @@ app.use(mongoSanitize());
 
 const auth = require('./middleware/auth');
 
+app.get('/api/health', (req, res) => {
+  res.status(200).json({ status: 'ok', message: 'Server is awake and running smoothly.' });
+});
+
+
 app.use('/api/registrants', auth, require('./routes/registrants'));
 app.use('/api/expenses', auth, require('./routes/expenses'));
 app.use('/api/solicitations', auth, require('./routes/solicitations'));
