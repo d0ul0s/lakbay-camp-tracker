@@ -57,7 +57,7 @@ export default function ColdStartLoader() {
             </div>
             <h3 className="text-xl font-bold text-gray-900 mb-2">Server Timeout</h3>
             <p className="text-gray-600 mb-6">The server is still starting. Please refresh in a moment to try again.</p>
-            <button 
+            <button
               onClick={() => window.location.reload()}
               className="px-6 py-2.5 bg-indigo-600 text-white rounded-lg font-medium hover:bg-indigo-700 transition shadow-sm"
             >
@@ -74,6 +74,7 @@ export default function ColdStartLoader() {
             <p className="text-gray-600 text-sm leading-relaxed">
               This may take <span className="font-semibold text-gray-800">10 to 60 seconds</span> on the free plan.<br />
               Please stay on this page.
+              The backend can sleep when unused on free tiers, so the first request after inactivity may take a long time.
             </p>
           </>
         )}
