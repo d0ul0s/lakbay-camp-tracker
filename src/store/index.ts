@@ -241,8 +241,9 @@ export const useAppStore = create<AppState>()((set) => {
     fetchRegistrants: async (silent = false) => {
       if (!silent) set({ isLoading: true });
       try {
-        const res = await api.get('/api/registrants');
-        set({ registrants: res.data, isLoading: false });
+        const res = await api.get('/api/registrants', { params: { limit: 1000 } });
+        const data = Array.isArray(res.data) ? res.data : (res.data.registrants || []);
+        set({ registrants: data, isLoading: false });
       } catch (err) {
         console.error("Fetch registrants failed", err);
         if (!silent) set({ isLoading: false });
@@ -260,6 +261,7 @@ export const useAppStore = create<AppState>()((set) => {
     syncRegistrant: (action: string, data: any) => {
       if (!data) return;
       set(state => {
+        if (!Array.isArray(state.registrants)) return { registrants: [data] };
         let next = [...state.registrants];
         if (action === 'added') {
           const dId = data.id || data._id;
@@ -290,6 +292,7 @@ export const useAppStore = create<AppState>()((set) => {
     syncExpense: (action: string, data: any) => {
       if (!data) return;
       set(state => {
+        if (!Array.isArray(state.expenses)) return { expenses: [data] };
         let next = [...state.expenses];
         if (action === 'added') {
           const dId = data.id || data._id;
@@ -321,8 +324,9 @@ export const useAppStore = create<AppState>()((set) => {
     fetchExpenses: async (silent = false) => {
       if (!silent) set({ isLoading: true });
       try {
-        const res = await api.get('/api/expenses');
-        set({ expenses: res.data, isLoading: false });
+        const res = await api.get('/api/expenses', { params: { limit: 1000 } });
+        const data = Array.isArray(res.data) ? res.data : (res.data.expenses || []);
+        set({ expenses: data, isLoading: false });
       } catch (err) {
         console.error("Fetch expenses failed", err);
         if (!silent) set({ isLoading: false });
@@ -331,6 +335,7 @@ export const useAppStore = create<AppState>()((set) => {
     syncSolicitation: (action: string, data: any) => {
       if (!data) return;
       set(state => {
+        if (!Array.isArray(state.solicitations)) return { solicitations: [data] };
         let next = [...state.solicitations];
         if (action === 'added') {
           const dId = data.id || data._id;
@@ -362,8 +367,9 @@ export const useAppStore = create<AppState>()((set) => {
     fetchSolicitations: async (silent = false) => {
       if (!silent) set({ isLoading: true });
       try {
-        const res = await api.get('/api/solicitations');
-        set({ solicitations: res.data, isLoading: false });
+        const res = await api.get('/api/solicitations', { params: { limit: 1000 } });
+        const data = Array.isArray(res.data) ? res.data : (res.data.solicitations || []);
+        set({ solicitations: data, isLoading: false });
       } catch (err) {
         console.error("Fetch solicitations failed", err);
         if (!silent) set({ isLoading: false });

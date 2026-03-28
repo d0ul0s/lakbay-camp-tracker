@@ -21,13 +21,13 @@ export default function Reports() {
     const fetchData = async () => {
       try {
         const [regRes, expRes, solRes] = await Promise.all([
-          api.get('/api/registrants'),
-          api.get('/api/expenses').catch(() => ({ data: [] })),
-          api.get('/api/solicitations').catch(() => ({ data: [] }))
+          api.get('/api/registrants', { params: { limit: 1000 } }),
+          api.get('/api/expenses', { params: { limit: 1000 } }).catch(() => ({ data: { expenses: [] } })),
+          api.get('/api/solicitations', { params: { limit: 1000 } }).catch(() => ({ data: { solicitations: [] } }))
         ]);
-        setRegistrants(regRes.data);
-        setExpenses(expRes.data);
-        setSolicitations(solRes.data);
+        setRegistrants(Array.isArray(regRes.data) ? regRes.data : (regRes.data.registrants || []));
+        setExpenses(Array.isArray(expRes.data) ? expRes.data : (expRes.data.expenses || []));
+        setSolicitations(Array.isArray(solRes.data) ? solRes.data : (solRes.data.solicitations || []));
       } catch (err) {
         console.error(err);
       }
@@ -45,7 +45,9 @@ export default function Reports() {
   };
 
   const exportRegistrants = () => {
-    const data = (isAdmin || isTreasurer ? registrants : registrants.filter(r => r.church === currentUser?.church)).map(r => ({
+    const dataList = Array.isArray(registrants) ? registrants : [];
+    const filtered = (isAdmin || isTreasurer ? dataList : dataList.filter(r => r.church === currentUser?.church));
+    const data = filtered.map(r => ({
       'Full Name': r.fullName,
       'Age': r.age,
       'Sex': r.sex || 'Male',
@@ -69,7 +71,8 @@ export default function Reports() {
 
   const exportExpenses = () => {
     if (!canViewExpenses) return;
-    const data = expenses.map(e => ({
+    const dataList = Array.isArray(expenses) ? expenses : [];
+    const data = dataList.map(e => ({
       'Date': format(new Date(e.date), 'MMM d, yyyy'),
       'Description': e.description,
       'Category': e.category,
@@ -83,7 +86,8 @@ export default function Reports() {
 
   const exportSolicitations = () => {
     if (!canViewSolicitations) return;
-    const data = solicitations.map(s => ({
+    const dataList = Array.isArray(solicitations) ? solicitations : [];
+    const data = dataList.map(s => ({
       'Source Name': s.sourceName,
       'Type': s.type,
       'Amount': s.amount,
@@ -185,8 +189,11 @@ export default function Reports() {
             </tr>
           </thead>
           <tbody>
-            {(isAdmin ? registrants : registrants.filter(r => r.church === currentUser?.church)).map(r => (
-              <tr key={r.id}>
+            {(() => {
+              const dataList = Array.isArray(registrants) ? registrants : [];
+              const filtered = (isAdmin ? dataList : dataList.filter(r => r.church === currentUser?.church));
+              return filtered.map(r => (
+                <tr key={r.id || (r as any)._id}>
                 <td className="border border-gray-300 p-2 font-medium">{r.fullName}</td>
                 <td className="border border-gray-300 p-2">{r.church}</td>
                 <td className="border border-gray-300 p-2 text-center">{r.shirtSize}</td>
@@ -195,7 +202,8 @@ export default function Reports() {
                 <td className="border border-gray-300 p-2 text-center">{r.merchClaims.notebook ? '✓' : ''}</td>
                 <td className="border border-gray-300 p-2 text-center">{r.merchClaims.pen ? '✓' : ''}</td>
               </tr>
-            ))}
+              ));
+            })()}
           </tbody>
         </table>
       </div>
