@@ -108,7 +108,8 @@ router.post('/login', loginLimiter, async (req, res) => {
         role: matchedUser.role, 
         church: matchedUser.church, 
         permissionMatrix: permissionMatrix,
-        _id: matchedUser._id 
+        _id: matchedUser._id,
+        token: token  // also return token in body for cross-origin Bearer auth (mobile)
       });
     }
 

@@ -151,8 +151,14 @@ export const useAppStore = create<AppState>()((set) => {
     }),
 
     login: (user) => {
-      sessionStorage.setItem('lakbay_auth', JSON.stringify(user));
-      set({ currentUser: user });
+      // Store token separately so the axios interceptor can send it as a Bearer header.
+      // This is the cross-origin mobile fix — cookies are blocked by Safari on Vercel→Render.
+      if ((user as any).token) {
+        sessionStorage.setItem('lakbay_token', (user as any).token);
+      }
+      const { token: _t, ...userWithoutToken } = user as any;
+      sessionStorage.setItem('lakbay_auth', JSON.stringify(userWithoutToken));
+      set({ currentUser: userWithoutToken });
       // Fetch settings immediately after login
       api.get('/api/settings').then(res => {
         if (res.data) set({ appSettings: {
@@ -173,6 +179,7 @@ export const useAppStore = create<AppState>()((set) => {
         console.error("Logout failed", err);
       }
       sessionStorage.removeItem('lakbay_auth');
+      sessionStorage.removeItem('lakbay_token');
       localStorage.removeItem('lakbay_cache');
       set({ 
         currentUser: null,

@@ -15,4 +15,17 @@ const api = axios.create({
   withCredentials: true,
 });
 
+// Attach stored JWT as Authorization Bearer header on every request.
+// This is the mobile/cross-origin fallback: Safari and some Android browsers
+// silently block SameSite=None cookies from third-party origins (Render → Vercel),
+// so we send the token in the header instead. The server middleware accepts both.
+api.interceptors.request.use(config => {
+  const token = sessionStorage.getItem('lakbay_token');
+  if (token) {
+    config.headers = config.headers ?? {};
+    config.headers['Authorization'] = `Bearer ${token}`;
+  }
+  return config;
+});
+
 export default api;
