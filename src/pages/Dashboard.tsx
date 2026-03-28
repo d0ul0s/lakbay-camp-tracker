@@ -1,54 +1,27 @@
 import { useState, useEffect, useMemo } from 'react';
-import api from '../api/axios';
 import { useAppStore } from '../store';
-import { Users, DollarSign, ShoppingBag, PlusCircle, ArrowRight, HeartHandshake, ShieldCheck } from 'lucide-react';
+import { Users, DollarSign, ShoppingBag, PlusCircle, ArrowRight, HeartHandshake, ShieldCheck, Loader2 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, Legend } from 'recharts';
-import type { Registrant, Expense, AppSettings, Solicitation } from '../types';
+import type { AppSettings } from '../types';
 
 export default function Dashboard() {
-  const { currentUser } = useAppStore();
-  const [registrants, setRegistrants] = useState<Registrant[]>([]);
-  const [expenses, setExpenses] = useState<Expense[]>([]);
-  const [solicitations, setSolicitations] = useState<Solicitation[]>([]);
+  const { 
+    currentUser, 
+    registrants, 
+    expenses, 
+    solicitations, 
+    appSettings,
+    hasBooted
+  } = useAppStore();
+
   const [settings, setSettings] = useState<AppSettings>({ churches: [], merchCosts: { tshirt: 0, bag: 0, notebook: 0, pen: 0 } } as any);
 
   useEffect(() => {
-    if (!currentUser) return;
-
-    const fetchData = async () => {
-      try {
-        const [regRes, expRes, setRes, solRes] = await Promise.all([
-          api.get('/api/registrants').catch(() => ({ data: [] })),
-          api.get('/api/expenses').catch(() => ({ data: [] })),
-          api.get('/api/settings'),
-          api.get('/api/solicitations').catch(() => ({ data: [] }))
-        ]);
-
-        setRegistrants(regRes.data);
-        setExpenses(expRes.data);
-        setSolicitations(solRes.data);
-
-        if (setRes.data) {
-          setSettings({
-            ...setRes.data,
-            churches: setRes.data.churchList || [],
-            merchCosts: setRes.data.merchCosts || {
-              tshirt: 0,
-              bag: 0,
-              notebook: 0,
-              pen: 0
-            }
-          });
-        }
-
-      } catch (err) {
-        console.error("Dashboard fetch error", err);
-      }
-    };
-
-    fetchData();
-  }, [currentUser?._id]);
+    if (appSettings) {
+      setSettings(appSettings);
+    }
+  }, [appSettings]);
 
   const isAdmin = currentUser?.role?.toLowerCase().trim() === 'admin';
   const roleKey = currentUser?.role?.toLowerCase().trim();
@@ -121,8 +94,18 @@ export default function Dashboard() {
       .sort((a, b) => b.value - a.value);
   }, [expenses, totalMerchProductionCost]);
 
-  const COLORS = ['#8b5c40', '#d4a373', '#e9edc9', '#ccd5ae', '#faedcd', '#fefae0', '#e3d5ca', '#ddbea9'];
+  const EXPENSE_COLORS = ['#8b5c40', '#d4a373', '#e9edc9', '#ccd5ae', '#faedcd', '#fefae0', '#e3d5ca', '#ddbea9'];
   const INCOME_COLORS = ['#4ade80', '#34d399'];
+
+  if (!hasBooted) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[60vh] text-brand-brown animate-in fade-in duration-500">
+        <Loader2 className="w-12 h-12 animate-spin mb-6 opacity-80" />
+        <h2 className="text-xl font-display tracking-widest animate-pulse">SYNCING CAMP DATA</h2>
+        <p className="text-sm text-gray-500 mt-2 font-medium">Establishing secure live connection...</p>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -161,7 +144,7 @@ export default function Dashboard() {
       </div>
 
       {/* KPI Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-4 gap-3 md:gap-6">
+      <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-3 md:gap-6">
         {/* Total Registrants */}
         <div className="bg-white p-3 md:p-6 rounded-2xl shadow-sm border border-brand-beige flex items-start gap-3 hover:shadow-md transition-shadow">
           <div className="p-2.5 bg-blue-50 text-blue-600 rounded-lg">
@@ -183,7 +166,9 @@ export default function Dashboard() {
             <div className="flex items-end gap-1.5 leading-tight">
               <h3 className="text-2xl font-bold text-gray-800">₱{verifiedReg.toLocaleString()}</h3>
             </div>
-            {regGap > 0 && <p className="text-[9px] text-orange-400 italic">₱{regGap.toLocaleString()} pending</p>}
+            <p className={`text-[9px] italic mt-0.5 ${regGap > 0 ? 'text-orange-400 font-bold' : 'text-gray-300'}`}>
+              ₱{regGap.toLocaleString()} pending
+            </p>
           </div>
         </div>
 
@@ -195,7 +180,9 @@ export default function Dashboard() {
           <div>
             <p className="text-[10px] text-gray-400 font-bold uppercase tracking-tight">Solicitations</p>
             <h3 className="text-2xl font-bold text-gray-800 leading-tight">₱{verifiedSol.toLocaleString()}</h3>
-            {solGap > 0 && <p className="text-[9px] text-orange-400 italic">₱{solGap.toLocaleString()} pending</p>}
+            <p className={`text-[9px] italic mt-0.5 ${solGap > 0 ? 'text-orange-400 font-bold' : 'text-gray-300'}`}>
+              ₱{solGap.toLocaleString()} pending
+            </p>
           </div>
         </div>
 
@@ -207,7 +194,9 @@ export default function Dashboard() {
           <div>
             <p className="text-[10px] text-gray-400 font-bold uppercase tracking-tight">Total Income (Net)</p>
             <h3 className="text-2xl font-bold text-brand-brown leading-tight">₱{totalIncomeVerified.toLocaleString()}</h3>
-            {(totalIncomeRecorded - totalIncomeVerified) > 0 && <p className="text-[9px] text-orange-400 italic">₱{(totalIncomeRecorded - totalIncomeVerified).toLocaleString()} pending</p>}
+            <p className={`text-[9px] italic mt-0.5 ${(totalIncomeRecorded - totalIncomeVerified) > 0 ? 'text-orange-400 font-bold' : 'text-gray-300'}`}>
+              ₱{(totalIncomeRecorded - totalIncomeVerified).toLocaleString()} pending
+            </p>
           </div>
         </div>
 
@@ -258,22 +247,22 @@ export default function Dashboard() {
 
 
       {/* Financial Charts (All Roles) */}
-      <div className="grid grid-cols-2 lg:grid-cols-2 gap-3 md:gap-4">
+      <div className="grid grid-cols-2 gap-2 md:gap-4">
         <div className="bg-white rounded-xl shadow-sm border border-brand-beige overflow-hidden flex flex-col">
           <div className="px-4 py-2 border-b border-gray-100 bg-gray-50/50">
             <h3 className="font-display text-sm text-brand-brown tracking-wide">Income Breakdown</h3>
           </div>
           <div className="p-2 flex-1 flex items-center justify-center min-h-[180px]">
             {incomeBreakdown.length > 0 ? (
-              <ResponsiveContainer width="100%" height={160}>
+              <ResponsiveContainer width="100%" height={140}>
                 <PieChart>
-                  <Pie data={incomeBreakdown} cx="50%" cy="50%" labelLine={false} outerRadius={45} dataKey="value">
+                  <Pie data={incomeBreakdown} cx="50%" cy="50%" labelLine={false} outerRadius={35} dataKey="value">
                     {incomeBreakdown.map((_entry, index) => (
                       <Cell key={`ic-${index}`} fill={INCOME_COLORS[index % INCOME_COLORS.length]} />
                     ))}
                   </Pie>
                   <Tooltip formatter={(value) => `₱${Number(value).toLocaleString()}`} />
-                  <Legend verticalAlign="bottom" height={36} wrapperStyle={{ fontSize: '8px', paddingTop: '10px' }} />
+                  <Legend verticalAlign="bottom" height={20} wrapperStyle={{ fontSize: '7px', paddingTop: '5px' }} />
                 </PieChart>
               </ResponsiveContainer>
             ) : (
@@ -287,15 +276,15 @@ export default function Dashboard() {
           </div>
           <div className="p-2 flex-1 flex items-center justify-center min-h-[180px]">
             {expenseBreakdown.length > 0 ? (
-              <ResponsiveContainer width="100%" height={160}>
+              <ResponsiveContainer width="100%" height={140}>
                 <PieChart>
-                  <Pie data={expenseBreakdown} cx="50%" cy="50%" labelLine={false} outerRadius={45} dataKey="value">
+                  <Pie data={expenseBreakdown} cx="50%" cy="50%" labelLine={false} outerRadius={35} dataKey="value">
                     {expenseBreakdown.map((_entry: any, index: number) => (
-                      <Cell key={`ec-${index}`} fill={COLORS[index % COLORS.length]} />
+                      <Cell key={`ec-${index}`} fill={EXPENSE_COLORS[index % EXPENSE_COLORS.length]} />
                     ))}
                   </Pie>
                   <Tooltip formatter={(value) => `₱${Number(value).toLocaleString()}`} />
-                  <Legend verticalAlign="bottom" height={36} wrapperStyle={{ fontSize: '8px', paddingTop: '10px' }} />
+                  <Legend verticalAlign="bottom" height={20} wrapperStyle={{ fontSize: '7px', paddingTop: '5px' }} />
                 </PieChart>
               </ResponsiveContainer>
             ) : (

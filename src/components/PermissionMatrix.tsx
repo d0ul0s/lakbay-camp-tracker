@@ -72,7 +72,7 @@ const PAGES = [
 const ROLES: ('treasurer' | 'coordinator')[] = ['treasurer', 'coordinator'];
 
 export default function PermissionMatrixUI() {
-  const { refreshPermissions, setGlobalError } = useAppStore();
+  const { appSettings, fetchGlobalSettings, refreshPermissions, setGlobalError } = useAppStore();
   const [matrix, setMatrix] = useState<PermissionMatrix | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [isConfirmOpen, setIsConfirmOpen] = useState(false);
@@ -85,22 +85,21 @@ export default function PermissionMatrixUI() {
   );
 
   useEffect(() => {
-    const fetchMatrix = async () => {
-      try {
-        const res = await api.get('/api/settings');
-        if (res.data?.permissionMatrix) {
-          setMatrix(res.data.permissionMatrix);
-        } else {
-          console.warn('Permission matrix not found in settings, using empty fallback');
-          setMatrix({}); 
-        }
-      } catch (err) {
-        console.error('Failed to fetch permission matrix:', err);
-        setGlobalError('Could not load permission settings');
-      }
-    };
-    fetchMatrix();
+    // Initial load from store if available
+    if (appSettings?.permissionMatrix) {
+      setMatrix(appSettings.permissionMatrix);
+    }
+    
+    // Always trigger a silent refresh to ensure we have the latest
+    fetchGlobalSettings(true);
   }, []);
+
+  useEffect(() => {
+    // Update local matrix when store settings arrive (if not currently editing)
+    if (appSettings?.permissionMatrix && !hasChanges) {
+      setMatrix(appSettings.permissionMatrix);
+    }
+  }, [appSettings, hasChanges]);
 
   useEffect(() => {
     const handleBeforeUnload = (e: BeforeUnloadEvent) => {

@@ -23,12 +23,16 @@ export default function AxiosInterceptor({ children }: { children: React.ReactNo
           return Promise.reject(error); // The ColdStartLoader will handle the UI
         }
 
-        if (status === 401 && message.toLowerCase().includes('token')) {
+        if (status === 401) {
           logout();
-          setGlobalError('Session expired. Please log in again.');
+          // Only show error if not already on login page to avoid repetitive alerts
+          if (!window.location.pathname.includes('/login')) {
+            setGlobalError('Session expired. Please log in again.');
+          }
         } else if (status === 403) {
           // Silently ignore role-based access restrictions
-        } else if (status !== 401 || !error.config?.url?.includes('/login')) {
+        } else if (!error.config?.url?.includes('/api/auth/login')) {
+          // Only set global error for non-login endpoints (Login.tsx handles its own errors)
           const msg = message || error.message || 'An unexpected networking error occurred.';
           setGlobalError(msg);
         }

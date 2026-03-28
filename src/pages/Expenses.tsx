@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import api from '../api/axios';
 import { useAppStore } from '../store';
-import type { Expense, Registrant, AppSettings } from '../types';
+import type { Expense } from '../types';
 import { PlusCircle, Filter, Trash2, Edit2, X, DollarSign, TrendingDown, TrendingUp, CheckCircle, Clock, ShieldAlert, Users, Receipt } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import ConfirmModal from '../components/ConfirmModal';
@@ -9,47 +9,58 @@ import ConfirmModal from '../components/ConfirmModal';
 
 
 export default function Expenses() {
-  const { currentUser, setLoading } = useAppStore();
-  const [expenses, setExpenses] = useState<Expense[]>([]);
-  const [registrants, setRegistrants] = useState<Registrant[]>([]);
-  const [settings, setSettings] = useState<AppSettings>({
+  const { 
+    currentUser, 
+    appSettings, 
+    fetchGlobalSettings, 
+    expenses, 
+    fetchExpenses,
+    registrants,
+    fetchRegistrants,
+    solicitations,
+    fetchSolicitations,
+    syncExpense
+  } = useAppStore();
+  
+  // Use global settings with fallback
+  const settings = appSettings || {
     churches: [],
     ministries: [],
     expenseCategories: [],
     paymentMethods: [],
     shirtSizePhoto: null,
     merchCosts: { tshirt: 0, bag: 0, notebook: 0, pen: 0 }
-  } as any);
-  const [solicitations, setSolicitations] = useState<any[]>([]);
+  } as any;
 
-  const fetchData = async () => {
-    try {
-      const [expRes, regRes, setRes, solRes] = await Promise.all([
-        api.get('/api/expenses').catch(() => ({ data: [] })),
-        api.get('/api/registrants'),
-        api.get('/api/settings'),
-        api.get('/api/solicitations').catch(() => ({ data: [] }))
-      ]);
-      setExpenses(expRes.data);
-      setRegistrants(regRes.data);
-      setSolicitations(solRes.data);
-      if (setRes.data) {
-        setSettings({
-          ...setRes.data,
-          churches: setRes.data.churchList || [],
-          ministries: setRes.data.ministries || [],
-          expenseCategories: setRes.data.expenseCategories || [],
-          paymentMethods: setRes.data.paymentMethods || []
-        });
-      }
-    } catch (err) {
-      console.error(err);
-    }
-  };
+  // Local state for snappy numeric typing without blocking the main event thread
+  // Casted to strings intermediate so React doesn't eat trailing zeros or empty states
+  // We strictly initialize this ONCE from settings to prevent any "snapback" or WebSocket overwrites during an edit session.
+  const [localMerchCosts, setLocalMerchCosts] = useState({
+    tshirt: settings.merchCosts?.tshirt?.toString() || '0',
+    bag: settings.merchCosts?.bag?.toString() || '0',
+    notebook: settings.merchCosts?.notebook?.toString() || '0',
+    pen: settings.merchCosts?.pen?.toString() || '0'
+  });
+
+  const localMerchCostsRef = React.useRef(localMerchCosts);
+  const saveTimeoutRef = React.useRef<NodeJS.Timeout | null>(null);
+
+  // Keep ref identically up to date with RAM state, but DO NOT overwrite RAM with external settings.
+  useEffect(() => {
+    localMerchCostsRef.current = localMerchCosts;
+  }, [localMerchCosts]);
 
   useEffect(() => {
-    fetchData();
-  }, [setLoading]);
+    // Only trigger network fetches if boot hasn't synced yet (cold start with no cache).
+    // Once hasSyncedLive=true, WebSocket in Layout.tsx handles all real-time updates.
+    const { hasSyncedLive } = useAppStore.getState();
+    if (!hasSyncedLive) {
+      fetchRegistrants(registrants.length > 0);
+      fetchSolicitations(solicitations.length > 0);
+      fetchExpenses(expenses.length > 0);
+      fetchGlobalSettings(true);
+    }
+  }, []);
 
   // Roles
   const isAdmin = currentUser?.role?.toLowerCase().trim() === 'admin';
@@ -97,15 +108,25 @@ export default function Expenses() {
   const doVerify = async () => {
     if (!verifyConfirm.expense) return;
     const exp = verifyConfirm.expense;
+    const expId = (exp as any)._id || exp.id;
     const nowVerified = !exp.verifiedByTreasurer;
-    try {
-      await api.put(`/api/expenses/${(exp as any)._id || exp.id}`, {
-        verifiedByTreasurer: nowVerified,
-        verifiedAt: nowVerified ? new Date().toISOString() : null
-      });
-      fetchData();
-    } catch (err) { console.error(err); }
+    
+    // Close immediately and optimistically update
     setVerifyConfirm({ isOpen: false, expense: null });
+    syncExpense('updated', { 
+      _id: expId, 
+      id: expId, 
+      verifiedByTreasurer: nowVerified,
+      verifiedAt: nowVerified ? new Date().toISOString() : null
+    });
+
+    api.put(`/api/expenses/${expId}`, {
+      verifiedByTreasurer: nowVerified,
+      verifiedAt: nowVerified ? new Date().toISOString() : null
+    }).catch(err => {
+      console.error(err);
+      fetchExpenses(true); // Silent revert on failure
+    });
   };
 
   const initialForm: Omit<Expense, 'id'> = {
@@ -139,10 +160,10 @@ export default function Expenses() {
 
   const totalItemsExpected = registrants.length;
   const totalMerchProductionCost =
-    ((settings.merchCosts?.tshirt || 0) * totalItemsExpected) +
-    ((settings.merchCosts?.bag || 0) * totalItemsExpected) +
-    ((settings.merchCosts?.notebook || 0) * totalItemsExpected) +
-    ((settings.merchCosts?.pen || 0) * totalItemsExpected);
+    ((parseInt(localMerchCosts.tshirt) || 0) * totalItemsExpected) +
+    ((parseInt(localMerchCosts.bag) || 0) * totalItemsExpected) +
+    ((parseInt(localMerchCosts.notebook) || 0) * totalItemsExpected) +
+    ((parseInt(localMerchCosts.pen) || 0) * totalItemsExpected);
 
   const loggedExpensesTotal = expenses.filter(e => e.verifiedByTreasurer).reduce((sum, e) => sum + (e.amount || 0), 0);
   const totalExpenses = loggedExpensesTotal + totalMerchProductionCost;
@@ -162,20 +183,42 @@ export default function Expenses() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
+    const { id, _id, __v, createdBy, createdAt, updatedAt, ...cleanData } = formData as any;
     const savePayload = {
-      ...formData,
+      ...cleanData,
       date: new Date(formData.date).toISOString()
     };
-    try {
-      if (editingId) {
-        await api.put(`/api/expenses/${editingId}`, savePayload);
-      } else {
-        await api.post(`/api/expenses`, savePayload);
-      }
+    
+    if (editingId) {
+      // Optimistic update
+      syncExpense('updated', { ...savePayload, _id: editingId, id: editingId });
       closeModal();
-      fetchData();
-    } catch (err) {
-      console.error(err);
+      api.put(`/api/expenses/${editingId}`, savePayload).catch(err => {
+        console.error(err);
+        fetchExpenses(true); // Silent revert on failure
+      });
+    } else {
+      // Optimistic added for new entries
+      const tempId = `temp-${Date.now()}`;
+      const optimisticNew = {
+        ...savePayload,
+        _id: tempId,
+        id: tempId,
+        createdBy: currentUser?._id
+      };
+      syncExpense('added', optimisticNew);
+      closeModal();
+
+      api.post(`/api/expenses`, savePayload).then((res) => {
+        // Graceful handoff: Swap temp optimistic UI instantly to prevent duplicates.
+        syncExpense('deleted', { _id: tempId, id: tempId });
+        syncExpense('added', res.data);
+      }).catch(err => {
+        console.error(err);
+        // Immediate rollback on error
+        syncExpense('deleted', { _id: tempId, id: tempId });
+        fetchExpenses(true);
+      });
     }
   };
 
@@ -187,13 +230,18 @@ export default function Expenses() {
 
   const confirmDelete = async () => {
     if (!confirmModal.id) return;
-    try {
-      await api.delete(`/api/expenses/${confirmModal.id}`);
-      setConfirmModal({ isOpen: false, id: null });
-      fetchData();
-    } catch (err) {
+    const deletedId = confirmModal.id;
+    // Optimistic delete
+    syncExpense('deleted', { _id: deletedId, id: deletedId });
+    setConfirmModal({ isOpen: false, id: null });
+    
+    // Guard: skip API call if this is still a temp optimistic entry (server hasn't responded yet)
+    if (String(deletedId).startsWith('temp-')) return;
+    
+    api.delete(`/api/expenses/${deletedId}`).catch(err => {
       console.error(err);
-    }
+      fetchExpenses(true);
+    });
   };
 
   const openModalForNew = () => {
@@ -220,15 +268,29 @@ export default function Expenses() {
     const validData = batchData.filter(d => d.paidBy && d.description && d.amount > 0);
     if (validData.length === 0) return;
 
-    try {
-      const payload = validData.map(d => ({ ...d, date: new Date(d.date).toISOString() }));
-      await api.post(`/api/expenses/batch`, { expenses: payload });
-      setIsBatchModalOpen(false);
-      setBatchData([]);
-      fetchData();
-    } catch (err) {
+    const payload = validData.map(d => ({ ...d, date: new Date(d.date).toISOString() }));
+    
+    // Optimistic batch add
+    const tempDocs = payload.map(d => ({
+      ...d,
+      _id: `temp-${Date.now()}-${Math.random()}`,
+      createdBy: currentUser?._id
+    }));
+    
+    syncExpense('imported', tempDocs);
+    setIsBatchModalOpen(false);
+    setBatchData([]);
+
+    api.post(`/api/expenses/batch`, { expenses: payload }).then((res) => {
+      // Graceful handoff: Swap temp optimistic UI instantly to prevent duplicates.
+      tempDocs.forEach(d => syncExpense('deleted', { _id: d._id }));
+      syncExpense('imported', res.data);
+    }).catch(err => {
       console.error(err);
-    }
+      // Immediate rollback on error
+      tempDocs.forEach(d => syncExpense('deleted', { _id: d._id }));
+      fetchExpenses(true);
+    });
   };
 
   const addBatchRow = () => {
@@ -256,15 +318,37 @@ export default function Expenses() {
     setEditingId(null);
   };
 
-  const handleMerchCostChange = async (item: string, value: number) => {
-    try {
-      await api.put(`/api/settings`, {
-        merchCosts: { ...settings.merchCosts, [item]: value }
-      });
-      fetchData();
-    } catch (err) {
-      console.error(err);
+  const handleMerchCostChange = (item: string, htmlValue: number) => {
+    if (saveTimeoutRef.current) {
+      clearTimeout(saveTimeoutRef.current);
     }
+
+    // Force update the ref immediately by bypassing React render cycle guarantees
+    // This perfectly captures blazing fast tabbing without losing adjacent box edits!
+    localMerchCostsRef.current = {
+      ...localMerchCostsRef.current,
+      [item]: htmlValue.toString()
+    };
+
+    const realtimePayload = {
+      tshirt: parseInt(localMerchCostsRef.current.tshirt) || 0,
+      bag: parseInt(localMerchCostsRef.current.bag) || 0,
+      notebook: parseInt(localMerchCostsRef.current.notebook) || 0,
+      pen: parseInt(localMerchCostsRef.current.pen) || 0,
+    };
+
+    // 1. Debounce the server transmission
+    // We intentionally DO NOT update global state here, as synchronously modifying global state
+    // will cause our local useEffect to nuke whatever input box you just tabbed into!
+    saveTimeoutRef.current = setTimeout(async () => {
+      try {
+        await api.put(`/api/settings`, {
+          merchCosts: realtimePayload
+        });
+      } catch (err) {
+        console.error(err);
+      }
+    }, 1000);
   };
 
   const isNameValid = true;
@@ -299,34 +383,39 @@ export default function Expenses() {
 
       {isAdmin && (
         <>
-          {/* Financial Summary - Desktop Only */}
-      <div className="hidden md:grid grid-cols-1 md:grid-cols-3 gap-6">
+      {/* Financial Summary - Desktop Only */}
+      <div className="hidden min-[1800px]:grid grid-cols-3 gap-6">
         <div className="bg-white p-6 rounded-2xl shadow-sm border border-brand-beige">
-              <div className="flex items-center gap-2 mb-1">
-                <div className="p-1.5 bg-green-50 text-green-600 rounded-lg"><TrendingUp size={16} /></div>
-                <p className="font-bold text-gray-400 uppercase tracking-tighter text-[10px]">Total Income</p>
-              </div>
-              {pendingIncome > 0 && <p className="text-[9px] text-orange-400 italic">₱{pendingIncome.toLocaleString()} pending</p>}
-            </div>
-
-            <div className="bg-white p-4 rounded-xl shadow-sm border border-brand-beige">
-              <div className="flex items-center gap-2 mb-1">
-                <div className="p-1.5 bg-red-50 text-red-500 rounded-lg"><TrendingDown size={16} /></div>
-                <p className="font-bold text-gray-400 uppercase tracking-tighter text-[10px]">Total Expenses</p>
-              </div>
-              <h3 className="text-2xl font-black text-red-500">₱{totalExpenses.toLocaleString()}</h3>
-              {pendingExpenses > 0 && <p className="text-[9px] text-orange-400 italic">₱{pendingExpenses.toLocaleString()} pending</p>}
-            </div>
-
-            <div className={`p-4 rounded-xl shadow-sm border ${netBalance >= 0 ? 'bg-brand-brown border-brand-brown text-white' : 'bg-red-50 border-red-200 text-red-900'}`}>
-              <div className="flex items-center gap-2 mb-1">
-                <div className={`p-1.5 rounded-lg ${netBalance >= 0 ? 'bg-white/20' : 'bg-red-100 text-red-600'}`}><DollarSign size={16} /></div>
-                <p className="font-bold uppercase tracking-tighter text-[10px] opacity-90">Net Balance</p>
-              </div>
-              <h3 className="text-2xl font-black">₱{netBalance.toLocaleString()}</h3>
-              <p className="text-[10px] opacity-75">Remaining camp funds</p>
-            </div>
+          <div className="flex items-center gap-2 mb-1">
+            <div className="p-1.5 bg-green-50 text-green-600 rounded-lg"><TrendingUp size={16} /></div>
+            <p className="font-bold text-gray-400 uppercase tracking-tighter text-[10px]">Total Income</p>
           </div>
+          <h3 className="text-2xl font-black text-green-600">₱{totalIncome.toLocaleString()}</h3>
+          <p className={`text-[9px] italic mt-0.5 ${pendingIncome > 0 ? 'text-orange-400 font-bold' : 'text-gray-300'}`}>
+            ₱{pendingIncome.toLocaleString()} pending
+          </p>
+        </div>
+
+        <div className="bg-white p-4 rounded-xl shadow-sm border border-brand-beige">
+          <div className="flex items-center gap-2 mb-1">
+            <div className="p-1.5 bg-red-50 text-red-500 rounded-lg"><TrendingDown size={16} /></div>
+            <p className="font-bold text-gray-400 uppercase tracking-tighter text-[10px]">Total Expenses</p>
+          </div>
+          <h3 className="text-2xl font-black text-red-500">₱{totalExpenses.toLocaleString()}</h3>
+          <p className={`text-[9px] italic mt-0.5 ${pendingExpenses > 0 ? 'text-orange-400 font-bold' : 'text-gray-300'}`}>
+            ₱{pendingExpenses.toLocaleString()} pending
+          </p>
+        </div>
+
+        <div className={`p-4 rounded-xl shadow-sm border ${netBalance >= 0 ? 'bg-brand-brown border-brand-brown text-white' : 'bg-red-50 border-red-200 text-red-900'}`}>
+          <div className="flex items-center gap-2 mb-1">
+            <div className={`p-1.5 rounded-lg ${netBalance >= 0 ? 'bg-white/20' : 'bg-red-100 text-red-600'}`}><DollarSign size={16} /></div>
+            <p className="font-bold uppercase tracking-tighter text-[10px] opacity-90">Net Balance</p>
+          </div>
+          <h3 className="text-2xl font-black">₱{netBalance.toLocaleString()}</h3>
+          <p className="text-[10px] opacity-75">Remaining camp funds</p>
+        </div>
+      </div>
         </>
       )}
 
@@ -341,10 +430,10 @@ export default function Expenses() {
                       <div className="p-4 space-y-3">
               <div className="space-y-2">
                 {[
-                  { id: 'tshirt', label: 'T-Shirt', val: settings.merchCosts?.tshirt },
-                  { id: 'bag', label: 'Bag', val: settings.merchCosts?.bag },
-                  { id: 'notebook', label: 'Notebook', val: settings.merchCosts?.notebook },
-                  { id: 'pen', label: 'Pen', val: settings.merchCosts?.pen },
+                  { id: 'tshirt', label: 'T-Shirt', val: localMerchCosts?.tshirt },
+                  { id: 'bag', label: 'Bag', val: localMerchCosts?.bag },
+                  { id: 'notebook', label: 'Notebook', val: localMerchCosts?.notebook },
+                  { id: 'pen', label: 'Pen', val: localMerchCosts?.pen },
                 ].map(item => (
                   <div key={item.id} className="flex justify-between items-center bg-gray-50 p-2 rounded-lg border border-gray-100">
                     <span className="text-xs font-medium text-gray-700">{item.label}</span>
@@ -352,9 +441,10 @@ export default function Expenses() {
                       <span className="text-[10px] text-gray-400">₱</span>
                       <input
                         type="number" min="0"
-                        value={item.val || ''}
-                        onChange={(e) => handleMerchCostChange(item.id, parseInt(e.target.value) || 0)}
-                        className="w-16 px-1.5 py-1 text-right rounded-md border border-gray-200 focus:outline-none focus:border-brand-brown text-xs font-bold"
+                        value={item.val}
+                        onChange={(e) => setLocalMerchCosts({ ...localMerchCosts, [item.id]: e.target.value })}
+                        onBlur={(e) => handleMerchCostChange(item.id, parseInt(e.target.value) || 0)}
+                        className="w-20 px-1.5 py-1 text-right rounded-md border border-gray-200 focus:outline-none focus:border-brand-brown text-xs font-bold"
                       />
                     </div>
                   </div>
@@ -371,78 +461,74 @@ export default function Expenses() {
 
         {/* Manual Expense Log Column */}
         <div className={`bg-white rounded-2xl shadow-sm border border-brand-beige overflow-hidden ${isAdmin ? 'lg:col-span-2' : 'lg:col-span-3'}`}>
-          <div className="p-4 border-b border-gray-100 flex flex-col md:flex-row justify-between md:items-center gap-4 bg-gray-50/30">
-            <h3 className="font-display text-xl text-brand-brown tracking-wide px-1">Camp-Wide Expense Log</h3>
+          <div className="p-3 md:p-4 border-b border-gray-100 flex flex-col md:flex-row justify-between md:items-center gap-3 md:gap-4 bg-gray-50/30">
+            <h3 className="font-display text-lg lg:text-xl text-brand-brown tracking-wide px-1">Expense Log</h3>
             <div className="flex items-center gap-2">
-              <Filter size={18} className="text-gray-400" />
+              <Filter size={18} className="text-gray-400 font-bold" />
               <select
                 value={filterCategory}
                 onChange={(e) => setFilterCategory(e.target.value)}
-                className="py-1.5 pl-3 pr-8 rounded-lg border border-gray-200 focus:outline-none focus:border-brand-brown focus:ring-1 text-sm bg-white"
+                className="py-1.5 pl-3 pr-8 rounded-lg border border-gray-200 focus:outline-none focus:border-brand-brown focus:ring-1 text-xs lg:text-sm bg-white font-bold"
               >
                 <option value="All">All Categories</option>
-                {settings.expenseCategories.map(c => <option key={c} value={c}>{c}</option>)}
+                {settings.expenseCategories.map((c: string) => <option key={c} value={c}>{c}</option>)}
               </select>
             </div>
           </div>
 
           {/* Mobile Card List */}
-          <div className="md:hidden space-y-2 px-1">
+          <div className="md:hidden space-y-1.5 px-0.5">
             {filteredExpenses.length > 0 ? filteredExpenses.map((exp) => (
-              <div key={exp.id} className="mobile-card flex flex-col gap-2">
+              <div key={exp.id} className="mobile-card flex flex-col gap-1.5 !p-2">
                 <div className="flex justify-between items-start">
                   <div className="flex-1 min-w-0">
-                    <p className="font-black text-brand-brown text-base leading-tight truncate">{exp.description}</p>
-                    <p className="text-[9px] text-gray-400 font-bold uppercase tracking-wider mt-0.5">{format(parseISO(exp.date), 'MMM d, yyyy')}</p>
+                    <p className="font-black text-brand-brown text-[13px] leading-tight truncate">{exp.description}</p>
+                    <p className="text-[8px] text-gray-400 font-bold uppercase tracking-wider mt-0.5">{format(parseISO(exp.date), 'MMM d, yyyy')}</p>
                   </div>
-                  <div className={`shrink-0 p-1.5 rounded-lg border shadow-sm ${exp.verifiedByTreasurer ? 'bg-green-100 text-green-700 border border-green-200' : 'bg-orange-50 text-orange-500 border border-orange-100'}`}>
+                  <div className={`shrink-0 p-1 rounded-lg border shadow-sm ${exp.verifiedByTreasurer ? 'bg-green-100 text-green-700 border-green-200' : 'bg-orange-50 text-orange-500 border-orange-100'}`}>
                     {canVerify ? (
-                      <button onClick={() => handleToggleVerify(exp)}>
-                        {exp.verifiedByTreasurer ? <CheckCircle size={18} /> : <Clock size={18} />}
+                      <button onClick={() => handleToggleVerify(exp)} className="flex items-center justify-center">
+                        {exp.verifiedByTreasurer ? <CheckCircle size={15} /> : <Clock size={15} />}
                       </button>
                     ) : (
-                      exp.verifiedByTreasurer ? <CheckCircle size={18} /> : <Clock size={18} />
+                      <div className="flex items-center justify-center">
+                        {exp.verifiedByTreasurer ? <CheckCircle size={15} /> : <Clock size={15} />}
+                      </div>
                     )}
                   </div>
                 </div>
  
-                <div className="flex items-center gap-1.5">
-                  <span className="px-1.5 py-0.5 bg-gray-50 text-gray-400 text-[9px] font-black uppercase rounded-md border border-gray-100">{exp.category}</span>
-                  <span className="px-1.5 py-0.5 bg-blue-50 text-blue-600 text-[9px] font-bold uppercase rounded-md border border-blue-100">{exp.method}</span>
+                <div className="flex items-center gap-1 flex-wrap">
+                  <span className="px-1 py-0.5 bg-gray-50 text-gray-400 text-[8px] font-black uppercase rounded border border-gray-100">{exp.category}</span>
+                  <span className="px-1 py-0.5 bg-blue-50 text-blue-600 text-[8px] font-bold uppercase rounded border border-blue-100">{exp.method}</span>
                 </div>
  
-                <div className="flex items-center justify-between mt-0.5 pt-1.5 border-t border-gray-50">
-                  <div className="flex items-center gap-2">
-                    <span className="text-[10px] text-gray-400 font-bold uppercase tracking-tighter shrink-0">Amount</span>
-                    <span className="text-[14px] font-black text-brand-brown">₱{exp.amount.toLocaleString()}</span>
+                <div className="flex items-center justify-between mt-0.5 pt-1.5 border-t border-gray-100">
+                  <div className="flex items-center gap-3">
+                    <span className="text-[11px] font-black text-brand-brown leading-none">₱{exp.amount.toLocaleString()} <span className="text-[8px] font-medium text-gray-400">by {exp.paidBy}</span></span>
                   </div>
-                  <div className="flex items-center gap-2 overflow-hidden">
-                    <span className="text-[10px] text-gray-400 font-bold uppercase tracking-tighter shrink-0">Paid By</span>
-                    <span className="text-[11px] font-bold text-gray-600 truncate">{exp.paidBy}</span>
-                  </div>
+                  {(() => {
+                    const canEditThis = isAdmin || canEditAny || (rolePerms?.editOwn && exp.createdBy === currentUser?._id);
+                    const canDeleteThis = isAdmin || canDeleteAny || (rolePerms?.deleteOwn && exp.createdBy === currentUser?._id);
+ 
+                    if (!canEditThis && !canDeleteThis) return null;
+ 
+                    return (
+                      <div className="flex items-center gap-1">
+                        {canEditThis && (
+                          <button onClick={() => openModalForEdit(exp)} className="p-1 bg-gray-50 text-gray-400 hover:text-brand-brown rounded-lg border border-gray-100 active:bg-brand-sand/20 transition-all">
+                            <Edit2 size={12} />
+                          </button>
+                        )}
+                        {canDeleteThis && (
+                          <button onClick={() => handleDelete(exp)} className="p-1 bg-red-50 text-red-300 hover:text-red-500 rounded-lg border border-red-100 active:bg-red-100 transition-all">
+                            <Trash2 size={12} />
+                          </button>
+                        )}
+                      </div>
+                    );
+                  })()}
                 </div>
- 
-                {(() => {
-                  const canEditThis = isAdmin || canEditAny || (rolePerms?.editOwn && exp.createdBy === currentUser?._id);
-                  const canDeleteThis = isAdmin || canDeleteAny || (rolePerms?.deleteOwn && exp.createdBy === currentUser?._id);
- 
-                  if (!canEditThis && !canDeleteThis) return null;
- 
-                  return (
-                    <div className="flex items-center justify-end gap-2 mt-0.5 pt-1.5 border-t border-gray-50/50">
-                      {canEditThis && (
-                        <button onClick={() => openModalForEdit(exp)} className="p-1.5 bg-gray-50 text-gray-400 hover:text-brand-brown rounded-lg border border-gray-100 active:bg-brand-sand/20 transition-all">
-                          <Edit2 size={14} />
-                        </button>
-                      )}
-                      {canDeleteThis && (
-                        <button onClick={() => handleDelete(exp)} className="p-1.5 bg-red-50 text-red-300 hover:text-red-500 rounded-lg border border-red-100 active:bg-red-100 transition-all">
-                          <Trash2 size={14} />
-                        </button>
-                      )}
-                    </div>
-                  );
-                })()}
               </div>
             )) : (
               <div className="mobile-card py-12 text-center text-gray-400">
@@ -454,14 +540,14 @@ export default function Expenses() {
 
           <div className="hidden md:block overflow-x-auto">
             <table className="w-full text-left text-sm text-gray-600">
-              <thead className="text-xs text-gray-400 uppercase bg-gray-50/80 border-b border-gray-100">
+              <thead className="text-[10px] lg:text-xs text-gray-400 uppercase bg-gray-50/80 border-b border-gray-100">
                 <tr>
-                  <th className="px-6 py-4 font-medium tracking-wider">Date</th>
-                  <th className="px-6 py-4 font-medium tracking-wider">Description</th>
-                  <th className="px-6 py-4 font-medium tracking-wider">Category</th>
-                  <th className="px-6 py-4 font-medium tracking-wider text-right">Amount</th>
-                  <th className="px-6 py-4 font-medium tracking-wider text-center">Verified</th>
-                  <th className="px-6 py-4 font-medium tracking-wider text-right">Actions</th>
+                  <th className="px-3 lg:px-6 py-4 font-medium tracking-wider">Date</th>
+                  <th className="px-3 lg:px-6 py-4 font-medium tracking-wider">Description</th>
+                  <th className="px-3 lg:px-6 py-4 font-medium tracking-wider">Category</th>
+                  <th className="px-3 lg:px-6 py-4 font-medium tracking-wider text-right">Amount</th>
+                  <th className="px-3 lg:px-6 py-4 font-medium tracking-wider text-center">Verified</th>
+                  <th className="px-3 lg:px-6 py-4 font-medium tracking-wider text-right">Actions</th>
                 </tr>
                 <tr className="bg-green-50/40 text-xs border-b border-gray-100">
                   <td colSpan={6} className="px-6 py-1.5 text-gray-500">
@@ -475,20 +561,20 @@ export default function Expenses() {
               <tbody className="divide-y divide-gray-100">
                 {filteredExpenses.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage).length > 0 ? filteredExpenses.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage).map((exp) => (
                   <tr key={exp.id} className="hover:bg-brand-cream/30 transition-colors">
-                    <td className="px-6 py-4 whitespace-nowrap">{format(parseISO(exp.date), 'MMM d, yyyy')}</td>
-                    <td className="px-6 py-4">
-                      <p className="font-medium text-brand-brown">{exp.description}</p>
-                      <p className="text-xs text-gray-400 mt-0.5">Paid by: <span className="font-medium text-gray-600">{exp.paidBy}</span> ({exp.method})</p>
+                    <td className="px-3 lg:px-6 py-4 whitespace-nowrap text-[11px] lg:text-sm">{format(parseISO(exp.date), 'MMM d, yyyy')}</td>
+                    <td className="px-3 lg:px-6 py-4">
+                      <p className="font-bold text-brand-brown text-xs lg:text-sm">{exp.description}</p>
+                      <p className="text-[10px] text-gray-400 mt-0.5">Paid by: <span className="font-medium text-gray-600">{exp.paidBy}</span> <span className="hidden lg:inline text-[9px]">({exp.method})</span></p>
                     </td>
-                    <td className="px-6 py-4">
-                      <span className="px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider bg-gray-100 text-gray-600 border border-gray-200">
+                    <td className="px-3 lg:px-6 py-4">
+                      <span className="px-2 py-0.5 rounded-full text-[8px] lg:text-[10px] font-bold uppercase tracking-wider bg-gray-100 text-gray-600 border border-gray-200">
                         {exp.category}
                       </span>
                     </td>
-                    <td className="px-6 py-4 text-right font-bold text-gray-800">
+                    <td className="px-3 lg:px-6 py-4 text-right font-black text-gray-800 text-xs lg:text-sm">
                       ₱{exp.amount.toLocaleString()}
                     </td>
-                    <td className="px-6 py-4 text-center">
+                    <td className="px-3 lg:px-6 py-4 text-center">
                       {canVerify ? (
                         <button
                           onClick={() => handleToggleVerify(exp)}
@@ -496,15 +582,15 @@ export default function Expenses() {
                             }`}
                           title={exp.verifiedByTreasurer ? 'Verified by Treasurer' : 'Pending Verification'}
                         >
-                          {exp.verifiedByTreasurer ? <CheckCircle size={20} /> : <Clock size={20} />}
+                          {exp.verifiedByTreasurer ? <CheckCircle size={18} className="lg:w-5 lg:h-5" /> : <Clock size={18} className="lg:w-5 lg:h-5" />}
                         </button>
                       ) : (
                         <div className={`inline-flex items-center justify-center p-1.5 rounded-lg ${exp.verifiedByTreasurer ? 'text-green-500' : 'text-orange-400'}`} title={exp.verifiedByTreasurer ? 'Verified by Treasurer' : 'Pending Verification'}>
-                          {exp.verifiedByTreasurer ? <CheckCircle size={20} /> : <Clock size={20} />}
+                          {exp.verifiedByTreasurer ? <CheckCircle size={18} className="lg:w-5 lg:h-5" /> : <Clock size={18} className="lg:w-5 lg:h-5" />}
                         </div>
                       )}
                     </td>
-                    <td className="px-6 py-4 text-right">
+                    <td className="px-3 lg:px-6 py-4 text-right">
                       {(() => {
                         const canEditThis = isAdmin || canEditAny || (rolePerms?.editOwn && exp.createdBy === currentUser?._id);
                         const canDeleteThis = isAdmin || canDeleteAny || (rolePerms?.deleteOwn && exp.createdBy === currentUser?._id);
@@ -512,14 +598,14 @@ export default function Expenses() {
                         if (!canEditThis && !canDeleteThis) return null;
 
                         return (
-                          <div className="flex items-center justify-end gap-2">
+                          <div className="flex items-center justify-end gap-1 lg:gap-2">
                             {canEditThis && (
-                              <button onClick={() => openModalForEdit(exp)} className="p-2 text-gray-400 hover:text-brand-brown hover:bg-brand-sand/20 rounded-lg transition-colors">
+                              <button onClick={() => openModalForEdit(exp)} className="p-1.5 lg:p-2 text-gray-400 hover:text-brand-brown hover:bg-brand-sand/20 rounded-lg transition-colors">
                                 <Edit2 size={16} />
                               </button>
                             )}
                             {canDeleteThis && (
-                              <button onClick={() => handleDelete(exp)} className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors">
+                              <button onClick={() => handleDelete(exp)} className="p-1.5 lg:p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors">
                                 <Trash2 size={16} />
                               </button>
                             )}
@@ -567,9 +653,10 @@ export default function Expenses() {
       </div>
 
       {isModalOpen && (
-        <div className="fixed inset-0 bg-brand-brown/40 backdrop-blur-sm z-50 flex items-center justify-center p-2 sm:p-4">
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg overflow-hidden border border-brand-sand max-h-[90vh] flex flex-col">
-            <div className="px-4 sm:px-6 py-4 border-b border-gray-100 flex justify-between items-center bg-brand-cream/50 sticky top-0 z-10">
+        <div className="fixed inset-0 bg-brand-brown/50 backdrop-blur-sm z-[100] flex items-center justify-center p-3 sm:p-4">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg border border-brand-sand flex flex-col" style={{maxHeight: 'min(92dvh, 700px)'}}>
+            {/* Modal Header — shrink-0 keeps it pinned above the scroll region */}
+            <div className="px-4 sm:px-6 py-4 border-b border-gray-100 flex justify-between items-center bg-brand-cream/50 shrink-0 rounded-t-2xl">
               <h3 className="text-2xl font-display text-brand-brown tracking-wide">
                 {editingId ? 'Edit Expense' : 'Log New Expense'}
               </h3>
@@ -578,7 +665,10 @@ export default function Expenses() {
               </button>
             </div>
 
-            <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4">
+            {/* Scrollable form fields.
+                CRITICAL: min-h-0 is required on iOS Safari — without it, a flex-1 child
+                expands to its content height and overflow-y-auto never activates. */}
+            <form id="expense-form" onSubmit={handleSubmit} className="min-h-0 flex-1 overflow-y-auto p-4 sm:p-6 space-y-4">
               <div>
                 <label className="block text-sm text-gray-600 mb-1">Description</label>
                 <input
@@ -597,7 +687,7 @@ export default function Expenses() {
                     onChange={(e) => setFormData({ ...formData, category: e.target.value })}
                     className="w-full px-3 py-2 rounded-lg border border-gray-200 focus:outline-none focus:border-brand-brown"
                   >
-                    {settings.expenseCategories.map(c => <option key={c} value={c}>{c}</option>)}
+                    {settings.expenseCategories.map((c: string) => <option key={c} value={c}>{c}</option>)}
                   </select>
                 </div>
                 <div>
@@ -628,8 +718,7 @@ export default function Expenses() {
                     type="text" required placeholder="Name"
                     value={formData.paidBy}
                     onChange={(e) => setFormData({ ...formData, paidBy: e.target.value })}
-                    className={`w-full px-3 py-2 rounded-lg border focus:outline-none transition-colors ${isNameValid ? 'border-gray-200 focus:border-brand-brown' : 'border-red-400 focus:border-red-500 bg-red-50/30'
-                      }`}
+                    className="w-full px-3 py-2 rounded-lg border border-gray-200 focus:outline-none focus:border-brand-brown"
                   />
                 </div>
                 <div>
@@ -640,34 +729,37 @@ export default function Expenses() {
                     onChange={(e) => setFormData({ ...formData, method: e.target.value })}
                     className="w-full px-3 py-2 rounded-lg border border-gray-200 focus:outline-none focus:border-brand-brown"
                   >
-                    {settings.paymentMethods.map(m => <option key={m} value={m}>{m}</option>)}
+                    {settings.paymentMethods.map((m: string) => <option key={m} value={m}>{m}</option>)}
                   </select>
                 </div>
               </div>
-
-              <div className="mt-8 pt-6 border-t border-brand-beige flex justify-end gap-3 sticky bottom-0 bg-white pb-2">
-                <button
-                  type="button"
-                  onClick={closeModal}
-                  className="px-5 py-2.5 rounded-lg border border-gray-300 text-gray-600 font-medium hover:bg-gray-50 transition-colors"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={!isNameValid}
-                  className="px-6 py-2.5 rounded-lg bg-brand-brown text-white font-bold hover:bg-brand-light-brown transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {editingId ? 'Save Changes' : 'Log Expense'}
-                </button>
-              </div>
             </form>
+
+            {/* Action buttons anchored to the modal floor — NOT inside the scroll container.         */}
+            {/* This prevents iOS keyboard from pushing them up when a text field is focused.         */}
+            <div className="shrink-0 px-4 sm:px-6 py-3 border-t border-brand-beige flex justify-end gap-3 bg-white rounded-b-2xl">
+              <button
+                type="button"
+                onClick={closeModal}
+                className="px-5 py-2.5 rounded-lg border border-gray-300 text-gray-600 font-medium hover:bg-gray-50 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                form="expense-form"
+                disabled={!isNameValid}
+                className="px-6 py-2.5 rounded-lg bg-brand-brown text-white font-bold hover:bg-brand-light-brown transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {editingId ? 'Save Changes' : 'Log Expense'}
+              </button>
+            </div>
           </div>
         </div>
       )}
 
       {isBatchModalOpen && (
-        <div className="fixed inset-0 bg-brand-brown/50 backdrop-blur-sm z-[60] flex items-center justify-center p-2 sm:p-4 overflow-y-auto">
+        <div className="fixed inset-0 bg-brand-brown/50 backdrop-blur-sm z-[100] flex items-center justify-center p-2 sm:p-4 overflow-y-auto">
           <div className="bg-white rounded-2xl shadow-xl w-full max-w-5xl overflow-hidden my-4 md:my-8 border border-brand-sand max-h-[95vh] sm:max-h-[90vh] flex flex-col">
             <div className="px-4 sm:px-6 py-4 border-b border-gray-100 flex justify-between items-center bg-brand-cream/50 sticky top-0 z-20">
               <h3 className="text-2xl font-display text-brand-brown tracking-wide flex items-center gap-2">
@@ -682,7 +774,7 @@ export default function Expenses() {
               </button>
             </div>
 
-            <form onSubmit={handleBatchSubmit} className="flex-1 overflow-y-auto p-4 sm:p-6 bg-gray-50/30">
+            <form onSubmit={handleBatchSubmit} className="flex-1 overflow-y-auto p-4 sm:p-6 bg-gray-50/30 pb-24 md:pb-6">
               <div className="space-y-4">
                 {batchData.map((row, idx) => {
                   return (
@@ -698,7 +790,7 @@ export default function Expenses() {
                         <div className="md:col-span-2">
                           <label className="block text-xs text-gray-500 mb-1">Category</label>
                           <select required value={row.category} onChange={(e) => setBatchData(batchData.map((d, i) => i === idx ? { ...d, category: e.target.value as any } : d))} className="w-full px-2 py-1.5 text-sm rounded-lg border border-gray-200 focus:outline-none focus:border-brand-brown">
-                            {settings.expenseCategories.map(c => <option key={c} value={c}>{c}</option>)}
+                            {settings.expenseCategories.map((c: string) => <option key={c} value={c}>{c}</option>)}
                           </select>
                         </div>
                         <div className="md:col-span-2">
@@ -716,7 +808,7 @@ export default function Expenses() {
                         <div className="md:col-span-2">
                           <label className="block text-xs text-gray-500 mb-1">Method</label>
                           <select required value={row.method} onChange={(e) => setBatchData(batchData.map((d, i) => i === idx ? { ...d, method: e.target.value } : d))} className="w-full px-3 py-1.5 text-sm rounded-lg border border-gray-200 focus:outline-none focus:border-brand-brown">
-                            {settings.paymentMethods.map(m => <option key={m} value={m}>{m}</option>)}
+                            {settings.paymentMethods.map((m: string) => <option key={m} value={m}>{m}</option>)}
                           </select>
                         </div>
                       </div>

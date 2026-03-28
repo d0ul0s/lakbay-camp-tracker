@@ -60,6 +60,18 @@ router.put('/', async (req, res) => {
       { new: true, upsert: true, runValidators: true, strict: false }
     );
     
+    // Broadcast update for all clients
+    req.io.emit('DATA_UPDATED', { 
+      type: 'settings', 
+      action: 'updated', 
+      user: req.user.role,
+      userId: req.user.id,
+      data: settings
+    });
+
+    const cache = require('../utils/cache');
+    await cache.refreshSettingsCache();
+
     res.json(settings);
   } catch (err) {
     console.error('Settings update error:', err);

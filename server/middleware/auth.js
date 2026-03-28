@@ -1,13 +1,17 @@
 const jwt = require('jsonwebtoken');
 
 module.exports = function (req, res, next) {
-  const authHeader = req.header('Authorization');
+  let token = null;
 
-  if (!authHeader) {
-    return res.status(401).json({ message: 'No token, authorization denied' });
+  // 1. Check Cookies (Primary)
+  if (req.cookies && req.cookies.lakbay_auth_token) {
+    token = req.cookies.lakbay_auth_token;
+  } 
+  // 2. Check Authorization Header (Fallback)
+  else if (req.header('Authorization')) {
+    const authHeader = req.header('Authorization');
+    token = authHeader.split(' ')[1];
   }
-
-  const token = authHeader.split(' ')[1];
 
   if (!token) {
     return res.status(401).json({ message: 'No token, authorization denied' });

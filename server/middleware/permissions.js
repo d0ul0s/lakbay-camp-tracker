@@ -57,10 +57,25 @@ function deepMerge(target, source) {
 const Settings = require('../models/Settings');
 const { DEFAULT_MATRIX } = require('../models/Settings');
 
+let cachedSettings = null;
+let cacheTimestamp = 0;
+const CACHE_TTL = 5000; // 5 seconds cache
+
+async function getCachedSettings() {
+  const now = Date.now();
+  if (cachedSettings && (now - cacheTimestamp < CACHE_TTL)) {
+    return cachedSettings;
+  }
+  const settings = await Settings.findOne().lean();
+  cachedSettings = settings;
+  cacheTimestamp = now;
+  return settings;
+}
+
 async function attachPermissions(req, res, next) {
   if (req.user.role === 'admin') return next(); // admin always full access
   try {
-    const settings = await Settings.findOne().lean();
+    const settings = await getCachedSettings();
     const dbMatrix = (settings && settings.permissionMatrix) ? settings.permissionMatrix : {};
     // Deep-merge: start with DEFAULT as base, overlay DB-saved values on top
     const merged = {};

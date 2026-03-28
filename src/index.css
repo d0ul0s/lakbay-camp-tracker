@@ -6,23 +6,58 @@
   --color-brand-cream: #FAF7F2;
   --color-brand-light-brown: #A0522D;
   --color-brand-beige: #F5F5DC;
-  
+
   --font-sans: "Inter", system-ui, sans-serif;
   --font-display: "Bebas Neue", "Barlow Condensed", sans-serif;
 }
 
 @layer base {
+
+  html,
+  body {
+    height: 100%;
+    /* Prevent iOS rubber-banding which swallows touch events near edges */
+    overscroll-behavior: none;
+  }
+
   body {
     background-color: var(--color-brand-cream);
     color: var(--color-brand-brown);
     font-family: var(--font-sans);
+    /* Suppress the 300ms iOS tap delay and the blue flash on tap */
     -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation;
   }
 
-  /* Improve touch targets for mobile */
-  button, a, select, input {
-    min-height: 44px;
+  /* Only buttons and links need enforced touch targets, NOT inputs/selects
+     (min-height on inputs breaks compact table rows and filter dropdowns) */
+  button,
+  a[href] {
     touch-action: manipulation;
+    /* Prevent text selection on long-press — a major source of "button didn't fire" */
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-touch-callout: none;
+  }
+
+  /* Inputs/selects: just suppres delay, don't enforce height */
+  input,
+  select,
+  textarea {
+    touch-action: manipulation;
+  }
+
+  /* Momentum scrolling on iOS for any overflow-y-auto container */
+  .overflow-y-auto,
+  [data-scroll] {
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior-y: contain;
+  }
+
+  /* Make SVG icons inside buttons pass through pointer/touch events cleanly */
+  button svg,
+  a svg {
+    pointer-events: none;
   }
 }
 
@@ -31,11 +66,18 @@
     @apply bg-white p-2.5 rounded-xl shadow-sm border border-brand-beige active:scale-[0.98] transition-transform;
   }
 
+  /* Bottom nav items: explicit 56px height touch target, no flex overflow */
   .bottom-nav-item {
-    @apply flex flex-col items-center justify-center flex-1 py-1 text-[10px] font-bold uppercase tracking-tighter transition-all;
+    @apply flex flex-col items-center justify-center flex-1 text-[10px] font-bold uppercase tracking-tighter transition-colors cursor-pointer;
+    min-height: 56px;
+    padding: 6px 0;
+    -webkit-user-select: none;
+    user-select: none;
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
   }
 
   .safe-area-bottom {
-    padding-bottom: env(safe-area-inset-bottom);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
   }
 }

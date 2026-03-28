@@ -5,7 +5,7 @@ import { Database, Download, Upload, AlertTriangle, Plus, Trash2, Image as Image
 import ConfirmModal from '../components/ConfirmModal';
 
 export default function Settings() {
-  const { currentUser } = useAppStore();
+  const { currentUser, appSettings, fetchGlobalSettings } = useAppStore();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const photoInputRef = useRef<HTMLInputElement>(null);
   const [importStatus, setImportStatus] = useState<{ type: 'success' | 'error' | null, msg: string }>({ type: null, msg: '' });
@@ -23,17 +23,21 @@ export default function Settings() {
   });
 
   useEffect(() => {
-    fetchSettings();
+    // Initial load from store if available
+    if (appSettings) {
+      setSettings(appSettings);
+    }
+    
+    // Always trigger a silent refresh
+    fetchGlobalSettings(true);
   }, []);
 
-  const fetchSettings = async () => {
-    try {
-      const res = await api.get('/api/settings');
-      setSettings(res.data);
-    } catch (err) {
-      console.error(err);
+  useEffect(() => {
+    // Update local settings when store arrives (if not currently adding/deleting)
+    if (appSettings && !addingField) {
+      setSettings(appSettings);
     }
-  };
+  }, [appSettings, addingField]);
   
   if (currentUser?.role !== 'admin') {
     return null;
@@ -143,6 +147,7 @@ export default function Settings() {
           shirtSizePhoto: base64
         });
         setSettings(res.data);
+        await fetchGlobalSettings(true); // Broadcast implicitly handled by backend
       } catch (err) {
         setPhotoError('Error saving photo: ' + (err as any).message);
       }

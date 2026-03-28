@@ -41,7 +41,18 @@ router.post('/', requirePermission('registrants', 'add'), async (req, res) => {
 
     const registrant = new Registrant(req.body);
     const newRegistrant = await registrant.save();
+    
+    // Broadcast update immediately after save
+    req.io.emit('DATA_UPDATED', { 
+      type: 'registrants', 
+      action: 'added', 
+      user: req.user.fullName || req.user.role,
+      userId: req.user.id,
+      data: newRegistrant
+    });
+
     await logActivity(req, 'CREATE', 'Registrant', newRegistrant._id, { name: newRegistrant.fullName });
+    
     res.status(201).json(newRegistrant);
   } catch (err) {
     res.status(400).json({ message: err.message });
@@ -84,8 +95,20 @@ router.post('/batch', requirePermission('registrants', 'add'), async (req, res) 
       }
       const registrant = new Registrant(data);
       const newRegistrant = await registrant.save();
-      await logActivity(req, 'CREATE', 'Registrant', newRegistrant._id, { name: newRegistrant.fullName, amountPaid: newRegistrant.amountPaid });
       savedDocs.push(newRegistrant);
+    }
+
+    // Broadcast update before logging activity
+    req.io.emit('DATA_UPDATED', { 
+      type: 'registrants', 
+      action: 'imported', 
+      user: req.user.fullName || req.user.role,
+      userId: req.user.id,
+      data: savedDocs
+    });
+
+    for (const doc of savedDocs) {
+      await logActivity(req, 'CREATE', 'Registrant', doc._id, { name: doc.fullName, amountPaid: doc.amountPaid });
     }
 
     res.status(201).json(savedDocs);
@@ -135,22 +158,18 @@ router.put('/:id', async (req, res) => {
       }
     }
 
-    // Idempotent Verification Check
-    if (req.body.verifiedByTreasurer !== undefined) {
-      if (registrant.verifiedByTreasurer === req.body.verifiedByTreasurer) {
-        // If only verification is sent, error out
-        const keys = Object.keys(req.body);
-        if (keys.length === 1) {
-          return res.status(400).json({ message: 'State identical. Verification already processed.' });
-        }
-        // If other fields are sent, just remove verification from body to avoid redundant logs/processing
-        delete req.body.verifiedByTreasurer;
-      }
-    }
-
     const updatedRegistrant = await Registrant.findByIdAndUpdate(req.params.id, req.body, { new: true });
     if (!updatedRegistrant) return res.status(404).json({ message: 'Registrant not found' });
     
+    // Broadcast update immediately
+    req.io.emit('DATA_UPDATED', { 
+      type: 'registrants', 
+      action: 'updated', 
+      user: req.user.fullName || req.user.role,
+      userId: req.user.id,
+      data: updatedRegistrant
+    });
+
     let action = 'UPDATE';
     if (req.body.verifiedByTreasurer !== undefined) {
       action = req.body.verifiedByTreasurer ? 'VERIFY' : 'UNVERIFY';
@@ -188,7 +207,18 @@ router.delete('/:id', async (req, res) => {
 
     const deletedRegistrant = await Registrant.findByIdAndDelete(req.params.id);
     if (!deletedRegistrant) return res.status(404).json({ message: 'Registrant not found' });
+
+    // Broadcast update immediately
+    req.io.emit('DATA_UPDATED', { 
+      type: 'registrants', 
+      action: 'deleted', 
+      user: req.user.fullName || req.user.role,
+      userId: req.user.id,
+      data: { id: req.params.id }
+    });
+
     await logActivity(req, 'DELETE', 'Registrant', deletedRegistrant._id, { name: deletedRegistrant.fullName });
+    
     res.json({ message: 'Registrant deleted' });
   } catch (err) {
     res.status(500).json({ message: err.message });
@@ -226,6 +256,15 @@ router.patch('/:id/merch', async (req, res) => {
 
     const updatedRegistrant = await Registrant.findByIdAndUpdate(req.params.id, update, { new: true });
     
+    // Broadcast update immediately
+    req.io.emit('DATA_UPDATED', { 
+      type: 'registrants', 
+      action: 'updated', 
+      user: req.user.fullName || req.user.role,
+      userId: req.user.id,
+      data: updatedRegistrant
+    });
+
     // Log Activity
     await logActivity(req, value ? 'CLAIM_MERCH' : 'UNCLAIM_MERCH', 'Registrant', updatedRegistrant._id, { 
       name: updatedRegistrant.fullName, 

@@ -19,7 +19,18 @@ router.post('/', requirePermission('expenses', 'add'), async (req, res) => {
   const expense = new Expense({ ...req.body, createdBy: req.user.id });
   try {
     const newExpense = await expense.save();
+    
+    // Broadcast update immediately
+    req.io.emit('DATA_UPDATED', { 
+      type: 'expenses', 
+      action: 'added', 
+      user: req.user.role,
+      userId: req.user.id,
+      data: newExpense
+    });
+
     await logActivity(req, 'CREATE', 'Expense', newExpense._id, { category: newExpense.category, description: newExpense.description, amount: newExpense.amount });
+    
     res.status(201).json(newExpense);
   } catch (err) {
     res.status(400).json({ message: err.message });
@@ -35,8 +46,20 @@ router.post('/batch', requirePermission('expenses', 'add'), async (req, res) => 
     for (const data of expenses) {
       const expense = new Expense({ ...data, createdBy: req.user.id });
       const newExpense = await expense.save();
-      await logActivity(req, 'CREATE', 'Expense', newExpense._id, { category: newExpense.category, description: newExpense.description, amount: newExpense.amount });
       savedDocs.push(newExpense);
+    }
+    
+    // Broadcast update before logging activity
+    req.io.emit('DATA_UPDATED', { 
+      type: 'expenses', 
+      action: 'imported', 
+      user: req.user.role,
+      userId: req.user.id,
+      data: savedDocs
+    });
+
+    for (const doc of savedDocs) {
+      await logActivity(req, 'CREATE', 'Expense', doc._id, { category: doc.category, description: doc.description, amount: doc.amount });
     }
     
     res.status(201).json(savedDocs);
@@ -65,13 +88,17 @@ router.put('/:id', async (req, res) => {
       }
     }
 
-    if (req.body.verifiedByTreasurer !== undefined) {
-      if (expense.verifiedByTreasurer === req.body.verifiedByTreasurer) {
-        return res.status(400).json({ message: 'State identical. Verification already processed.' });
-      }
-    }
     const updatedExpense = await Expense.findByIdAndUpdate(req.params.id, req.body, { new: true });
     if (!updatedExpense) return res.status(404).json({ message: 'Expense not found' });
+
+    // Broadcast update immediately
+    req.io.emit('DATA_UPDATED', { 
+      type: 'expenses', 
+      action: 'updated', 
+      user: req.user.role,
+      userId: req.user.id,
+      data: updatedExpense
+    });
 
     let action = 'UPDATE';
     if (req.body.verifiedByTreasurer !== undefined) {
@@ -106,9 +133,20 @@ router.delete('/:id', async (req, res) => {
     }
 
     const deletedExpense = await Expense.findByIdAndDelete(req.params.id);
-    if (!deletedExpense) return res.status(404).json({ message: 'Expense not found' });
     
-    await logActivity(req, 'DELETE', 'Expense', deletedExpense._id, { description: deletedExpense.description });
+    // Broadcast update immediately
+    req.io.emit('DATA_UPDATED', { 
+      type: 'expenses', 
+      action: 'deleted', 
+      user: req.user.role,
+      userId: req.user.id,
+      data: { _id: req.params.id }
+    });
+
+    if (deletedExpense) {
+      await logActivity(req, 'DELETE', 'Expense', deletedExpense._id, { description: deletedExpense.description });
+    }
+
     res.json({ message: 'Expense deleted' });
   } catch (err) {
     res.status(500).json({ message: err.message });

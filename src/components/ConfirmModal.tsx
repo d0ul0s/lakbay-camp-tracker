@@ -28,9 +28,9 @@ export default function ConfirmModal({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-brand-brown/40 backdrop-blur-sm z-[9999] flex items-end sm:items-center justify-center p-0 sm:p-4">
+    <div className="fixed inset-0 bg-brand-brown/40 backdrop-blur-sm z-[150] flex items-center justify-center p-4">
       <div 
-        className="bg-white rounded-t-2xl sm:rounded-2xl shadow-xl w-full max-w-sm overflow-hidden border border-brand-sand transform transition-all sm:mx-auto"
+        className="bg-white rounded-2xl shadow-xl w-full max-w-sm overflow-hidden border border-brand-sand transform transition-all mx-auto"
         role="dialog"
       >
         <div className="p-5 sm:p-6">

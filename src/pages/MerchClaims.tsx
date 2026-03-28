@@ -5,8 +5,8 @@ import { Search, Filter, Check, Shirt, Briefcase, Book, PenTool, ShieldAlert, Sh
 import type { Registrant, AppSettings } from '../types';
 
 export default function MerchClaims() {
-  const { currentUser } = useAppStore();
-  const [registrants, setRegistrants] = useState<Registrant[]>([]);
+  const { currentUser, registrants, fetchRegistrants, updateRegistrant, appSettings, fetchGlobalSettings, lockRegistrant, unlockRegistrant } = useAppStore();
+  // fetchRegistrants kept in deps to avoid lint warning even though we only use it for cold starts
   const [settings, setSettings] = useState<AppSettings>({ churches: [], merchCosts: {} } as any);
   
   const isAdmin = currentUser?.role?.toLowerCase().trim() === 'admin';
@@ -24,24 +24,26 @@ export default function MerchClaims() {
     );
   }
   
-  const fetchData = async () => {
-    try {
-      const [regRes, setRes] = await Promise.all([
-        api.get('/api/registrants'),
-        api.get('/api/settings')
-      ]);
-      setRegistrants(regRes.data);
-      if (setRes.data && setRes.data.churchList) {
-        setSettings({ ...setRes.data, churches: setRes.data.churchList });
-      }
-    } catch (err) {
-      console.error(err);
+  useEffect(() => {
+    // Initial sync from store
+    if (appSettings) {
+      setSettings({ ...appSettings, churches: appSettings.churches || [] });
     }
-  };
+
+    // Only trigger network fetches if boot hasn't synced yet (cold start with no cache).
+    // Once hasSyncedLive=true, WebSocket in Layout.tsx handles all real-time updates.
+    const { hasSyncedLive } = useAppStore.getState();
+    if (!hasSyncedLive) {
+      fetchGlobalSettings(true);
+      fetchRegistrants(registrants.length > 0);
+    }
+  }, []);
 
   useEffect(() => {
-    fetchData();
-  }, []);
+    if (appSettings) {
+      setSettings({ ...appSettings, churches: appSettings.churches || [] });
+    }
+  }, [appSettings]);
 
   
   const [searchTerm, setSearchTerm] = useState('');
@@ -75,7 +77,10 @@ export default function MerchClaims() {
   }, [baseRegistrants, searchTerm, filterChurch, filterStatus]);
 
   const toggleClaim = async (regId: string, item: keyof typeof registrants[0]['merchClaims']) => {
-    const reg = registrants.find(r => (r.id === regId || (r as any)._id === regId));
+    // Read directly from the synchronous Zustand store to bypass React's async rendering closure.
+    // This physically prevents rapid-fire sequential clicks from overwriting each other's optimistic UI states.
+    const currentRegs = useAppStore.getState().registrants;
+    const reg = currentRegs.find(r => (r.id === regId || (r as any)._id === regId));
     if (!reg) return;
 
     const canToggleAll = isAdmin || merchPerms?.toggleAll;
@@ -86,39 +91,34 @@ export default function MerchClaims() {
     const isClaimed = reg.merchClaims[item];
     const newValue = !isClaimed;
 
-    // 1. Optimistic UI Update
-    setRegistrants(prev => prev.map(r => {
-      if ((r.id === regId || (r as any)._id === regId)) {
-        return {
-          ...r,
-          merchClaims: { ...r.merchClaims, [item]: newValue },
-          merchClaimDates: { ...r.merchClaimDates, [item]: newValue ? new Date().toISOString() : null }
-        };
-      }
-      return r;
-    }));
+    // 1. Lock this registrant: any WebSocket echo during this request will be ignored
+    lockRegistrant(regId);
+
+    // 2. Optimistic UI Update using Store
+    const updatedClaims = { ...reg.merchClaims, [item]: newValue };
+    const updatedDates = { ...reg.merchClaimDates, [item]: newValue ? new Date().toISOString() : null };
+    
+    updateRegistrant(regId, { 
+      merchClaims: updatedClaims,
+      merchClaimDates: updatedDates
+    });
 
     try {
-      // 2. Atomic Patch Update
+      // 3. Atomic Patch Update
       await api.patch(`/api/registrants/${regId}/merch`, {
         item: item,
         value: newValue
       });
-      // No need to fetchData(); optimistic state is already correct
     } catch (err) {
       console.error('Failed to toggle merch claim:', err);
-      // 3. Revert on failure
-      setRegistrants(prev => prev.map(r => {
-        if ((r.id === regId || (r as any)._id === regId)) {
-          return {
-            ...r,
-            merchClaims: { ...r.merchClaims, [item]: isClaimed },
-            merchClaimDates: { ...r.merchClaimDates, [item]: reg.merchClaimDates[item] }
-          };
-        }
-        return r;
-      }));
-      // Alert the user? Optional
+      // 4. Revert on failure
+      updateRegistrant(regId, { 
+        merchClaims: reg.merchClaims,
+        merchClaimDates: reg.merchClaimDates
+      });
+    } finally {
+      // 5. Always unlock, whether success or failure
+      unlockRegistrant(regId);
     }
   };
 
@@ -145,24 +145,24 @@ export default function MerchClaims() {
       <h2 className="text-2xl md:text-3xl font-display text-brand-brown tracking-wide">Merch Claims</h2>
       
       {/* Stats Summary */}
-      <div className="grid grid-cols-4 md:grid-cols-4 gap-2 md:gap-4 overflow-x-auto pb-1 md:pb-0">
+      <div className="grid grid-cols-4 md:grid-cols-4 gap-2 lg:gap-4 overflow-x-auto pb-1 md:pb-0">
         {[
           { label: 'Shirts', icon: Shirt, stats: stats.tshirts, color: 'text-blue-500', bg: 'bg-blue-50' },
           { label: 'Bags', icon: Briefcase, stats: stats.bags, color: 'text-orange-500', bg: 'bg-orange-50' },
           { label: 'Notes', icon: Book, stats: stats.notebooks, color: 'text-green-500', bg: 'bg-green-50' },
           { label: 'Pens', icon: PenTool, stats: stats.pens, color: 'text-purple-500', bg: 'bg-purple-50' },
         ].map(item => (
-          <div key={item.label} className="bg-white p-2 md:p-5 rounded-xl shadow-sm border border-brand-beige hover:shadow-md transition-shadow min-w-[70px] md:min-w-0">
-            <div className="flex items-center gap-1.5 md:gap-2 mb-1 md:mb-2">
+          <div key={item.label} className="bg-white p-2 md:p-3 lg:p-5 rounded-xl shadow-sm border border-brand-beige hover:shadow-md transition-shadow min-w-[70px] md:min-w-0">
+            <div className="flex items-center gap-1.5 md:gap-2 mb-1 lg:mb-2">
               <div className={`p-1 md:p-1.5 ${item.bg} ${item.color} rounded-lg`}>
                 <item.icon size={12} className="md:w-3.5 md:h-3.5" />
               </div>
-              <p className="font-bold text-gray-400 uppercase tracking-tighter text-[8px] md:text-[10px] truncate">{item.label}</p>
+              <p className="font-bold text-gray-400 uppercase tracking-tighter text-[7px] md:text-[8px] lg:text-[10px] truncate">{item.label}</p>
             </div>
-            <p className="text-sm md:text-xl font-black text-gray-900 leading-none">
-              {item.stats.claimed} <span className="text-[8px] md:text-[10px] font-normal text-gray-400 lowercase">/ {item.stats.total}</span>
+            <p className="text-xs md:text-sm lg:text-xl font-black text-gray-900 leading-none">
+              {item.stats.claimed} <span className="text-[7px] md:text-[8px] lg:text-[10px] font-normal text-gray-400 lowercase">/ {item.stats.total}</span>
             </p>
-            <div className="w-full bg-gray-100 h-0.5 md:h-1 rounded-full mt-1.5 md:mt-2">
+            <div className="w-full bg-gray-100 h-0.5 md:h-1 rounded-full mt-1 lg:mt-2">
               <div 
                 className="bg-brand-brown h-0.5 md:h-1 rounded-full transition-all duration-500" 
                 style={{ width: item.stats.total ? `${(item.stats.claimed / item.stats.total) * 100}%` : '0%' }}
@@ -174,15 +174,15 @@ export default function MerchClaims() {
 
       <div className="bg-white rounded-2xl shadow-sm border border-brand-beige overflow-hidden">
         {/* Toolbar */}
-        <div className="p-4 border-b border-gray-100 flex flex-col md:flex-row gap-4 bg-gray-50/30">
+        <div className="p-3 md:p-4 border-b border-gray-100 flex flex-col md:flex-row gap-3 md:gap-4 bg-gray-50/30">
           <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 font-bold" size={18} />
             <input 
               type="text" 
               placeholder="Search registrant..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 rounded-lg border border-gray-200 focus:outline-none focus:border-brand-brown focus:ring-1 transition-all"
+              className="w-full pl-10 pr-4 py-2 rounded-lg border border-gray-200 focus:outline-none focus:border-brand-brown focus:ring-1 transition-all text-xs lg:text-sm bg-white"
             />
           </div>
           
@@ -192,7 +192,7 @@ export default function MerchClaims() {
               <select 
                 value={filterChurch} 
                 onChange={(e) => setFilterChurch(e.target.value)}
-                className="py-2 pl-3 pr-8 rounded-lg border border-gray-200 focus:outline-none focus:border-brand-brown focus:ring-1 bg-white md:w-40 transition-all"
+                className="py-1.5 pl-3 pr-8 rounded-lg border border-gray-200 focus:outline-none focus:border-brand-brown focus:ring-1 bg-white w-full md:w-32 lg:w-40 transition-all text-xs lg:text-sm font-bold"
               >
                 <option value="All">All Churches</option>
                 {settings.churches.map(c => <option key={c} value={c}>{c}</option>)}
@@ -202,7 +202,7 @@ export default function MerchClaims() {
             <select 
               value={filterStatus} 
               onChange={(e) => setFilterStatus(e.target.value)}
-              className="py-2 pl-3 pr-8 rounded-lg border border-gray-200 focus:outline-none focus:border-brand-brown focus:ring-1 bg-white md:w-40 transition-all"
+              className="py-1.5 pl-3 pr-8 rounded-lg border border-gray-200 focus:outline-none focus:border-brand-brown focus:ring-1 bg-white w-full md:w-32 lg:w-40 transition-all text-xs lg:text-sm font-bold"
             >
               <option value="All">Filter Status</option>
               <option value="Fully Claimed">Fully Claimed</option>
@@ -265,27 +265,27 @@ export default function MerchClaims() {
         {/* Desktop Table */}
         <div className="hidden md:block overflow-x-auto">
           <table className="w-full text-left text-sm text-gray-600">
-            <thead className="text-xs text-gray-400 uppercase bg-gray-50/80 border-b border-gray-100">
+            <thead className="text-[10px] lg:text-xs text-gray-400 uppercase bg-gray-50/80 border-b border-gray-100">
               <tr>
-                <th className="px-6 py-4 font-medium tracking-wider">Registrant</th>
-                <th className="px-6 py-4 font-medium tracking-wider text-center">T-Shirt</th>
-                <th className="px-6 py-4 font-medium tracking-wider text-center">Bag</th>
-                <th className="px-6 py-4 font-medium tracking-wider text-center">Notebook</th>
-                <th className="px-6 py-4 font-medium tracking-wider text-center">Pen</th>
+                <th className="px-3 lg:px-6 py-4 font-medium tracking-wider">Registrant</th>
+                <th className="px-3 lg:px-6 py-4 font-medium tracking-wider text-center">T-Shirt</th>
+                <th className="px-3 lg:px-6 py-4 font-medium tracking-wider text-center">Bag</th>
+                <th className="px-3 lg:px-6 py-4 font-medium tracking-wider text-center">Notebook</th>
+                <th className="px-3 lg:px-6 py-4 font-medium tracking-wider text-center">Pen</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
               {filteredRegistrants.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage).length > 0 ? filteredRegistrants.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage).map((reg) => (
                 <tr key={reg.id} className="hover:bg-brand-cream/30 transition-colors">
-                  <td className="px-6 py-4">
-                    <p className="font-bold text-brand-brown text-base">{reg.fullName}</p>
-                    <p className="text-xs text-gray-500 mt-1 font-medium">{reg.church} • Size {reg.shirtSize}</p>
+                  <td className="px-3 lg:px-6 py-4">
+                    <p className="font-bold text-brand-brown text-xs lg:text-base leading-tight">{reg.fullName}</p>
+                    <p className="text-[10px] lg:text-xs text-gray-500 mt-1 font-medium">{reg.church} <span className="hidden lg:inline">• Size {reg.shirtSize}</span></p>
                   </td>
                   
                   {['tshirt', 'bag', 'notebook', 'pen'].map((item) => {
                     const isClaimed = reg.merchClaims[item as keyof Registrant['merchClaims']];
                     return (
-                      <td key={item} className="px-6 py-4 text-center">
+                      <td key={item} className="px-3 lg:px-6 py-4 text-center">
                         <button
                           disabled={(() => {
                             const canToggleAll = isAdmin || merchPerms?.toggleAll;
@@ -293,13 +293,13 @@ export default function MerchClaims() {
                             return !canToggleAll && !canToggleOwn;
                           })()}
                           onClick={() => toggleClaim(reg.id || (reg as any)._id, item as keyof typeof reg.merchClaims)}
-                          className={`w-12 h-12 rounded-xl flex items-center justify-center mx-auto transition-all transform active:scale-95 ${
+                          className={`w-10 h-10 lg:w-12 lg:h-12 rounded-xl flex items-center justify-center mx-auto transition-all transform active:scale-95 ${
                             isClaimed 
                               ? 'bg-green-100 text-green-600 ring-2 ring-green-500 ring-offset-2' 
                               : 'bg-gray-100 text-gray-300 hover:bg-gray-200 hover:text-gray-500'
                           } ${((!isAdmin && !merchPerms?.toggleAll) && (!merchPerms?.toggleOwn || reg.church !== currentUser?.church)) ? 'opacity-50 cursor-not-allowed' : ''}`}
                         >
-                          {isClaimed && <Check size={24} className="stroke-[3]" />}
+                          {isClaimed && <Check size={20} className="lg:w-6 lg:h-6 stroke-[3]" />}
                         </button>
                       </td>
                     );

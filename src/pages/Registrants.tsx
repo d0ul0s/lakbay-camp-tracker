@@ -1,45 +1,30 @@
 import { useState, useMemo, useEffect } from 'react';
 import api from '../api/axios';
 import { useAppStore } from '../store';
-import type { Registrant, ShirtSize, PaymentStatus, PaymentMethod, AppSettings } from '../types';
+import type { Registrant, ShirtSize, PaymentStatus, PaymentMethod } from '../types';
 import { PlusCircle, Search, Edit2, Trash2, X, Filter, Info, CheckSquare, Square, CheckCircle, Clock, ShieldAlert, Users } from 'lucide-react';
 import ConfirmModal from '../components/ConfirmModal';
 
 const NAME_REGEX = /^[A-Z][a-zA-Z]+(?:\s[A-Z][a-zA-Z]+)*,\s[A-Z][a-zA-Z]+(?:\s[A-Z][a-zA-Z]+)*\s[A-Z]\.(?:\s(?:Jr\.|III|IV|V))?$/;
 
 export default function Registrants() {
-  const { currentUser, setLoading } = useAppStore();
+  const { currentUser, appSettings, fetchGlobalSettings, registrants, fetchRegistrants, syncRegistrant, updateRegistrant } = useAppStore();
   const user = currentUser; // Cache for stable null-checks
-  const [registrants, setRegistrants] = useState<Registrant[]>([]);
-  const [settings, setSettings] = useState<AppSettings>({
+  
+  // Use global settings with an internal fallback for the structure
+  const settings = appSettings || {
     churches: [], merchCosts: {}, ministries: [], expenseCategories: [], paymentMethods: [], shirtSizePhoto: null
-  } as any);
-
-  const fetchRegistrants = async () => {
-    try {
-      const [regRes, setRes] = await Promise.all([
-        api.get('/api/registrants'),
-        api.get('/api/settings')
-      ]);
-      setRegistrants(regRes.data);
-      if (setRes.data) {
-        setSettings({
-          ...setRes.data,
-          churches: setRes.data.churchList || [],
-          ministries: setRes.data.ministries || [],
-          expenseCategories: setRes.data.expenseCategories || [],
-          paymentMethods: setRes.data.paymentMethods || [],
-          shirtSizePhoto: setRes.data.shirtSizePhoto || null
-        });
-      }
-    } catch (err) {
-      console.error(err);
-    }
-  };
+  } as any;
 
   useEffect(() => {
-    fetchRegistrants();
-  }, [setLoading]);
+    // If boot sync is already complete (cache hit + live sync), skip redundant fetches.
+    // Layout.tsx already handles the live boot cycle for all roles via fetchBootData().
+    const { hasSyncedLive } = useAppStore.getState();
+    if (!hasSyncedLive) {
+      fetchGlobalSettings();
+      fetchRegistrants(registrants.length > 0);
+    }
+  }, []);
 
   // Local state for UI
   const [searchTerm, setSearchTerm] = useState('');
@@ -118,9 +103,15 @@ export default function Registrants() {
   const filteredRegistrants = useMemo(() => {
     return baseRegistrants.filter(r => {
       const matchesSearch = r.fullName.toLowerCase().includes(searchTerm.toLowerCase());
-      const matchesChurch = filterChurch === 'All' || r.church === filterChurch;
+      
+      // Case-insensitive church match for filtering
+      const regChurch = (r.church || '').trim().toLowerCase();
+      const targetChurch = filterChurch === 'All' ? 'all' : (filterChurch || '').trim().toLowerCase();
+      const matchesChurch = targetChurch === 'all' || regChurch === targetChurch;
+
       const matchesStatus = filterStatus === 'All' || r.paymentStatus === filterStatus;
       const matchesMinistry = filterMinistry === 'All' || (r.ministry && r.ministry.includes(filterMinistry));
+      
       return matchesSearch && matchesChurch && matchesStatus && matchesMinistry;
     }).sort((a, b) => new Date(b.dateRegistered).getTime() - new Date(a.dateRegistered).getTime());
   }, [baseRegistrants, searchTerm, filterChurch, filterStatus, filterMinistry]);
@@ -165,13 +156,37 @@ export default function Registrants() {
 
     try {
       setFormError(null);
+      const { id, _id, __v, createdAt, updatedAt, ...cleanData } = formData as any;
       if (editingId) {
-        await api.put(`/api/registrants/${editingId}`, formData);
+        // Optimistic update: instantly reflect the edit in the UI before server confirms
+        updateRegistrant(editingId, cleanData);
+        closeModal();
+        api.put(`/api/registrants/${editingId}`, cleanData).catch(err => {
+          console.error('Failed to save edit:', err);
+          // Removed global fetch to prevent race conditions during rapid edits
+        });
       } else {
-        await api.post(`/api/registrants`, formData);
+        // Optimistic update for new entries
+        const tempId = `temp-${Date.now()}`;
+        const optimisticNew = {
+          ...cleanData,
+          _id: tempId,
+          id: tempId,
+          dateRegistered: new Date().toISOString()
+        };
+        syncRegistrant('added', optimisticNew);
+        closeModal();
+
+        api.post(`/api/registrants`, cleanData).then((res) => {
+          // Graceful handoff: Swap temp optimistic UI instantly to prevent duplicates.
+          syncRegistrant('deleted', { _id: tempId, id: tempId });
+          syncRegistrant('added', res.data);
+        }).catch(err => {
+          console.error('Failed to register participant:', err);
+          // Immediate rollback on error
+          syncRegistrant('deleted', { _id: tempId, id: tempId });
+        });
       }
-      closeModal();
-      fetchRegistrants();
     } catch (err: any) {
       console.error(err);
       setFormError(err.response?.data?.message || 'Failed to save registrant.');
@@ -202,16 +217,26 @@ export default function Registrants() {
     const validData = batchData.filter(d => d.fullName && NAME_REGEX.test(d.fullName));
     if (validData.length === 0) return;
 
-    try {
-      setBatchError(null);
-      await api.post(`/api/registrants/batch`, { registrants: validData });
-      setIsBatchModalOpen(false);
-      setBatchData([]);
-      fetchRegistrants();
-    } catch (err: any) {
+    setBatchError(null);
+    // Optimistic batch add with temp entries
+    const tempDocs = validData.map(d => ({
+      ...d,
+      _id: `temp-${Date.now()}-${Math.random()}`,
+      dateRegistered: new Date().toISOString()
+    }));
+    syncRegistrant('imported', tempDocs);
+    setIsBatchModalOpen(false);
+    setBatchData([]);
+
+    api.post(`/api/registrants/batch`, { registrants: validData }).then((res) => {
+      // Graceful handoff: Swap temp optimistic UI instantly to prevent duplicates.
+      tempDocs.forEach(d => syncRegistrant('deleted', { _id: d._id }));
+      syncRegistrant('imported', res.data);
+    }).catch(err => {
       console.error(err);
-      setBatchError(err.response?.data?.message || 'Failed to save batch registrations.');
-    }
+      // Immediate rollback on error
+      tempDocs.forEach(d => syncRegistrant('deleted', { _id: d._id }));
+    });
   };
 
   const addBatchRow = () => {
@@ -247,13 +272,14 @@ export default function Registrants() {
 
   const confirmDelete = async () => {
     if (!confirmModal.id) return;
-    try {
-      await api.delete(`/api/registrants/${confirmModal.id}`);
-      setConfirmModal({ isOpen: false, id: null });
-      fetchRegistrants();
-    } catch (err) {
-      console.error(err);
-    }
+    const deletedId = confirmModal.id;
+    // Optimistic instant removal from list
+    syncRegistrant('deleted', { _id: deletedId, id: deletedId });
+    setConfirmModal({ isOpen: false, id: null });
+    api.delete(`/api/registrants/${deletedId}`).catch(err => {
+      console.error('Delete failed:', err);
+      // Removed global fetch to prevent race conditions on bulk actions
+    });
   };
 
   const handleToggleVerify = (reg: Registrant) => {
@@ -262,15 +288,25 @@ export default function Registrants() {
   const doVerify = async () => {
     if (!verifyConfirm.reg) return;
     const reg = verifyConfirm.reg;
+    const regId = (reg as any)._id || reg.id;
     const nowVerified = !reg.verifiedByTreasurer;
-    try {
-      await api.put(`/api/registrants/${(reg as any)._id || reg.id}`, {
-        verifiedByTreasurer: nowVerified,
-        verifiedAt: nowVerified ? new Date().toISOString() : null
-      });
-      fetchRegistrants();
-    } catch (err) { console.error(err); }
+    // Close immediately and optimistically update
     setVerifyConfirm({ isOpen: false, reg: null });
+    updateRegistrant(regId, {
+      verifiedByTreasurer: nowVerified,
+      verifiedAt: nowVerified ? new Date().toISOString() : null
+    });
+    api.put(`/api/registrants/${regId}`, {
+      verifiedByTreasurer: nowVerified,
+      verifiedAt: nowVerified ? new Date().toISOString() : null
+    }).catch(err => {
+      console.error(err);
+      // Revert ONLY the failed row back to its original state
+      updateRegistrant(regId, {
+        verifiedByTreasurer: reg.verifiedByTreasurer,
+        verifiedAt: reg.verifiedAt
+      });
+    });
   };
 
   const toggleMinistry = (m: string) => {
@@ -283,6 +319,10 @@ export default function Registrants() {
   };
 
   const isNameValid = !formData.fullName || NAME_REGEX.test(formData.fullName);
+  
+  const expectedFee = formData.feeType === 'Early Bird' ? 350 : 500;
+  const isAmountMismatch = formData.paymentStatus === 'Paid' && formData.amountPaid !== expectedFee;
+  const isPartialMismatch = formData.paymentStatus === 'Partial' && formData.amountPaid >= expectedFee;
 
   return (
     <div className="space-y-6">
@@ -332,12 +372,10 @@ export default function Registrants() {
                     <span className="font-black text-green-600">₱{stats.collected.toLocaleString()}</span>
                   </div>
                   
-                  {stats.pending > 0 && (
-                    <div className="flex justify-between items-center px-1.5 py-0.5 bg-orange-50 rounded-md border border-orange-100">
-                      <span className="text-orange-400 font-black uppercase tracking-tighter text-[7px]">Pending</span>
-                      <span className="text-orange-500 font-bold text-[9px]">₱{stats.pending.toLocaleString()}</span>
-                    </div>
-                  )}
+                  <div className={`flex justify-between items-center px-1.5 py-0.5 rounded-md border mt-1 ${stats.pending > 0 ? 'bg-orange-50 border-orange-100' : 'bg-transparent border-transparent'}`}>
+                    <span className={`uppercase tracking-tighter text-[7px] font-black ${stats.pending > 0 ? 'text-orange-400' : 'text-gray-300'}`}>Pending</span>
+                    <span className={`font-bold text-[9px] ${stats.pending > 0 ? 'text-orange-500' : 'text-gray-300'}`}>₱{stats.pending.toLocaleString()}</span>
+                  </div>
                   
                   <div className="flex justify-between items-center pt-1 border-t border-gray-100 mt-1">
                     <span className="text-gray-400 font-bold uppercase tracking-tighter text-[8px]">Gap</span>
@@ -392,47 +430,45 @@ export default function Registrants() {
       {/* Filters and Table */}
       <div className="bg-white rounded-2xl shadow-sm border border-brand-beige overflow-hidden">
         {/* Toolbar */}
-        <div className="p-4 border-b border-gray-100 flex flex-col md:flex-row gap-4 bg-gray-50/30">
+        <div className="p-3 md:p-4 border-b border-gray-100 flex flex-col md:flex-row gap-3 md:gap-4 bg-gray-50/30">
           <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 font-bold" size={18} />
             <input
               type="text"
-              placeholder="Search name..."
+              placeholder="Search delegate..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 rounded-lg border border-gray-200 focus:outline-none focus:border-brand-brown focus:ring-1 focus:ring-brand-brown transition-all"
+              className="w-full pl-10 pr-4 py-2 rounded-lg border border-gray-200 focus:outline-none focus:border-brand-brown focus:ring-1 focus:ring-brand-brown transition-all bg-white"
             />
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
             <Filter size={18} className="text-gray-400 hidden lg:block" />
 
-            {roleKey === 'admin' && (
-              <select
-                value={filterChurch}
-                onChange={(e) => setFilterChurch(e.target.value)}
-                className="py-2 pl-3 pr-8 rounded-lg border border-gray-200 focus:outline-none focus:border-brand-brown focus:ring-1 transition-all md:w-36 bg-white text-sm"
-              >
-                <option value="All">All Churches</option>
-                {settings.churches.map(c => <option key={c} value={c}>{c}</option>)}
-              </select>
-            )}
+            <select
+              value={filterChurch}
+              onChange={(e) => setFilterChurch(e.target.value)}
+              className="py-2 pl-3 pr-8 rounded-lg border border-gray-200 focus:outline-none focus:border-brand-brown focus:ring-1 transition-all w-full md:w-32 lg:w-40 bg-white text-xs font-bold"
+            >
+              <option value="All">All Churches</option>
+              {settings.churches.map((c: string) => <option key={c} value={c}>{c}</option>)}
+            </select>
 
             <select
               value={filterMinistry}
               onChange={(e) => setFilterMinistry(e.target.value)}
-              className="py-2 pl-3 pr-8 rounded-lg border border-gray-200 focus:outline-none focus:border-brand-brown focus:ring-1 transition-all md:w-36 bg-white text-sm"
+              className="py-2 pl-3 pr-8 rounded-lg border border-gray-200 focus:outline-none focus:border-brand-brown focus:ring-1 transition-all w-[48%] md:w-32 lg:w-40 bg-white text-xs font-bold"
             >
-              <option value="All">All Ministries</option>
-              {settings.ministries.map(m => <option key={m} value={m}>{m}</option>)}
+              <option value="All">Ministries</option>
+              {settings.ministries.map((m: string) => <option key={m} value={m}>{m}</option>)}
             </select>
 
             <select
               value={filterStatus}
               onChange={(e) => setFilterStatus(e.target.value)}
-              className="py-2 pl-3 pr-8 rounded-lg border border-gray-200 focus:outline-none focus:border-brand-brown focus:ring-1 transition-all w-full md:w-36 bg-white text-sm"
+              className="py-2 pl-3 pr-8 rounded-lg border border-gray-200 focus:outline-none focus:border-brand-brown focus:ring-1 transition-all w-[48%] md:w-32 lg:w-40 bg-white text-xs font-bold"
             >
-              <option value="All">All Statuses</option>
+              <option value="All">Statuses</option>
               <option value="Paid">Paid</option>
               <option value="Partial">Partial</option>
               <option value="Unpaid">Unpaid</option>
@@ -443,73 +479,75 @@ export default function Registrants() {
         {/* Desktop Table */}
         <div className="hidden md:block overflow-x-auto">
           <table className="w-full text-left text-sm text-gray-600">
-            <thead className="text-xs text-gray-400 uppercase bg-gray-50/80 border-b border-gray-100">
+            <thead className="text-[9px] lg:text-xs text-gray-400 uppercase bg-gray-50/80 border-b border-gray-100">
               <tr>
-                <th className="px-6 py-4 font-medium tracking-wider">Name</th>
-                <th className="px-6 py-4 font-medium tracking-wider text-center">Age / Sex / Size</th>
-                <th className="px-6 py-4 font-medium tracking-wider">Church & Ministry</th>
-                <th className="px-6 py-4 font-medium tracking-wider">Package</th>
-                <th className="px-6 py-4 font-medium tracking-wider text-center">Payment</th>
-                <th className="px-6 py-4 font-medium tracking-wider text-center">Verified</th>
-                <th className="px-6 py-4 font-medium tracking-wider text-right">Actions</th>
+                <th className="px-2 lg:px-6 py-4 font-medium tracking-wider">Name</th>
+                <th className="px-2 lg:px-6 py-4 font-medium tracking-wider text-center">Age / Sex / Size</th>
+                <th className="px-2 lg:px-6 py-4 font-medium tracking-wider">Church & Ministry</th>
+                <th className="px-2 lg:px-6 py-4 font-medium tracking-wider">Package</th>
+                <th className="px-2 lg:px-6 py-4 font-medium tracking-wider text-center">Payment</th>
+                <th className="px-2 lg:px-6 py-4 font-medium tracking-wider text-center">Verified</th>
+                <th className="px-2 lg:px-6 py-4 font-medium tracking-wider text-right">Actions</th>
               </tr>
-              <tr className="bg-green-50/40 text-xs border-b border-gray-100">
-                <td colSpan={7} className="px-6 py-1.5 text-gray-500 flex items-center gap-4">
-                  <span className="flex items-center gap-1.5"><CheckCircle size={13} className="text-green-600" /> Verified by Treasurer</span>
-                  <span className="flex items-center gap-1.5"><Clock size={13} className="text-orange-500" /> Pending verification</span>
+              <tr className="bg-green-50/40 text-[9px] lg:text-xs border-b border-gray-100">
+                <td colSpan={7} className="px-2 lg:px-6 py-1.5 text-gray-500">
+                  <div className="flex items-center gap-4">
+                    <span className="flex items-center gap-1.5"><CheckCircle size={12} className="text-green-600" /> Verified by Treasurer</span>
+                    <span className="flex items-center gap-1.5"><Clock size={12} className="text-orange-500" /> Pending verification</span>
+                  </div>
                 </td>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
               {paginatedRegistrants.length > 0 ? paginatedRegistrants.map((reg) => (
                 <tr key={reg.id || (reg as any)._id} className="hover:bg-brand-cream/30 transition-colors">
-                  <td className="px-6 py-4 font-medium text-brand-brown">{reg.fullName}</td>
-                  <td className="px-6 py-4 text-center">
-                    <span className="font-medium text-gray-800">{reg.age} • {reg.sex?.charAt(0) || 'M'}</span>
-                    <span className="text-xs text-gray-400 block mt-0.5 font-bold">{reg.shirtSize}</span>
+                  <td className="px-2 lg:px-6 py-4 font-bold text-brand-brown truncate max-w-[80px] md:max-w-[120px] xl:max-w-none text-[10px] lg:text-base leading-tight">{reg.fullName}</td>
+                  <td className="px-2 lg:px-6 py-4 text-center">
+                    <span className="font-medium text-gray-800 text-[9px] lg:text-sm">{reg.age} • {reg.sex?.charAt(0) || 'M'}</span>
+                    <span className="text-[8px] text-gray-400 block mt-0.5 font-bold">{reg.shirtSize}</span>
                   </td>
-                  <td className="px-6 py-4 max-w-[200px]">
-                    <div className="truncate font-medium text-gray-800" title={reg.church}>{reg.church}</div>
-                    <div className="flex flex-wrap gap-1 mt-1">
+                  <td className="px-2 lg:px-6 py-4 max-w-[120px] lg:max-w-[200px]">
+                    <div className="truncate font-medium text-gray-800 text-[10px] lg:text-sm" title={reg.church}>{reg.church}</div>
+                    <div className="flex flex-wrap gap-0.5 mt-1">
                       {reg.ministry && reg.ministry.length > 0 ? reg.ministry.map(m => (
-                        <span key={m} className="px-1.5 py-0.5 bg-brand-sand/30 text-brand-brown border border-brand-sand rounded text-[10px] uppercase font-bold tracking-wider">{m}</span>
-                      )) : <span className="text-[10px] text-gray-300 italic">No ministries</span>}
+                        <span key={m} className="px-1 py-0.5 bg-brand-sand/30 text-brand-brown border border-brand-sand rounded text-[7px] lg:text-[10px] uppercase font-bold tracking-wider">{m}</span>
+                      )) : <span className="text-[8px] text-gray-300 italic">None</span>}
                     </div>
                   </td>
-                  <td className="px-6 py-4">
-                    <span className="block text-gray-800 font-medium">{reg.feeType}</span>
-                    <span className="text-xs text-gray-400">₱{reg.feeType === 'Early Bird' ? 350 : 500}</span>
+                  <td className="px-2 lg:px-6 py-4 text-[10px] lg:text-sm">
+                    <span className="block text-gray-800 font-medium leading-tight">{reg.feeType}</span>
+                    <span className="text-[9px] text-gray-400">₱{reg.feeType === 'Early Bird' ? 350 : 500}</span>
                   </td>
-                  <td className="px-6 py-4">
+                  <td className="px-2 lg:px-6 py-4">
                     <div className="flex flex-col items-center">
-                      <span className={`px-2.5 py-1 rounded-full text-xs font-bold ${reg.paymentStatus === 'Paid' ? 'bg-green-100 text-green-700' :
+                      <span className={`px-1.5 py-0.5 lg:px-2.5 lg:py-1 rounded-full text-[8px] lg:text-xs font-bold ${reg.paymentStatus === 'Paid' ? 'bg-green-100 text-green-700' :
                           reg.paymentStatus === 'Partial' ? 'bg-yellow-100 text-yellow-700' :
                             'bg-red-100 text-red-700'
                         }`}>
                         {reg.paymentStatus}
                       </span>
                       {reg.paymentStatus !== 'Unpaid' && (
-                        <span className="text-[10px] text-gray-400 font-medium mt-1 uppercase tracking-wider text-center leading-tight">₱{reg.amountPaid} via <br />{reg.paymentMethod?.split(' ')[0]}</span>
+                        <span className="text-[7px] lg:text-[10px] text-gray-400 font-medium mt-1 uppercase tracking-wider text-center leading-tight">₱{reg.amountPaid} <br className="lg:hidden" /> {reg.paymentMethod?.split(' ')[0]}</span>
                       )}
                     </div>
                   </td>
-                  <td className="px-6 py-4 text-center">
+                  <td className="px-2 lg:px-6 py-4 text-center">
                     {canVerify ? (
                       <button
                         onClick={() => handleToggleVerify(reg)}
-                        className={`inline-flex items-center justify-center p-1.5 rounded-lg transition-colors ${reg.verifiedByTreasurer ? 'bg-green-100 text-green-700 hover:bg-green-200' : 'bg-orange-100 text-orange-600 hover:bg-orange-200'
+                        className={`inline-flex items-center justify-center p-1 rounded-lg transition-colors ${reg.verifiedByTreasurer ? 'bg-green-100 text-green-700 hover:bg-green-200' : 'bg-orange-100 text-orange-600 hover:bg-orange-200'
                           }`}
                         title={reg.verifiedByTreasurer ? 'Verified by Treasurer' : 'Pending Verification'}
                       >
-                        {reg.verifiedByTreasurer ? <CheckCircle size={20} /> : <Clock size={20} />}
+                        {reg.verifiedByTreasurer ? <CheckCircle size={14} className="lg:w-5 lg:h-5" /> : <Clock size={14} className="lg:w-5 lg:h-5" />}
                       </button>
                     ) : (
-                      <div className={`inline-flex items-center justify-center p-1.5 rounded-lg ${reg.verifiedByTreasurer ? 'text-green-500' : 'text-orange-400'}`} title={reg.verifiedByTreasurer ? 'Verified by Treasurer' : 'Pending Verification'}>
-                        {reg.verifiedByTreasurer ? <CheckCircle size={20} /> : <Clock size={20} />}
+                      <div className={`inline-flex items-center justify-center p-1 rounded-lg ${reg.verifiedByTreasurer ? 'text-green-500' : 'text-orange-400'}`} title={reg.verifiedByTreasurer ? 'Verified by Treasurer' : 'Pending Verification'}>
+                        {reg.verifiedByTreasurer ? <CheckCircle size={14} className="lg:w-5 lg:h-5" /> : <Clock size={14} className="lg:w-5 lg:h-5" />}
                       </div>
                     )}
                   </td>
-                  <td className="px-6 py-4 text-right">
+                  <td className="px-2 lg:px-6 py-4 text-right">
                     {(() => {
                     const canEditThis = isAdmin || canEditAny || (rolePerms?.editOwn && reg.church === user?.church);
                     const canDeleteThis = isAdmin || canDeleteAny || (rolePerms?.deleteOwn && reg.church === user?.church);
@@ -517,15 +555,15 @@ export default function Registrants() {
                       if (!canEditThis && !canDeleteThis) return null;
 
                       return (
-                        <div className="flex items-center justify-end gap-2">
+                        <div className="flex items-center justify-end gap-0.5 lg:gap-2">
                           {canEditThis && (
-                            <button onClick={() => openModalForEdit(reg)} className="p-2 text-gray-400 hover:text-brand-brown hover:bg-brand-sand/20 rounded-lg transition-colors">
-                              <Edit2 size={16} />
+                            <button onClick={() => openModalForEdit(reg)} className="p-1 lg:p-2 text-gray-400 hover:text-brand-brown hover:bg-brand-sand/20 rounded-lg transition-colors">
+                              <Edit2 size={14} className="lg:w-4 lg:h-4" />
                             </button>
                           )}
                           {canDeleteThis && (
-                            <button onClick={() => handleDelete(reg)} className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors">
-                              <Trash2 size={16} />
+                            <button onClick={() => handleDelete(reg)} className="p-1 lg:p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors">
+                              <Trash2 size={14} className="lg:w-4 lg:h-4" />
                             </button>
                           )}
                         </div>
@@ -545,47 +583,44 @@ export default function Registrants() {
         </div>
 
         {/* Mobile Cards */}
-        <div className="md:hidden space-y-2 px-1">
+        <div className="md:hidden space-y-1.5 px-0.5 pb-32">
           {paginatedRegistrants.length > 0 ? paginatedRegistrants.map(reg => (
-            <div key={(reg as any)._id || reg.id} className="mobile-card flex flex-col gap-2">
+            <div key={(reg as any)._id || reg.id} className="mobile-card flex flex-col gap-1.5 !p-2">
               <div className="flex justify-between items-start">
                 <div className="flex-1 min-w-0">
-                  <p className="font-black text-brand-brown text-base leading-tight truncate">{reg.fullName}</p>
-                  <p className="text-[9px] text-gray-400 font-bold uppercase tracking-wider mt-0.5 truncate">{reg.church}</p>
+                  <p className="font-black text-brand-brown text-[13px] leading-tight truncate">{reg.fullName}</p>
+                  <p className="text-[8px] text-gray-400 font-bold uppercase tracking-wider mt-0.5 truncate">{reg.church}</p>
                 </div>
-                <div className={`shrink-0 p-1.5 rounded-lg transition-all shadow-sm ${reg.verifiedByTreasurer ? 'bg-green-100 text-green-700 border border-green-200' : 'bg-orange-50 text-orange-500 border border-orange-100'}`}>
+                <div className={`shrink-0 p-1 rounded-lg transition-all shadow-sm ${reg.verifiedByTreasurer ? 'bg-green-100 text-green-700 border border-green-200' : 'bg-orange-50 text-orange-500 border border-orange-100'}`}>
                   {canVerify ? (
-                    <button onClick={() => handleToggleVerify(reg)}>
-                      {reg.verifiedByTreasurer ? <CheckCircle size={18} /> : <Clock size={18} />}
+                    <button onClick={() => handleToggleVerify(reg)} className="flex items-center justify-center">
+                      {reg.verifiedByTreasurer ? <CheckCircle size={15} /> : <Clock size={15} />}
                     </button>
                   ) : (
-                    reg.verifiedByTreasurer ? <CheckCircle size={18} /> : <Clock size={18} />
+                    <div className="flex items-center justify-center">
+                      {reg.verifiedByTreasurer ? <CheckCircle size={15} /> : <Clock size={15} />}
+                    </div>
                   )}
                 </div>
               </div>
               
               <div className="flex items-center gap-1 flex-wrap">
-                <span className="px-1.5 py-0.5 bg-brand-cream border border-brand-sand/30 text-brand-brown rounded-md text-[9px] font-black uppercase leading-none">{reg.age}Y • {reg.sex?.charAt(0) || 'M'}</span>
-                <span className="px-1.5 py-0.5 bg-brand-brown text-brand-cream rounded-md text-[9px] font-black uppercase tracking-tighter leading-none">Size {reg.shirtSize}</span>
-                <span className={`px-1.5 py-0.5 rounded-md text-[9px] font-black uppercase border leading-none ${reg.paymentStatus === 'Paid' ? 'bg-green-50 text-green-700 border-green-200' :
+                <span className="px-1 py-0.5 bg-brand-cream border border-brand-sand/30 text-brand-brown rounded text-[8px] font-black uppercase leading-none">{reg.age}Y • {reg.sex?.charAt(0) || 'M'}</span>
+                <span className="px-1 py-0.5 bg-brand-brown text-brand-cream rounded text-[8px] font-black uppercase tracking-tighter leading-none">Size {reg.shirtSize}</span>
+                <span className={`px-1 py-0.5 rounded text-[8px] font-black uppercase border leading-none ${reg.paymentStatus === 'Paid' ? 'bg-green-50 text-green-700 border-green-200' :
                     reg.paymentStatus === 'Partial' ? 'bg-yellow-50 text-yellow-700 border-yellow-200' :
                       'bg-red-50 text-red-700 border-red-200'
                   }`}>{reg.paymentStatus}</span>
-                <span className="px-1.5 py-0.5 bg-blue-50 text-blue-700 rounded-md text-[9px] font-bold uppercase border border-blue-100 leading-none">{reg.feeType}</span>
+                <span className="px-1 py-0.5 bg-blue-50 text-blue-700 rounded text-[8px] font-bold uppercase border border-blue-100 leading-none">{reg.feeType}</span>
+                {reg.ministry && reg.ministry.length > 0 && reg.ministry.map(m => (
+                  <span key={m} className="px-1 py-0.5 bg-gray-50 text-gray-400 text-[8px] font-bold rounded border border-gray-100">{m}</span>
+                ))}
               </div>
 
-              {reg.ministry && reg.ministry.length > 0 && (
-                <div className="flex flex-wrap gap-1">
-                  {reg.ministry.map(m => (
-                    <span key={m} className="px-1.5 py-0.5 bg-gray-50 text-gray-400 text-[9px] font-bold rounded border border-gray-100">{m}</span>
-                  ))}
-                </div>
-              )}
-
               <div className="flex items-center justify-between mt-0.5 pt-1.5 border-t border-gray-100">
-                <div className="flex items-center gap-2">
-                  <span className="text-[10px] text-gray-400 font-bold uppercase tracking-tighter shrink-0">Paid</span>
-                  <span className="text-[11px] font-black text-brand-brown">₱{reg.amountPaid} <span className="text-[9px] font-medium text-gray-300">{reg.paymentMethod ? `via ${reg.paymentMethod.split(' ')[0]}` : ''}</span></span>
+                <div className="flex items-center gap-1.5">
+                  <span className="text-[8px] text-gray-400 font-bold uppercase tracking-tighter shrink-0">Paid</span>
+                  <span className="text-[11px] font-black text-brand-brown leading-none">₱{reg.amountPaid} <span className="text-[8px] font-medium text-gray-400">{reg.paymentMethod ? `(${reg.paymentMethod.split(' ')[0]})` : ''}</span></span>
                 </div>
                 {(() => {
                   const canEditThis = isAdmin || canEditAny || (rolePerms?.editOwn && reg.church === currentUser?.church);
@@ -594,12 +629,12 @@ export default function Registrants() {
                   if (!canEditThis && !canDeleteThis) return null;
 
                   return (
-                    <div className="flex gap-2">
+                    <div className="flex gap-1">
                       {canEditThis && (
-                        <button onClick={() => openModalForEdit(reg)} className="p-1.5 bg-gray-50 text-gray-400 hover:text-brand-brown rounded-lg border border-gray-100 active:bg-brand-sand/20 transition-colors"><Edit2 size={14} /></button>
+                        <button onClick={() => openModalForEdit(reg)} className="p-1 lg:p-1.5 bg-gray-50 text-gray-400 hover:text-brand-brown rounded-lg border border-gray-100 active:bg-brand-sand/20 transition-colors"><Edit2 size={12} /></button>
                       )}
                       {canDeleteThis && (
-                        <button onClick={() => handleDelete(reg)} className="p-1.5 bg-red-50 text-red-300 hover:text-red-500 rounded-lg border border-red-100 active:bg-red-100 transition-colors"><Trash2 size={14} /></button>
+                        <button onClick={() => handleDelete(reg)} className="p-1 lg:p-1.5 bg-red-50 text-red-300 hover:text-red-500 rounded-lg border border-red-100 active:bg-red-100 transition-colors"><Trash2 size={12} /></button>
                       )}
                     </div>
                   );
@@ -641,7 +676,7 @@ export default function Registrants() {
       </div>
 
       {isModalOpen && (
-        <div className="fixed inset-0 bg-brand-brown/50 backdrop-blur-sm z-50 flex items-center justify-center p-2 sm:p-4 overflow-y-auto">
+        <div className="fixed inset-0 bg-brand-brown/50 backdrop-blur-sm z-[100] flex items-center justify-center p-2 sm:p-4 overflow-y-auto">
           <div className="bg-white rounded-2xl shadow-xl w-full max-w-3xl overflow-hidden my-4 md:my-8 border border-brand-sand max-h-[95vh] sm:max-h-[90vh] flex flex-col">
             <div className="px-4 sm:px-6 py-4 border-b border-gray-100 flex justify-between items-center bg-brand-cream/50 sticky top-0 z-20">
               <h3 className="text-2xl font-display text-brand-brown tracking-wide">
@@ -656,7 +691,7 @@ export default function Registrants() {
               </button>
             </div>
 
-            <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-4 sm:p-6">
+            <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-4 sm:p-6 pb-24 md:pb-6">
               {formError && (
                 <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-2xl flex items-start gap-4 animate-shake shadow-sm relative overflow-hidden group">
                   <div className="absolute top-0 left-0 w-1 h-full bg-red-500"></div>
@@ -738,7 +773,7 @@ export default function Registrants() {
                         <label className="block text-sm text-gray-600 mb-2">Ministries (Select all that apply)</label>
                         {settings.ministries.length > 0 ? (
                           <div className="grid grid-cols-2 gap-2 p-3 bg-gray-50 border border-gray-100 rounded-xl">
-                            {settings.ministries.map(m => {
+                            {settings.ministries.map((m: string) => {
                               const isChecked = formData.ministry?.includes(m) || false;
                               return (
                                 <button
@@ -774,7 +809,7 @@ export default function Registrants() {
                             onChange={(e) => setFormData({ ...formData, church: e.target.value })}
                             className="w-full px-3 py-2 rounded-lg border border-gray-200 focus:outline-none focus:border-brand-brown"
                           >
-                            {settings.churches.map(c => <option key={c} value={c}>{c}</option>)}
+                            {settings.churches.map((c: string) => <option key={c} value={c}>{c}</option>)}
                           </select>
                         ) : (
                           <input
@@ -787,7 +822,15 @@ export default function Registrants() {
                         <label className="block text-sm text-gray-600 mb-1">Package / Fee Type</label>
                         <select
                           value={formData.feeType}
-                          onChange={(e) => setFormData({ ...formData, feeType: e.target.value as any })}
+                          onChange={(e) => {
+                            const newFeeType = e.target.value as any;
+                            const newExpected = newFeeType === 'Early Bird' ? 350 : 500;
+                            setFormData({ 
+                              ...formData, 
+                              feeType: newFeeType,
+                              amountPaid: formData.paymentStatus === 'Paid' ? newExpected : formData.amountPaid
+                            });
+                          }}
                           className="w-full px-3 py-2 rounded-lg border border-gray-200 focus:outline-none focus:border-brand-brown"
                         >
                           <option value="Early Bird">Early Bird (₱350)</option>
@@ -813,10 +856,11 @@ export default function Registrants() {
                               amountPaid: status === 'Unpaid' ? 0 : (status === 'Paid' ? (formData.feeType === 'Early Bird' ? 350 : 500) : formData.amountPaid)
                             });
                           }}
-                          className={`w-full px-3 py-2 rounded-lg border focus:outline-none font-bold ${formData.paymentStatus === 'Paid' ? 'border-green-300 bg-green-50 text-green-700' :
-                              formData.paymentStatus === 'Partial' ? 'border-yellow-300 bg-yellow-50 text-yellow-700' :
+                          className={`w-full px-3 py-2 rounded-lg border focus:outline-none font-bold transition-all ${
+                                formData.paymentStatus === 'Paid' ? (isAmountMismatch ? 'border-orange-400 bg-orange-50 text-orange-700' : 'border-green-300 bg-green-50 text-green-700') :
+                                formData.paymentStatus === 'Partial' ? (isPartialMismatch ? 'border-orange-400 bg-orange-50 text-orange-700' : 'border-yellow-300 bg-yellow-50 text-yellow-700') :
                                 'border-red-300 bg-red-50 text-red-700'
-                            }`}
+                             }`}
                         >
                           <option value="Unpaid">Unpaid</option>
                           <option value="Partial">Partial</option>
@@ -832,8 +876,16 @@ export default function Registrants() {
                               type="number" required min="1"
                               value={formData.amountPaid || ''}
                               onChange={(e) => setFormData({ ...formData, amountPaid: parseInt(e.target.value) || 0 })}
-                              className="w-full px-3 py-2 rounded-lg border border-gray-200 focus:outline-none focus:border-brand-brown font-medium"
+                              className={`w-full px-3 py-2 rounded-lg border focus:outline-none font-medium transition-colors ${
+                                isAmountMismatch || isPartialMismatch ? 'border-orange-400 bg-orange-50 focus:border-orange-500' : 'border-gray-200 focus:border-brand-brown'
+                              }`}
                             />
+                            {isAmountMismatch && (
+                              <p className="text-[10px] text-orange-600 font-bold mt-1 uppercase tracking-tighter">⚠️ Amount must be ₱{expectedFee} for 'Paid Fully'</p>
+                            )}
+                            {isPartialMismatch && (
+                              <p className="text-[10px] text-orange-600 font-bold mt-1 uppercase tracking-tighter">⚠️ Use 'Paid Fully' if amount is ₱{expectedFee}</p>
+                            )}
                           </div>
 
                           <div>
@@ -845,7 +897,7 @@ export default function Registrants() {
                               className="w-full px-3 py-2 rounded-lg border border-gray-200 focus:outline-none focus:border-brand-brown text-sm"
                             >
                               <option value="">Select...</option>
-                              {settings.paymentMethods.map(pm => <option key={pm} value={pm}>{pm}</option>)}
+                              {settings.paymentMethods.map((pm: string) => <option key={pm} value={pm}>{pm}</option>)}
                             </select>
                           </div>
 
@@ -868,7 +920,7 @@ export default function Registrants() {
                 </div>
               </div>
 
-              <div className="mt-8 pt-6 border-t border-brand-beige flex justify-end gap-3 sticky bottom-0 bg-white z-20 pb-2">
+              <div className="mt-8 pt-6 border-t border-brand-beige flex justify-end gap-3 bg-white pb-2">
                 <button
                   type="button"
                   onClick={closeModal}
@@ -890,7 +942,7 @@ export default function Registrants() {
       )}
 
       {isBatchModalOpen && (
-        <div className="fixed inset-0 bg-brand-brown/50 backdrop-blur-sm z-50 flex items-center justify-center p-2 sm:p-4 overflow-y-auto">
+        <div className="fixed inset-0 bg-brand-brown/50 backdrop-blur-sm z-[100] flex items-center justify-center p-2 sm:p-4 overflow-y-auto">
           <div className="bg-white rounded-2xl shadow-xl w-full max-w-6xl overflow-hidden my-4 md:my-8 border border-brand-sand max-h-[95vh] sm:max-h-[90vh] flex flex-col">
             <div className="px-4 sm:px-6 py-4 border-b border-gray-100 flex justify-between items-center bg-brand-cream/50 sticky top-0 z-20">
               <h3 className="text-2xl font-display text-brand-brown tracking-wide flex items-center gap-2">
@@ -922,116 +974,180 @@ export default function Registrants() {
                   <span className="font-bold">Format requirement:</span> Last, First M. (e.g., 'Santos, Maria C.' or 'Reyes, Jose P. Jr.')
                 </p>
               </div>
-              <div className="space-y-4">
+              <div className="space-y-8">
                 {batchData.map((row, idx) => {
                   const isValidName = !row.fullName || NAME_REGEX.test(row.fullName);
+                  const expected = row.feeType === 'Early Bird' ? 350 : 500;
+                  const isMistake = row.paymentStatus === 'Paid' && row.amountPaid !== expected;
+                  const isPartialMistake = row.paymentStatus === 'Partial' && row.amountPaid >= expected;
+
                   return (
-                    <div key={idx} className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm relative group">
-                      <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                         <button type="button" onClick={() => setBatchData(batchData.filter((_, i) => i !== idx))} className="p-1.5 text-red-400 hover:bg-red-50 rounded-lg"><Trash2 size={16} /></button>
+                    <div key={idx} className="bg-white rounded-2xl border-2 border-brand-sand/30 shadow-sm overflow-hidden relative group">
+                      {/* Card Header */}
+                      <div className="bg-brand-cream/50 px-4 py-2 border-b border-brand-sand/20 flex justify-between items-center sticky top-0 md:static z-10">
+                        <span className="text-[10px] font-black text-brand-brown uppercase tracking-widest">Registrant #{idx + 1}</span>
+                        <button 
+                          type="button" 
+                          onClick={() => setBatchData(batchData.filter((_: any, i: number) => i !== idx))} 
+                          className="p-1.5 text-red-400 hover:bg-red-50 rounded-lg transition-all opacity-100 lg:opacity-0 group-hover:opacity-100"
+                          title="Remove this registrant"
+                        >
+                          <Trash2 size={18} />
+                        </button>
                       </div>
-                      <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-start">
-                        <div className="md:col-span-3">
-                          <label className="block text-xs text-gray-500 mb-1">Full Name (Last, First M.)</label>
-                          <input type="text" required value={row.fullName} onChange={(e) => setBatchData(batchData.map((d, i) => i === idx ? { ...d, fullName: e.target.value } : d))} className={`w-full px-3 py-1.5 text-sm rounded-lg border focus:outline-none transition-colors ${isValidName ? 'border-gray-200 focus:border-brand-brown' : 'border-red-400 focus:border-red-500 bg-red-50/30'}`} placeholder="Dela Cruz, Juan P." />
-                        </div>
-                        <div className="md:col-span-2">
-                          <label className="block text-xs text-gray-500 mb-1">Church</label>
-                          {roleKey === 'admin' ? (
-                            <select value={row.church} onChange={(e) => setBatchData(batchData.map((d, i) => i === idx ? { ...d, church: e.target.value } : d))} className="w-full px-3 py-1.5 text-sm rounded-lg border border-gray-200 focus:outline-none focus:border-brand-brown">
-                              {settings.churches.map(c => <option key={c} value={c}>{c}</option>)}
-                            </select>
-                          ) : (
-                            <input type="text" disabled value={row.church} className="w-full px-3 py-1.5 text-sm rounded-lg border border-gray-100 bg-gray-50 text-gray-500 opacity-80 cursor-not-allowed" />
-                          )}
-                        </div>
-                        <div className="md:col-span-4">
-                          <label className="block text-xs text-gray-500 mb-1">Ministries</label>
-                          <div className="flex flex-wrap gap-1 p-1 bg-gray-50 rounded-lg border border-gray-100 min-h-[34px]">
-                            {settings.ministries.map(m => {
-                              const isChecked = row.ministry?.includes(m);
-                              return (
-                                <button
-                                  type="button"
-                                  key={m}
-                                  onClick={() => {
-                                    const current = row.ministry || [];
-                                    const next = isChecked ? current.filter(x => x !== m) : [...current, m];
-                                    setBatchData(batchData.map((d, i) => i === idx ? { ...d, ministry: next } : d));
-                                  }}
-                                  className={`px-1.5 py-0.5 rounded text-[9px] font-bold uppercase transition-colors border ${isChecked ? 'bg-brand-sand text-brand-brown border-brand-sand' : 'bg-white text-gray-400 border-gray-200 hover:border-brand-sand'}`}
-                                >
-                                  {m}
-                                </button>
-                              );
-                            })}
-                          </div>
-                        </div>
-                        <div className="md:col-span-3 grid grid-cols-2 gap-2">
-                           <div>
-                              <label className="block text-xs text-gray-500 mb-1">Package</label>
-                              <select 
-                                value={row.feeType} 
-                                onChange={(e) => {
-                                  const ft = e.target.value as any;
-                                  setBatchData(batchData.map((d, i) => i === idx ? { ...d, feeType: ft, amountPaid: d.paymentStatus === 'Paid' ? (ft === 'Early Bird' ? 350 : 500) : d.amountPaid } : d));
-                                }}
-                                className="w-full px-2 py-1.5 text-[11px] font-bold rounded-lg border border-gray-200 focus:outline-none focus:border-brand-brown"
-                              >
-                                <option value="Early Bird">Early (₱350)</option>
-                                <option value="Regular">Reg (₱500)</option>
-                              </select>
-                           </div>
-                           <div>
-                              <label className="block text-xs text-gray-500 mb-1">Status</label>
-                              <select value={row.paymentStatus} onChange={(e) => {
-                                 const status = e.target.value as PaymentStatus;
-                                 setBatchData(batchData.map((d, i) => i === idx ? { ...d, paymentStatus: status, amountPaid: status === 'Unpaid' ? 0 : (status === 'Paid' ? (d.feeType === 'Early Bird' ? 350 : 500) : d.amountPaid) } : d));
-                              }} className="w-full px-2 py-1.5 text-[11px] font-black rounded-lg border border-gray-200 focus:outline-none focus:border-brand-brown">
-                                <option value="Unpaid">Unpaid</option><option value="Partial">Partial</option><option value="Paid">Paid</option>
-                              </select>
-                           </div>
-                        </div>
-                        
-                        {/* Summary / Sub-row for basic details */}
-                        <div className="md:col-span-12 flex flex-wrap items-center gap-4 mt-2 px-3 py-2 bg-brand-cream/20 rounded-xl border border-brand-sand/30">
-                          <div className="flex items-center gap-2">
-                            <label className="text-[10px] text-gray-400 uppercase font-bold">Age</label>
-                            <input type="number" required min="1" max="100" value={row.age || ''} onChange={(e) => setBatchData(batchData.map((d, i) => i === idx ? { ...d, age: parseInt(e.target.value) || 0 } : d))} className="w-12 px-2 py-1 text-xs rounded border border-gray-200 focus:outline-none focus:border-brand-brown text-center" />
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <label className="text-[10px] text-gray-400 uppercase font-bold">Sex</label>
-                            <select value={row.sex} onChange={(e) => setBatchData(batchData.map((d, i) => i === idx ? { ...d, sex: e.target.value as 'Male' | 'Female' } : d))} className="px-2 py-1 text-xs rounded border border-gray-200 focus:outline-none focus:border-brand-brown">
-                              <option value="Male">M</option><option value="Female">F</option>
-                            </select>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <label className="text-[10px] text-gray-400 uppercase font-bold">Size</label>
-                            <select value={row.shirtSize} onChange={(e) => setBatchData(batchData.map((d, i) => i === idx ? { ...d, shirtSize: e.target.value as ShirtSize } : d))} className="px-2 py-1 text-xs rounded border border-gray-200 focus:outline-none focus:border-brand-brown font-black">
-                              {['XS', 'S', 'M', 'L', 'XL', 'XXL'].map(s => <option key={s} value={s}>{s}</option>)}
-                            </select>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <label className="text-[10px] text-gray-400 uppercase font-bold">Method</label>
-                            <select value={row.paymentMethod || 'Cash'} onChange={(e) => setBatchData(batchData.map((d, i) => i === idx ? { ...d, paymentMethod: e.target.value as PaymentMethod } : d))} className="px-2 py-1 text-xs rounded border border-gray-200 focus:outline-none focus:border-brand-brown">
-                              {settings.paymentMethods.map(pm => <option key={pm} value={pm}>{pm}</option>)}
-                            </select>
-                          </div>
-                          {row.paymentMethod?.toLowerCase().includes('gcash') && (
-                            <div className="flex items-center gap-2">
-                              <label className="text-[10px] text-gray-400 uppercase font-bold">GCash Ref</label>
-                              <input type="text" value={row.gcRef || ''} onChange={(e) => setBatchData(batchData.map((d, i) => i === idx ? { ...d, gcRef: e.target.value } : d))} className="w-28 px-2 py-1 text-xs rounded border border-gray-200 focus:outline-none focus:border-brand-brown font-mono" placeholder="Ref#" />
+
+                      <div className="p-4 sm:p-6 grid grid-cols-1 md:grid-cols-2 gap-8">
+                         {/* Personal Info Column (Batch) */}
+                         <div className="space-y-6">
+                            <div>
+                               <h6 className="text-[10px] font-black text-gray-400 uppercase tracking-widest border-b pb-2 mb-4">Personal Info</h6>
+                               <div className="space-y-4">
+                                  <div>
+                                    <label className="block text-xs text-gray-500 mb-1">Full Name (Last, First M.)</label>
+                                    <input 
+                                      type="text" required 
+                                      value={row.fullName} 
+                                      onChange={(e) => setBatchData(batchData.map((d, i) => i === idx ? { ...d, fullName: e.target.value } : d))} 
+                                      className={`w-full px-3 py-2 text-sm rounded-lg border focus:outline-none transition-colors ${isValidName ? 'border-gray-200 focus:border-brand-brown' : 'border-red-400 focus:border-red-500 bg-red-50/30'}`} 
+                                      placeholder="Dela Cruz, Juan P." 
+                                    />
+                                    {!isValidName && <p className="text-[10px] text-red-500 mt-1 font-bold">Incorrect format. Use 'Last, First M.'</p>}
+                                  </div>
+
+                                  <div className="grid grid-cols-3 gap-3">
+                                    <div>
+                                      <label className="block text-xs text-gray-500 mb-1 text-center">Age</label>
+                                      <input type="number" required min="1" max="100" value={row.age || ''} onChange={(e) => setBatchData(batchData.map((d, i) => i === idx ? { ...d, age: parseInt(e.target.value) || 0 } : d))} className="w-full px-2 py-2 text-sm rounded-lg border border-gray-200 focus:outline-none focus:border-brand-brown text-center" />
+                                    </div>
+                                    <div>
+                                      <label className="block text-xs text-gray-500 mb-1 text-center font-medium">Sex</label>
+                                      <select value={row.sex} onChange={(e) => setBatchData(batchData.map((d, i) => i === idx ? { ...d, sex: e.target.value as any } : d))} className="w-full px-2 py-2 text-sm rounded-lg border border-gray-200 focus:outline-none focus:border-brand-brown text-center font-medium">
+                                        <option value="Male">Male</option>
+                                        <option value="Female">Female</option>
+                                      </select>
+                                    </div>
+                                    <div>
+                                      <label className="block text-xs text-gray-500 mb-1 text-center font-bold">Size</label>
+                                      <select value={row.shirtSize} onChange={(e) => setBatchData(batchData.map((d, i) => i === idx ? { ...d, shirtSize: e.target.value as any } : d))} className="w-full px-2 py-2 text-sm rounded-lg border border-gray-200 focus:outline-none focus:border-brand-brown text-center font-black">
+                                        {['XS', 'S', 'M', 'L', 'XL', 'XXL'].map(s => <option key={s} value={s}>{s}</option>)}
+                                      </select>
+                                    </div>
+                                  </div>
+
+                                  <div>
+                                     <label className="block text-[10px] text-gray-400 uppercase font-black mb-2">Ministries</label>
+                                     <div className="grid grid-cols-2 gap-2 p-2 bg-gray-50 rounded-xl border border-gray-100 min-h-[42px]">
+                                        {settings.ministries.map((m: string) => {
+                                          const isChecked = row.ministry?.includes(m);
+                                          return (
+                                            <button
+                                              type="button"
+                                              key={m}
+                                              onClick={() => {
+                                                const current = row.ministry || [];
+                                                const next = isChecked ? current.filter(x => x !== m) : [...current, m];
+                                                setBatchData(batchData.map((d, i) => i === idx ? { ...d, ministry: next } : d));
+                                              }}
+                                              className={`flex items-center gap-2 px-3 py-2 rounded-lg text-[10px] font-bold uppercase transition-all border ${isChecked ? 'bg-brand-sand text-brand-brown border-brand-sand shadow-sm' : 'bg-white text-gray-400 border-gray-200 hover:border-brand-sand'}`}
+                                            >
+                                              <div className={`w-3 h-3 rounded border flex items-center justify-center ${isChecked ? 'bg-brand-brown border-brand-brown text-white' : 'bg-white border-gray-300 text-transparent'}`}>
+                                                <CheckCircle size={8} />
+                                              </div>
+                                              <span className="truncate">{m}</span>
+                                            </button>
+                                          );
+                                        })}
+                                     </div>
+                                  </div>
+                               </div>
                             </div>
-                          )}
-                          <div className="flex-1"></div>
-                          <div className="flex items-center gap-2">
-                             <label className="text-[10px] text-gray-400 uppercase font-black">Amount Paid</label>
-                             <div className="relative">
-                               <span className="absolute left-2 top-1/2 -translate-y-1/2 text-[10px] text-gray-400">₱</span>
-                               <input type="number" required={row.paymentStatus !== 'Unpaid'} min="0" disabled={row.paymentStatus === 'Unpaid'} value={row.amountPaid || ''} onChange={(e) => setBatchData(batchData.map((d, i) => i === idx ? { ...d, amountPaid: parseInt(e.target.value) || 0 } : d))} className="w-24 pl-5 pr-2 py-1 text-xs rounded border border-gray-200 focus:outline-none focus:border-brand-brown font-black text-brand-brown" />
-                             </div>
-                          </div>
-                        </div>
+                         </div>
+
+                         {/* Camp & Payment Column (Batch) */}
+                         <div className="space-y-6">
+                            <div>
+                               <h6 className="text-[10px] font-black text-gray-400 uppercase tracking-widest border-b pb-2 mb-4">Camp & Payment</h6>
+                               <div className="space-y-4">
+                                  <div className="grid grid-cols-2 gap-4">
+                                     <div>
+                                        <label className="block text-xs text-gray-500 mb-1">Church</label>
+                                        {roleKey === 'admin' ? (
+                                          <select value={row.church} onChange={(e) => setBatchData(batchData.map((d, i) => i === idx ? { ...d, church: e.target.value } : d))} className="w-full px-3 py-2 text-sm rounded-lg border border-gray-200 focus:outline-none focus:border-brand-brown">
+                                            {settings.churches.map((c: string) => <option key={c} value={c}>{c}</option>)}
+                                          </select>
+                                        ) : (
+                                          <input type="text" disabled value={row.church} className="w-full px-3 py-2 text-sm rounded-lg border border-gray-100 bg-gray-50 text-gray-500 opacity-80 cursor-not-allowed font-medium" />
+                                        )}
+                                     </div>
+                                     <div>
+                                        <label className="block text-xs text-gray-500 mb-1">Package</label>
+                                        <select 
+                                          value={row.feeType} 
+                                          onChange={(e) => {
+                                            const ft = e.target.value as any;
+                                            const newExpected = ft === 'Early Bird' ? 350 : 500;
+                                            setBatchData(batchData.map((d, i) => i === idx ? { ...d, feeType: ft, amountPaid: d.paymentStatus === 'Paid' ? newExpected : d.amountPaid } : d));
+                                          }}
+                                          className="w-full px-3 py-2 text-sm rounded-lg border border-gray-200 focus:outline-none focus:border-brand-brown"
+                                        >
+                                          <option value="Early Bird">Early (₱350)</option>
+                                          <option value="Regular">Regular (₱500)</option>
+                                        </select>
+                                     </div>
+                                  </div>
+
+                                  <div className="grid grid-cols-2 gap-4 pt-2">
+                                     <div>
+                                        <label className="block text-xs text-gray-500 mb-1">Status</label>
+                                        <select 
+                                          value={row.paymentStatus} 
+                                          onChange={(e) => {
+                                            const status = e.target.value as any;
+                                            const pkgFixed = row.feeType === 'Early Bird' ? 350 : 500;
+                                            setBatchData(batchData.map((d, i) => i === idx ? { ...d, paymentStatus: status, amountPaid: status === 'Unpaid' ? 0 : (status === 'Paid' ? pkgFixed : d.amountPaid) } : d));
+                                          }} 
+                                          className={`w-full px-3 py-2 text-sm font-black rounded-lg border focus:outline-none transition-all ${
+                                            row.paymentStatus === 'Paid' ? (isMistake ? 'border-orange-400 bg-orange-50 text-orange-700' : 'border-green-300 bg-green-50 text-green-700') :
+                                            row.paymentStatus === 'Partial' ? (isPartialMistake ? 'border-orange-400 bg-orange-50 text-orange-700' : 'border-yellow-300 bg-yellow-50 text-yellow-700') :
+                                            'border-red-300 bg-red-50 text-red-700'
+                                          }`}
+                                        >
+                                          <option value="Unpaid">Unpaid</option>
+                                          <option value="Partial">Partial</option>
+                                          <option value="Paid">Paid Fully</option>
+                                        </select>
+                                     </div>
+                                     <div>
+                                        <label className="block text-xs text-gray-500 mb-1">Amount Paid (₱)</label>
+                                        <input 
+                                          type="number" required={row.paymentStatus !== 'Unpaid'} min="0" 
+                                          disabled={row.paymentStatus === 'Unpaid'} 
+                                          value={row.amountPaid || ''} 
+                                          onChange={(e) => setBatchData(batchData.map((d, i) => i === idx ? { ...d, amountPaid: parseInt(e.target.value) || 0 } : d))} 
+                                          className={`w-full px-3 py-2 text-sm rounded-lg border focus:outline-none transition-all font-black text-brand-brown ${
+                                            isMistake || isPartialMistake ? 'border-orange-400 bg-orange-50' : 'border-gray-200 focus:border-brand-brown'
+                                          }`} 
+                                        />
+                                        {isMistake && <p className="text-[8px] text-orange-500 font-black mt-1 uppercase">⚠️ Balance mismatch</p>}
+                                     </div>
+
+                                     <div className="col-span-2">
+                                        <label className="block text-xs text-gray-500 mb-1">Payment Method</label>
+                                        <select value={row.paymentMethod || 'Cash'} onChange={(e) => setBatchData(batchData.map((d, i) => i === idx ? { ...d, paymentMethod: e.target.value as any } : d))} className="w-full px-3 py-2 text-sm rounded-lg border border-gray-200 focus:outline-none focus:border-brand-brown">
+                                          {settings.paymentMethods.map((pm: string) => <option key={pm} value={pm}>{pm}</option>)}
+                                        </select>
+                                     </div>
+
+                                     {row.paymentMethod?.toLowerCase().includes('gcash') && (
+                                       <div className="col-span-2">
+                                         <label className="block text-xs text-gray-500 mb-1">GCash Ref No.</label>
+                                         <input type="text" value={row.gcRef || ''} onChange={(e) => setBatchData(batchData.map((d, i) => i === idx ? { ...d, gcRef: e.target.value } : d))} className="w-full px-3 py-2 text-sm rounded-lg border border-gray-200 focus:outline-none focus:border-brand-brown font-mono" placeholder="000 000 000000" />
+                                       </div>
+                                     )}
+                                  </div>
+                               </div>
+                            </div>
+                         </div>
                       </div>
                     </div>
                   );
@@ -1041,7 +1157,7 @@ export default function Registrants() {
                 <PlusCircle size={20} /> Add Another Row
               </button>
 
-              <div className="mt-8 pt-6 border-t border-brand-beige flex justify-end gap-3 sticky bottom-0 bg-gray-50/30 backdrop-blur-md pb-2 z-20">
+              <div className="mt-8 pt-6 border-t border-brand-beige flex justify-end gap-3 bg-gray-50/30 pb-2">
                 <button
                   type="button"
                   onClick={() => setIsBatchModalOpen(false)}
@@ -1064,7 +1180,7 @@ export default function Registrants() {
 
       {/* Shirt Size Photo Modal */}
       {shirtModalOpen && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[60] flex items-center justify-center p-2 sm:p-4" onClick={() => setShirtModalOpen(false)}>
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[120] flex items-center justify-center p-2 sm:p-4" onClick={() => setShirtModalOpen(false)}>
           <div className="bg-white rounded-2xl shadow-2xl p-4 sm:p-6 max-w-lg w-full relative max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
             <button
               onClick={() => setShirtModalOpen(false)}

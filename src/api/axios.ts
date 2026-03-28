@@ -1,17 +1,18 @@
 import axios from 'axios';
-import { useAppStore } from '../store';
+
+let defaultBaseUrl = import.meta.env.VITE_API_URL;
+
+// Force relative paths locally so Vite natively handles the REST traffic proxy. 
+// This physically prevents cross-origin SameSite cookie packet stripping entirely, ignoring .env overrides.
+if (window.location.hostname === 'localhost' || window.location.hostname.startsWith('192.168.')) {
+  defaultBaseUrl = ''; 
+} else if (!defaultBaseUrl) {
+  defaultBaseUrl = 'https://lakbay-camp-tracker.onrender.com';
+}
 
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL,
+  baseURL: defaultBaseUrl,
   withCredentials: true,
-});
-
-api.interceptors.request.use((config) => {
-  const token = useAppStore.getState().currentUser?.token;
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`;
-  }
-  return config;
 });
 
 export default api;

@@ -14,8 +14,7 @@ interface AppUser {
 }
 
 export default function Users() {
-  const { currentUser, setLoading } = useAppStore();
-  const [users, setUsers] = useState<AppUser[]>([]);
+  const { currentUser, users, fetchUsers, appSettings, fetchGlobalSettings } = useAppStore();
   const [settings, setSettings] = useState<AppSettings>({ churches: [], merchCosts: {} } as any);
   
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -30,24 +29,28 @@ export default function Users() {
 
   const [confirmModal, setConfirmModal] = useState<{isOpen: boolean, id: string | null}>({isOpen: false, id: null});
 
-  const fetchData = async () => {
+  const fetchData = async (silent = false) => {
     try {
-      const [usrRes, setRes] = await Promise.all([
-        api.get('/api/auth/users'),
-        api.get('/api/settings')
+      await Promise.all([
+        fetchUsers(silent),
+        fetchGlobalSettings()
       ]);
-      setUsers(usrRes.data);
-      if (setRes.data && setRes.data.churchList) {
-        setSettings({ ...setRes.data, churches: setRes.data.churchList });
-      }
     } catch (err) {
       console.error(err);
     }
   };
 
   useEffect(() => {
-    fetchData();
-  }, [setLoading]);
+    // If we already have users in the store, do a silent refresh.
+    // Otherwise, do a foreground fetch.
+    fetchData(users.length > 0);
+  }, []);
+
+  useEffect(() => {
+    if (appSettings) {
+      setSettings(appSettings);
+    }
+  }, [appSettings]);
 
   if (currentUser?.role?.toLowerCase().trim() !== 'admin') {
     return (

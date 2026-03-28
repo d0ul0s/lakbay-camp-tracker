@@ -3,12 +3,17 @@ import api from '../api/axios';
 import { useAppStore } from '../store';
 import { PlusCircle, Edit2, Trash2, Search, X, ShieldAlert, CheckCircle, Clock, HeartHandshake } from 'lucide-react';
 import ConfirmModal from '../components/ConfirmModal';
-import type { Solicitation, AppSettings } from '../types';
+import type { Solicitation } from '../types';
 
 export default function Solicitations() {
-  const { currentUser, setLoading } = useAppStore();
-  const [solicitations, setSolicitations] = useState<Solicitation[]>([]);
-  const [settings, setSettings] = useState<AppSettings | null>(null);
+  const { currentUser, appSettings, fetchGlobalSettings, solicitations, fetchSolicitations, syncSolicitation } = useAppStore();
+  
+  // Use global settings with fallback
+  const settings = appSettings || {
+    churches: [],
+    paymentMethods: []
+  } as any;
+
   const [searchTerm, setSearchTerm] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
@@ -34,22 +39,18 @@ export default function Solicitations() {
   };
   const [formData, setFormData] = useState<Omit<Solicitation, 'id' | 'verifiedByTreasurer' | 'verifiedAt'>>(initialForm);
 
-  const fetchData = async () => {
-    try {
-      const [solRes, setRes] = await Promise.all([
-        api.get('/api/solicitations'),
-        api.get('/api/settings')
-      ]);
-      setSolicitations(solRes.data);
-      setSettings(setRes.data);
-    } catch (err) {
-      console.error(err);
-    }
-  };
+
 
   useEffect(() => {
-    fetchData();
-  }, [setLoading]);
+    // Only trigger network fetches if boot hasn't synced yet (cold start with no cache).
+    // Once hasSyncedLive=true, WebSocket in Layout.tsx handles all real-time updates.
+    const { hasSyncedLive } = useAppStore.getState();
+    if (!hasSyncedLive) {
+      const isFirstLoad = solicitations.length === 0;
+      fetchSolicitations(!isFirstLoad);
+      fetchGlobalSettings();
+    }
+  }, []);
 
   const isAdmin = currentUser?.role?.toLowerCase().trim() === 'admin';
   const roleKey = currentUser?.role?.toLowerCase().trim();
@@ -77,37 +78,46 @@ export default function Solicitations() {
     const canDeleteThis = isAdmin || (canDeleteAny && sol.createdBy === currentUser?._id);
     if (!canDeleteThis) return;
 
+    const solId = sol.id || (sol as any)._id;
     setConfirmModal({
       isOpen: true,
       title: 'Delete Solicitation',
       message: 'Are you sure you want to delete this solicitation record? This will alter financial reports.',
-      action: async () => {
-        try {
-          await api.delete(`/api/solicitations/${sol.id || (sol as any)._id}`);
-          fetchData();
-        } catch (err) {
+      action: () => {
+        // Optimistic delete
+        syncSolicitation('deleted', { _id: solId, id: solId });
+        api.delete(`/api/solicitations/${solId}`).catch(err => {
           console.error(err);
-        }
+          fetchSolicitations(true);
+        });
       }
     });
   };
 
   const handleToggleVerified = (solicitation: Solicitation) => {
     const isNowVerified = !solicitation.verifiedByTreasurer;
+    const solId = solicitation.id || (solicitation as any)._id;
+    
     setConfirmModal({
       isOpen: true,
       title: isNowVerified ? 'Confirm Verification' : 'Remove Verification',
       message: `Are you sure you want to mark this as ${isNowVerified ? 'verified' : 'unverified'}? This affects the financial summary.`,
-      action: async () => {
-        try {
-          await api.put(`/api/solicitations/${solicitation.id || (solicitation as any)._id}`, {
-            verifiedByTreasurer: isNowVerified,
-            verifiedAt: isNowVerified ? new Date().toISOString() : null
-          });
-          fetchData();
-        } catch (err) {
+      action: () => {
+        // Optimistic update
+        syncSolicitation('updated', { 
+          _id: solId, 
+          id: solId, 
+          verifiedByTreasurer: isNowVerified,
+          verifiedAt: isNowVerified ? new Date().toISOString() : null
+        });
+        
+        api.put(`/api/solicitations/${solId}`, {
+          verifiedByTreasurer: isNowVerified,
+          verifiedAt: isNowVerified ? new Date().toISOString() : null
+        }).catch(err => {
           console.error(err);
-        }
+          fetchSolicitations(true);
+        });
       }
     });
   };
@@ -140,17 +150,44 @@ export default function Solicitations() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
+      const { id, _id, __v, createdAt, updatedAt, createdBy, ...cleanData } = formData as any;
       const payload = {
-        ...formData,
+        ...cleanData,
         dateReceived: new Date(formData.dateReceived).toISOString()
       };
+      
       if (editingId) {
-        await api.put(`/api/solicitations/${editingId}`, payload);
+        // Optimistic update for edit
+        syncSolicitation('updated', { ...payload, _id: editingId, id: editingId });
+        setIsModalOpen(false);
+        api.put(`/api/solicitations/${editingId}`, payload).catch(err => {
+          console.error(err);
+          fetchSolicitations(true); // Silent revert on failure
+        });
       } else {
-        await api.post(`/api/solicitations`, payload);
+        // Optimistic update for new solicitations
+        const tempId = `temp-${Date.now()}`;
+        const optimisticNew = {
+          ...payload,
+          _id: tempId,
+          id: tempId,
+          createdBy: currentUser?._id,
+          dateReceived: payload.dateReceived
+        };
+        syncSolicitation('added', optimisticNew);
+        setIsModalOpen(false);
+
+        api.post(`/api/solicitations`, payload).then((res) => {
+          // Graceful handoff: Swap temp optimistic UI instantly to prevent duplicates.
+          syncSolicitation('deleted', { _id: tempId, id: tempId });
+          syncSolicitation('added', res.data);
+        }).catch(err => {
+          console.error(err);
+          // Immediate rollback on error
+          syncSolicitation('deleted', { _id: tempId, id: tempId });
+          fetchSolicitations(true);
+        });
       }
-      setIsModalOpen(false);
-      fetchData();
     } catch (err) {
       console.error(err);
     }
@@ -176,63 +213,63 @@ export default function Solicitations() {
       </div>
 
       <div className="bg-white p-4 md:p-6 rounded-2xl shadow-sm border border-brand-beige">
-        <div className="relative mb-4">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+        <div className="relative mb-3 lg:mb-4">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 font-bold" size={18} />
           <input 
             type="text" 
             placeholder="Search sources or types..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-10 pr-4 py-2 rounded-xl border border-gray-200 focus:outline-none focus:border-brand-brown text-sm"
+            className="w-full pl-10 pr-4 py-2 rounded-xl border border-gray-200 focus:outline-none focus:border-brand-brown text-xs lg:text-sm bg-white font-medium"
           />
         </div>
 
         {/* Desktop Table View */}
         <div className="hidden md:block overflow-x-auto">
           <table className="w-full text-left text-sm text-gray-600">
-            <thead className="text-xs text-gray-400 uppercase bg-gray-50/80 border-b border-gray-100">
+            <thead className="text-[10px] lg:text-xs text-gray-400 uppercase bg-gray-50/80 border-b border-gray-100">
               <tr>
-                <th className="px-4 py-4 font-medium tracking-wider">Source Name</th>
-                <th className="px-4 py-4 font-medium tracking-wider">Type</th>
-                <th className="px-4 py-4 font-medium tracking-wider">Amount</th>
-                <th className="px-4 py-4 font-medium tracking-wider">Payment Method</th>
-                <th className="px-4 py-4 font-medium tracking-wider">Date</th>
-                <th className="px-4 py-4 font-medium tracking-wider text-center">Verified</th>
-                <th className="px-4 py-4 font-medium tracking-wider text-right">Actions</th>
+                <th className="px-2 lg:px-4 py-4 font-medium tracking-wider">Source Name</th>
+                <th className="px-2 lg:px-4 py-4 font-medium tracking-wider text-center">Type</th>
+                <th className="px-2 lg:px-4 py-4 font-medium tracking-wider">Amount</th>
+                <th className="px-2 lg:px-4 py-4 font-medium tracking-wider">Method</th>
+                <th className="px-2 lg:px-4 py-4 font-medium tracking-wider text-center">Date</th>
+                <th className="px-2 lg:px-4 py-4 font-medium tracking-wider text-center">Verified</th>
+                <th className="px-2 lg:px-4 py-4 font-medium tracking-wider text-right">Actions</th>
               </tr>
-              <tr className="bg-green-50/40 text-xs border-b border-gray-100">
-                <td colSpan={7} className="px-4 py-1.5 text-gray-500">
-                  <span className="flex items-center gap-4">
-                    <span className="flex items-center gap-1.5"><CheckCircle size={13} className="text-green-600" /> Verified by Treasurer</span>
-                    <span className="flex items-center gap-1.5"><Clock size={13} className="text-orange-500" /> Pending verification</span>
-                  </span>
+              <tr className="bg-green-50/40 text-[9px] lg:text-xs border-b border-gray-100">
+                <td colSpan={7} className="px-2 lg:px-4 py-1.5 text-gray-500">
+                  <div className="flex items-center gap-4">
+                    <span className="flex items-center gap-1.5"><CheckCircle size={12} className="text-green-600" /> Verified by Treasurer</span>
+                    <span className="flex items-center gap-1.5"><Clock size={12} className="text-orange-500" /> Pending verification</span>
+                  </div>
                 </td>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
               {filtered.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage).map(sol => (
                 <tr key={sol.id || (sol as any)._id} className="hover:bg-brand-cream/30 transition-colors">
-                  <td className="px-4 py-4 font-medium text-gray-800">{sol.sourceName}</td>
-                  <td className="px-4 py-4"><span className="px-2.5 py-1 rounded-full text-xs font-bold uppercase bg-brand-sand/50 text-brand-brown">{sol.type}</span></td>
-                  <td className="px-4 py-4 font-bold text-gray-900">₱{sol.amount.toLocaleString()}</td>
-                  <td className="px-4 py-4">{sol.paymentMethod}</td>
-                  <td className="px-4 py-4">{new Date(sol.dateReceived).toLocaleDateString()}</td>
-                  <td className="px-4 py-4 text-center">
+                  <td className="px-2 lg:px-4 py-4 font-black text-brand-brown text-[11px] lg:text-sm leading-tight">{sol.sourceName}</td>
+                  <td className="px-2 lg:px-4 py-4 text-center"><span className="px-1.5 py-0.5 rounded-full text-[8px] lg:text-xs font-black uppercase bg-brand-sand/30 text-brand-brown border border-brand-sand/20">{sol.type}</span></td>
+                  <td className="px-2 lg:px-4 py-4 font-black text-gray-900 text-[11px] lg:text-sm whitespace-nowrap">₱{sol.amount.toLocaleString()}</td>
+                  <td className="px-2 lg:px-4 py-4 text-[10px] lg:text-sm whitespace-nowrap">{sol.paymentMethod?.split(' ')[0]}</td>
+                  <td className="px-2 lg:px-4 py-4 text-[10px] lg:text-sm text-center whitespace-nowrap">{new Date(sol.dateReceived).toLocaleDateString([], { month: '2-digit', day: '2-digit', year: '2-digit' })}</td>
+                  <td className="px-2 lg:px-4 py-4 text-center">
                     {canVerify ? (
                       <button 
                         onClick={() => handleToggleVerified(sol)}
                         className={`inline-flex items-center justify-center p-1.5 rounded-lg transition-colors ${sol.verifiedByTreasurer ? 'bg-green-100 text-green-700 hover:bg-green-200' : 'bg-orange-100 text-orange-600 hover:bg-orange-200'}`}
                         title={sol.verifiedByTreasurer ? "Verified by Treasurer" : "Pending Verification"}
                       >
-                        {sol.verifiedByTreasurer ? <CheckCircle size={20} /> : <Clock size={20} />}
+                        {sol.verifiedByTreasurer ? <CheckCircle size={18} className="lg:w-5 lg:h-5" /> : <Clock size={18} className="lg:w-5 lg:h-5" />}
                       </button>
                     ) : (
                       <div className={`inline-flex items-center justify-center p-1.5 rounded-lg ${sol.verifiedByTreasurer ? 'text-green-500' : 'text-orange-400'}`}>
-                        {sol.verifiedByTreasurer ? <CheckCircle size={20} /> : <Clock size={20} />}
+                        {sol.verifiedByTreasurer ? <CheckCircle size={18} className="lg:w-5 lg:h-5" /> : <Clock size={18} className="lg:w-5 lg:h-5" />}
                       </div>
                     )}
                   </td>
-                   <td className="px-4 py-4 text-right">
+                  <td className="px-2 lg:px-4 py-4 text-right">
                     {(() => {
                       const canEditThis = isAdmin || (canEditAny && sol.createdBy === currentUser?._id);
                       const canDeleteThis = isAdmin || (canDeleteAny && sol.createdBy === currentUser?._id);
@@ -240,15 +277,15 @@ export default function Solicitations() {
                       if (!canEditThis && !canDeleteThis) return null;
 
                       return (
-                        <div className="flex items-center justify-end gap-2">
+                        <div className="flex items-center justify-end gap-0.5 lg:gap-2">
                           {canEditThis && (
-                            <button onClick={() => openModal(sol)} className="p-2 text-gray-400 hover:text-brand-brown hover:bg-brand-sand/20 rounded-lg">
-                              <Edit2 size={16} />
+                            <button onClick={() => openModal(sol)} className="p-1 lg:p-2 text-gray-400 hover:text-brand-brown hover:bg-brand-sand/20 rounded-lg">
+                              <Edit2 size={14} className="lg:w-4 lg:h-4" />
                             </button>
                           )}
                           {canDeleteThis && (
-                            <button onClick={() => handleDelete(sol)} className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg">
-                              <Trash2 size={16} />
+                            <button onClick={() => handleDelete(sol)} className="p-1 lg:p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg">
+                              <Trash2 size={14} className="lg:w-4 lg:h-4" />
                             </button>
                           )}
                         </div>
@@ -356,8 +393,8 @@ export default function Solicitations() {
       </div>
 
       {isModalOpen && (
-        <div className="fixed inset-0 bg-brand-brown/40 backdrop-blur-sm z-50 flex items-center justify-center p-2 sm:p-4">
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg overflow-hidden border border-brand-sand max-h-[90vh] flex flex-col">
+        <div className="fixed inset-0 bg-brand-brown/40 backdrop-blur-sm z-[100] flex items-center justify-center p-2 sm:p-4">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg overflow-hidden border border-brand-sand max-h-[92vh] flex flex-col">
             <div className="px-4 sm:px-6 py-4 border-b border-gray-100 flex justify-between items-center bg-brand-cream/50 sticky top-0 z-10 shrink-0">
               <h3 className="text-2xl font-display text-brand-brown tracking-wide">
                 {editingId ? 'Edit Solicitation' : 'Record Solicitation'}
@@ -367,7 +404,7 @@ export default function Solicitations() {
               </button>
             </div>
             
-            <form onSubmit={handleSubmit} className="p-4 sm:p-6 space-y-4 overflow-y-auto flex-1">
+            <form onSubmit={handleSubmit} className="p-4 sm:p-6 space-y-4 overflow-y-auto flex-1 pb-24 md:pb-6">
               <div>
                 <label className="block text-sm text-gray-600 mb-1">Source / Donor Name</label>
                 <input required type="text" value={formData.sourceName} onChange={e => setFormData({...formData, sourceName: e.target.value})} className="w-full px-3 py-2 rounded-lg border border-gray-200 focus:outline-none focus:border-brand-brown" placeholder="e.g. John Doe, or Youth Ministry" />
@@ -378,7 +415,7 @@ export default function Solicitations() {
                   <label className="block text-sm text-gray-600 mb-1">Type</label>
                   <select required value={formData.type} onChange={e => setFormData({...formData, type: e.target.value})} className="w-full px-3 py-2 rounded-lg border border-gray-200 focus:outline-none focus:border-brand-brown">
                     <option value="" disabled>Select Type</option>
-                    {settings?.solicitationTypes?.map(t => <option key={t} value={t}>{t}</option>)}
+                    {settings?.solicitationTypes?.map((t: string) => <option key={t} value={t}>{t}</option>)}
                   </select>
                 </div>
                 <div>
@@ -392,7 +429,7 @@ export default function Solicitations() {
                   <label className="block text-sm text-gray-600 mb-1">Payment Method</label>
                   <select required value={formData.paymentMethod} onChange={e => setFormData({...formData, paymentMethod: e.target.value})} className="w-full px-3 py-2 rounded-lg border border-gray-200 focus:outline-none focus:border-brand-brown">
                     <option value="" disabled>Select Method</option>
-                    {settings?.paymentMethods?.map(m => <option key={m} value={m}>{m}</option>)}
+                    {settings?.paymentMethods?.map((m: string) => <option key={m} value={m}>{m}</option>)}
                   </select>
                 </div>
                 <div>
