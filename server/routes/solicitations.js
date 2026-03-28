@@ -8,12 +8,63 @@ router.use(attachPermissions);
 
 router.get('/', requirePermission('solicitations', 'view'), async (req, res) => {
   try {
-    const records = await Solicitation.find();
-    res.json(records);
+    const { 
+      page = 1, 
+      limit = 30, 
+      search = '' 
+    } = req.query;
+
+    const query = {};
+    if (search) {
+      query.sourceName = { $regex: search, $options: 'i' };
+    }
+
+    const pageNum = parseInt(page);
+    const limitNum = parseInt(limit);
+    const skip = (pageNum - 1) * limitNum;
+
+    const total = await Solicitation.countDocuments(query);
+    const solicitations = await Solicitation.find(query)
+      .sort({ createdAt: -1 }) // Newest first
+      .skip(skip)
+      .limit(limitNum);
+
+    res.json({
+      solicitations,
+      total,
+      page: pageNum,
+      pages: Math.ceil(total / limitNum)
+    });
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
 });
+
+// GET solicitations summary
+router.get('/summary', requirePermission('solicitations', 'view'), async (req, res) => {
+  try {
+    const all = await Solicitation.find({}, 'amount verifiedByTreasurer');
+    
+    let verifiedTotal = 0;
+    let pendingTotal = 0;
+
+    all.forEach(s => {
+      if (s.verifiedByTreasurer) {
+        verifiedTotal += (s.amount || 0);
+      } else {
+        pendingTotal += (s.amount || 0);
+      }
+    });
+
+    res.json({
+      verifiedTotal,
+      pendingTotal
+    });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
 
 router.post('/', requirePermission('solicitations', 'add'), async (req, res) => {
   const record = new Solicitation({ ...req.body, createdBy: req.user.id });

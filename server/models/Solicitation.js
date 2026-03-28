@@ -12,4 +12,8 @@ const SolicitationSchema = new mongoose.Schema({
   createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null }
 }, { timestamps: true });
 
+SolicitationSchema.index({ sourceName: 1 });
+SolicitationSchema.index({ type: 1 });
+SolicitationSchema.index({ dateReceived: -1 });
+
 module.exports = mongoose.model('Solicitation', SolicitationSchema);

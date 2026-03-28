@@ -3,12 +3,12 @@ const mongoose = require('mongoose');
 const registrantSchema = new mongoose.Schema({
   fullName: { type: String, required: true },
   age: { type: Number, required: true },
-  church: { type: String, required: true },
+  church: { type: String, required: true, index: true },
   sex: { type: String, enum: ['Male', 'Female'], required: true, default: 'Male' },
   ministry: { type: [String], default: [] },
   shirtSize: { type: String },
   feeType: { type: String },
-  paymentStatus: { type: String },
+  paymentStatus: { type: String, index: true },
   paymentMethod: { type: String, default: null },
   gcRef: { type: String, default: null },
   amountPaid: { type: Number, default: 0 },
@@ -24,6 +24,12 @@ const registrantSchema = new mongoose.Schema({
   verifiedByTreasurer: { type: Boolean, default: false },
   verifiedAt: { type: Date, default: null }
 });
+
+// Compound index for fullName regex search and sorting
+registrantSchema.index({ fullName: 1 });
+registrantSchema.index({ firstName: 1 });
+registrantSchema.index({ lastName: 1 });
+registrantSchema.index({ ministry: 1 });
 
 registrantSchema.set('toJSON', {
   virtuals: true,

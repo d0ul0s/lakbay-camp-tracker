@@ -1,8 +1,8 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import api from '../api/axios';
 import { useAppStore } from '../store';
 import type { Expense } from '../types';
-import { PlusCircle, Filter, Trash2, Edit2, X, DollarSign, TrendingDown, TrendingUp, CheckCircle, Clock, ShieldAlert, Users, Receipt } from 'lucide-react';
+import { PlusCircle, Filter, Trash2, Edit2, X, DollarSign, TrendingDown, TrendingUp, CheckCircle, Clock, ShieldAlert, Users, Receipt, Loader2 } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import ConfirmModal from '../components/ConfirmModal';
 
@@ -87,7 +87,66 @@ export default function Expenses() {
 
   const [filterCategory, setFilterCategory] = useState<string>('All');
   const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 10;
+  const itemsPerPage = 30;
+  const [pageExpenses, setPageExpenses] = useState<Expense[]>([]);
+  const [total, setTotal] = useState(0);
+  const [isFetching, setIsFetching] = useState(false);
+  const [stats, setStats] = useState({
+    regIncome: 0,
+    solIncome: 0,
+    expTotal: 0,
+    pendingInc: 0,
+    pendingExp: 0,
+    totalRegs: 0
+  });
+
+  const fetchData = async () => {
+    setIsFetching(true);
+    try {
+      const res = await api.get('/api/expenses', {
+        params: {
+          page: currentPage,
+          limit: itemsPerPage,
+          category: filterCategory
+        }
+      });
+      setPageExpenses(res.data.expenses);
+      setTotal(res.data.total);
+    } catch (err) {
+      console.error('Fetch error:', err);
+    } finally {
+      setIsFetching(false);
+    }
+  };
+
+  const fetchFinancialStats = async () => {
+    try {
+      const [regRes, solRes, expRes] = await Promise.all([
+        api.get('/api/registrants/summary'),
+        api.get('/api/solicitations/summary'),
+        api.get('/api/expenses/summary')
+      ]);
+
+      setStats({
+        regIncome: regRes.data.totalCollected,
+        solIncome: solRes.data.verifiedTotal,
+        expTotal: expRes.data.verifiedTotal,
+        pendingInc: (regRes.data.totalExpected - regRes.data.totalCollected) + solRes.data.pendingTotal,
+        pendingExp: expRes.data.pendingTotal,
+        totalRegs: Object.values(regRes.data.churchSummaries as Record<string, any>).reduce((acc, s) => acc + s.total, 0)
+      });
+    } catch (err) {
+      console.error('Stats fetch error:', err);
+    }
+  };
+
+  useEffect(() => {
+    fetchData();
+  }, [currentPage, filterCategory]);
+
+  useEffect(() => {
+    fetchFinancialStats();
+  }, []);
 
   // Reset pagination on filter change
   useEffect(() => {
@@ -123,6 +182,9 @@ export default function Expenses() {
     api.put(`/api/expenses/${expId}`, {
       verifiedByTreasurer: nowVerified,
       verifiedAt: nowVerified ? new Date().toISOString() : null
+    }).then(() => {
+      fetchFinancialStats();
+      fetchData();
     }).catch(err => {
       console.error(err);
       fetchExpenses(true); // Silent revert on failure
@@ -154,31 +216,21 @@ export default function Expenses() {
   }, [isModalOpen, editingId, settings.expenseCategories, settings.paymentMethods, formData.category, formData.method]);
 
   // Stats calculation (Verified Only)
-  const registrationIncome = registrants.filter(r => r.verifiedByTreasurer).reduce((sum, r) => sum + (r.amountPaid || 0), 0);
-  const solicitationIncome = solicitations.filter(s => s.verifiedByTreasurer).reduce((sum, s) => sum + (s.amount || 0), 0);
-  const totalIncome = registrationIncome + solicitationIncome;
-
-  const totalItemsExpected = registrants.length;
+  const totalIncome = stats.regIncome + stats.solIncome;
+  const totalItemsExpected = stats.totalRegs;
   const totalMerchProductionCost =
     ((parseInt(localMerchCosts.tshirt) || 0) * totalItemsExpected) +
     ((parseInt(localMerchCosts.bag) || 0) * totalItemsExpected) +
     ((parseInt(localMerchCosts.notebook) || 0) * totalItemsExpected) +
     ((parseInt(localMerchCosts.pen) || 0) * totalItemsExpected);
 
-  const loggedExpensesTotal = expenses.filter(e => e.verifiedByTreasurer).reduce((sum, e) => sum + (e.amount || 0), 0);
-  const totalExpenses = loggedExpensesTotal + totalMerchProductionCost;
-
-  const pendingIncome = registrants.filter(r => !r.verifiedByTreasurer).reduce((sum, r) => sum + (r.amountPaid || 0), 0) +
-                        solicitations.filter(s => !s.verifiedByTreasurer).reduce((sum, s) => sum + (s.amount || 0), 0);
-  const pendingExpenses = expenses.filter(e => !e.verifiedByTreasurer).reduce((sum, e) => sum + (e.amount || 0), 0);
-
+  const totalExpenses = stats.expTotal + totalMerchProductionCost;
+  const pendingIncome = stats.pendingInc;
+  const pendingExpenses = stats.pendingExp;
   const netBalance = totalIncome - totalExpenses;
 
   // Filtered log
-  const filteredExpenses = useMemo(() => {
-    return expenses.filter(e => filterCategory === 'All' || e.category === filterCategory)
-      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-  }, [expenses, filterCategory]);
+  const filteredExpenses = pageExpenses; // Server already filtered them
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -213,6 +265,8 @@ export default function Expenses() {
         // Graceful handoff: Swap temp optimistic UI instantly to prevent duplicates.
         syncExpense('deleted', { _id: tempId, id: tempId });
         syncExpense('added', res.data);
+        fetchFinancialStats();
+        fetchData();
       }).catch(err => {
         console.error(err);
         // Immediate rollback on error
@@ -238,7 +292,10 @@ export default function Expenses() {
     // Guard: skip API call if this is still a temp optimistic entry (server hasn't responded yet)
     if (String(deletedId).startsWith('temp-')) return;
     
-    api.delete(`/api/expenses/${deletedId}`).catch(err => {
+    api.delete(`/api/expenses/${deletedId}`).then(() => {
+      fetchFinancialStats();
+      fetchData();
+    }).catch(err => {
       console.error(err);
       fetchExpenses(true);
     });
@@ -353,8 +410,16 @@ export default function Expenses() {
 
   const isNameValid = true;
 
+  const totalPages = Math.ceil(total / itemsPerPage);
+  const paginatedExpenses = filteredExpenses;
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 relative">
+      {isFetching && (
+        <div className="absolute top-0 right-0 p-2 z-10">
+          <Loader2 className="animate-spin text-brand-brown w-6 h-6" />
+        </div>
+      )}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
         <div>
           <h2 className="text-2xl md:text-3xl font-display text-brand-brown tracking-wide">Expenses</h2>
@@ -478,7 +543,7 @@ export default function Expenses() {
 
           {/* Mobile Card List */}
           <div className="md:hidden space-y-1.5 px-0.5">
-            {filteredExpenses.length > 0 ? filteredExpenses.map((exp) => (
+            {paginatedExpenses.length > 0 ? paginatedExpenses.map((exp) => (
               <div key={exp.id} className="mobile-card flex flex-col gap-1.5 !p-2">
                 <div className="flex justify-between items-start">
                   <div className="flex-1 min-w-0">
@@ -559,7 +624,7 @@ export default function Expenses() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
-                {filteredExpenses.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage).length > 0 ? filteredExpenses.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage).map((exp) => (
+                {paginatedExpenses.length > 0 ? paginatedExpenses.map((exp) => (
                   <tr key={exp.id} className="hover:bg-brand-cream/30 transition-colors">
                     <td className="px-3 lg:px-6 py-4 whitespace-nowrap text-[11px] lg:text-sm">{format(parseISO(exp.date), 'MMM d, yyyy')}</td>
                     <td className="px-3 lg:px-6 py-4">
@@ -626,10 +691,10 @@ export default function Expenses() {
           </div>
 
           {/* Pagination Controls */}
-          {Math.ceil(filteredExpenses.length / itemsPerPage) > 1 && (
+          {totalPages > 1 && (
             <div className="px-6 py-4 border-t border-gray-100 flex items-center justify-between bg-gray-50/30">
               <span className="text-sm text-gray-500">
-                Showing {(currentPage - 1) * itemsPerPage + 1} to {Math.min(currentPage * itemsPerPage, filteredExpenses.length)} of {filteredExpenses.length}
+                Showing {(currentPage - 1) * itemsPerPage + 1} to {Math.min(currentPage * itemsPerPage, total)} of {total}
               </span>
               <div className="flex gap-2">
                 <button
@@ -640,8 +705,8 @@ export default function Expenses() {
                   Previous
                 </button>
                 <button
-                  onClick={() => setCurrentPage(p => Math.min(Math.ceil(filteredExpenses.length / itemsPerPage), p + 1))}
-                  disabled={currentPage === Math.ceil(filteredExpenses.length / itemsPerPage)}
+                  onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                  disabled={currentPage === totalPages}
                   className="px-3 py-1.5 rounded-lg border border-brand-brown text-brand-brown text-sm font-bold disabled:opacity-50"
                 >
                   Next

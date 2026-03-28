@@ -8,12 +8,61 @@ router.use(attachPermissions);
 
 router.get('/', requirePermission('expenses', 'view'), async (req, res) => {
   try {
-    const expenses = await Expense.find();
-    res.json(expenses);
+    const { 
+      page = 1, 
+      limit = 30, 
+      category = 'All' 
+    } = req.query;
+
+    const query = {};
+    if (category !== 'All') query.category = category;
+
+    const pageNum = parseInt(page);
+    const limitNum = parseInt(limit);
+    const skip = (pageNum - 1) * limitNum;
+
+    const total = await Expense.countDocuments(query);
+    const expenses = await Expense.find(query)
+      .sort({ date: -1 }) // Sort newest first
+      .skip(skip)
+      .limit(limitNum);
+
+    res.json({
+      expenses,
+      total,
+      page: pageNum,
+      pages: Math.ceil(total / limitNum)
+    });
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
 });
+
+// GET expenses summary
+router.get('/summary', requirePermission('expenses', 'view'), async (req, res) => {
+  try {
+    const all = await Expense.find({}, 'amount verifiedByTreasurer');
+    
+    let verifiedTotal = 0;
+    let pendingTotal = 0;
+
+    all.forEach(e => {
+      if (e.verifiedByTreasurer) {
+        verifiedTotal += (e.amount || 0);
+      } else {
+        pendingTotal += (e.amount || 0);
+      }
+    });
+
+    res.json({
+      verifiedTotal,
+      pendingTotal
+    });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
 
 router.post('/', requirePermission('expenses', 'add'), async (req, res) => {
   const expense = new Expense({ ...req.body, createdBy: req.user.id });

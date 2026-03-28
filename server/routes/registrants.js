@@ -7,15 +7,138 @@ const { attachPermissions, requirePermission } = require('../middleware/permissi
 // Always attach fresh permissions matrix for these routes
 router.use(attachPermissions);
 
-// GET all registrants
+// GET all registrants with pagination and filtering
 router.get('/', requirePermission('registrants', 'view'), async (req, res) => {
   try {
-    const registrants = await Registrant.find();
-    res.json(registrants);
+    const { 
+      page = 1, 
+      limit = 30, 
+      search = '', 
+      church = 'All', 
+      status = 'All', 
+      ministry = 'All',
+      merchStatus = 'All' 
+    } = req.query;
+
+    const query = {};
+    
+    // Role-based visibility: Non-admins might only see their own church depending on permissions
+    // But the current controller design seems to return all by default for 'view' permission.
+    // We maintain that but allow church filter.
+    if (church !== 'All') query.church = church;
+    if (status !== 'All') query.paymentStatus = status;
+    if (ministry !== 'All') query.ministry = ministry;
+    if (search) {
+      query.$or = [
+        { firstName: { $regex: search, $options: 'i' } },
+        { lastName: { $regex: search, $options: 'i' } },
+        { fullName: { $regex: search, $options: 'i' } },
+        { idNumber: { $regex: search, $options: 'i' } }
+      ];
+    }
+
+    // Merch Status logic
+    if (merchStatus && merchStatus !== 'All') {
+      if (merchStatus === 'Fully Claimed') {
+        query['merchClaims.tshirt'] = true;
+        query['merchClaims.bag'] = true;
+        query['merchClaims.notebook'] = true;
+        query['merchClaims.pen'] = true;
+      } else if (merchStatus === 'Unclaimed') {
+        query['merchClaims.tshirt'] = false;
+        query['merchClaims.bag'] = false;
+        query['merchClaims.notebook'] = false;
+        query['merchClaims.pen'] = false;
+      } else if (merchStatus === 'Partial') {
+        query.$or = [
+          { 'merchClaims.tshirt': true },
+          { 'merchClaims.bag': true },
+          { 'merchClaims.notebook': true },
+          { 'merchClaims.pen': true }
+        ];
+        // But NOT all True
+        query.$and = query.$and || [];
+        query.$and.push({
+          $or: [
+            { 'merchClaims.tshirt': false },
+            { 'merchClaims.bag': false },
+            { 'merchClaims.notebook': false },
+            { 'merchClaims.pen': false }
+          ]
+        });
+      }
+    }
+
+    const pageNum = parseInt(page);
+    const limitNum = parseInt(limit);
+    const skip = (pageNum - 1) * limitNum;
+
+    const total = await Registrant.countDocuments(query);
+    const registrants = await Registrant.find(query)
+      .sort({ fullName: 1 })
+      .skip(skip)
+      .limit(limitNum);
+
+    res.json({
+      registrants,
+      total,
+      page: pageNum,
+      pages: Math.ceil(total / limitNum)
+    });
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
 });
+
+// GET registrants summary (separate from list to avoid aggregate overhead on list calls)
+router.get('/summary', requirePermission('registrants', 'view'), async (req, res) => {
+  try {
+    const all = await Registrant.find({}, 'church amountPaid verifiedByTreasurer feeType merchClaims');
+    
+    const sum = {};
+    let totalExpected = 0;
+    let totalCollected = 0;
+
+    const merchStats = {
+      tshirt: 0,
+      bag: 0,
+      notebook: 0,
+      pen: 0,
+      total: 0
+    };
+
+    all.forEach(r => {
+      if (!sum[r.church]) sum[r.church] = { total: 0, collected: 0, expected: 0, pending: 0 };
+      sum[r.church].total += 1;
+      if (r.verifiedByTreasurer) {
+        sum[r.church].collected += (r.amountPaid || 0);
+        totalCollected += (r.amountPaid || 0);
+      } else {
+        sum[r.church].pending += (r.amountPaid || 0);
+      }
+      const fee = r.feeType === 'Early Bird' ? 350 : 500;
+      sum[r.church].expected += fee;
+      totalExpected += fee;
+
+      // Merch stats
+      merchStats.total += 1;
+      if (r.merchClaims?.tshirt) merchStats.tshirt++;
+      if (r.merchClaims?.bag) merchStats.bag++;
+      if (r.merchClaims?.notebook) merchStats.notebook++;
+      if (r.merchClaims?.pen) merchStats.pen++;
+    });
+
+    res.json({
+      churchSummaries: sum,
+      totalExpected,
+      totalCollected,
+      merchStats
+    });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
 
 // POST new registrant
 router.post('/', requirePermission('registrants', 'add'), async (req, res) => {

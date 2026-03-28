@@ -12,6 +12,9 @@ const expenseSchema = new mongoose.Schema({
   createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null }
 });
 
+expenseSchema.index({ category: 1 });
+expenseSchema.index({ date: -1 }); // Index for descending sorting
+
 expenseSchema.set('toJSON', {
   virtuals: true,
   versionKey: false,

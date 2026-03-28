@@ -23,7 +23,7 @@ export default function ActivityLogs() {
   const [filterRole, setFilterRole] = useState('All');
   const [filterDate, setFilterDate] = useState('');
   const [totalLogs, setTotalLogs] = useState(0);
-  const [itemsPerPage] = useState(10);
+  const [itemsPerPage] = useState(30);
   const [currentPage, setCurrentPage] = useState(1);
   const [isFetching, setIsFetching] = useState(false);
 

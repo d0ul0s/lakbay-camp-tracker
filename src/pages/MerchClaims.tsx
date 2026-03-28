@@ -1,7 +1,7 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import api from '../api/axios';
 import { useAppStore } from '../store';
-import { Search, Filter, Check, Shirt, Briefcase, Book, PenTool, ShieldAlert, ShoppingBag } from 'lucide-react';
+import { Search, Filter, Check, Shirt, Briefcase, Book, PenTool, ShieldAlert, ShoppingBag, Loader2 } from 'lucide-react';
 import type { Registrant, AppSettings } from '../types';
 
 export default function MerchClaims() {
@@ -51,30 +51,68 @@ export default function MerchClaims() {
   const [filterStatus, setFilterStatus] = useState('All'); // All, Fully Claimed, Partial, Unclaimed
 
   const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 10;
+  const itemsPerPage = 30;
+  const [pageRegistrants, setPageRegistrants] = useState<Registrant[]>([]);
+  const [total, setTotal] = useState(0);
+  const [isFetching, setIsFetching] = useState(false);
+  const [stats, setStats] = useState({
+    tshirts: { claimed: 0, total: 0 },
+    bags: { claimed: 0, total: 0 },
+    notebooks: { claimed: 0, total: 0 },
+    pens: { claimed: 0, total: 0 }
+  });
+
+  const fetchData = async () => {
+    setIsFetching(true);
+    try {
+      const res = await api.get('/api/registrants', {
+        params: {
+          page: currentPage,
+          limit: itemsPerPage,
+          search: searchTerm,
+          church: filterChurch,
+          merchStatus: filterStatus
+        }
+      });
+      setPageRegistrants(res.data.registrants);
+      setTotal(res.data.total);
+    } catch (err) {
+      console.error('Fetch error:', err);
+    } finally {
+      setIsFetching(false);
+    }
+  };
+
+  const fetchSummary = async () => {
+    try {
+      const res = await api.get('/api/registrants/summary');
+      const m = res.data.merchStats;
+      setStats({
+        tshirts: { claimed: m.tshirt, total: m.total },
+        bags: { claimed: m.bag, total: m.total },
+        notebooks: { claimed: m.notebook, total: m.total },
+        pens: { claimed: m.pen, total: m.total }
+      });
+    } catch (err) {
+      console.error('Summary error:', err);
+    }
+  };
+
+  useEffect(() => {
+    fetchData();
+  }, [currentPage, searchTerm, filterChurch, filterStatus]);
+
+  useEffect(() => {
+    fetchSummary();
+  }, []);
 
   // Reset pagination on filter change
   useEffect(() => {
     setCurrentPage(1);
   }, [searchTerm, filterChurch, filterStatus]);
   
-  // All roles now see global registrants
-  const baseRegistrants = registrants;
-
-  const filteredRegistrants = useMemo(() => {
-    return baseRegistrants.filter(r => {
-      const matchSearch = r.fullName.toLowerCase().includes(searchTerm.toLowerCase());
-      const matchChurch = filterChurch === 'All' || r.church === filterChurch;
-      
-      const claimedCount = Object.values(r.merchClaims).filter(Boolean).length;
-      let matchStatus = true;
-      if (filterStatus === 'Fully Claimed') matchStatus = claimedCount === 4;
-      if (filterStatus === 'Partial') matchStatus = claimedCount > 0 && claimedCount < 4;
-      if (filterStatus === 'Unclaimed') matchStatus = claimedCount === 0;
-      
-      return matchSearch && matchChurch && matchStatus;
-    });
-  }, [baseRegistrants, searchTerm, filterChurch, filterStatus]);
+  // Derived visible data
+  const filteredRegistrants = pageRegistrants; // Server already filtered them
 
   const toggleClaim = async (regId: string, item: keyof typeof registrants[0]['merchClaims']) => {
     // Read directly from the synchronous Zustand store to bypass React's async rendering closure.
@@ -109,6 +147,7 @@ export default function MerchClaims() {
         item: item,
         value: newValue
       });
+      fetchSummary();
     } catch (err) {
       console.error('Failed to toggle merch claim:', err);
       // 4. Revert on failure
@@ -122,26 +161,16 @@ export default function MerchClaims() {
     }
   };
 
-  // Stats
-  const stats = useMemo(() => {
-    let tshirts = 0, bags = 0, notebooks = 0, pens = 0;
-    baseRegistrants.forEach(r => {
-      if (r.merchClaims.tshirt) tshirts++;
-      if (r.merchClaims.bag) bags++;
-      if (r.merchClaims.notebook) notebooks++;
-      if (r.merchClaims.pen) pens++;
-    });
-    const total = baseRegistrants.length;
-    return { 
-      tshirts: { claimed: tshirts, total },
-      bags: { claimed: bags, total },
-      notebooks: { claimed: notebooks, total },
-      pens: { claimed: pens, total }
-    };
-  }, [baseRegistrants]);
+  const totalPages = Math.ceil(total / itemsPerPage);
+  const paginatedRegistrants = filteredRegistrants;
 
   return (
-    <div className="space-y-4 md:space-y-6">
+    <div className="space-y-4 md:space-y-6 relative">
+      {isFetching && (
+        <div className="absolute top-0 right-0 p-2 z-10">
+          <Loader2 className="animate-spin text-brand-brown w-6 h-6" />
+        </div>
+      )}
       <h2 className="text-2xl md:text-3xl font-display text-brand-brown tracking-wide">Merch Claims</h2>
       
       {/* Stats Summary */}
@@ -214,7 +243,7 @@ export default function MerchClaims() {
 
         {/* Mobile Card View */}
         <div className="md:hidden space-y-2 px-1">
-          {filteredRegistrants.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage).length > 0 ? filteredRegistrants.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage).map((reg) => (
+          {paginatedRegistrants.length > 0 ? paginatedRegistrants.map((reg) => (
             <div key={reg.id || (reg as any)._id} className="mobile-card flex flex-col gap-2">
               <div className="flex justify-between items-start border-b border-gray-50 pb-1.5 -mx-1 px-1">
                 <div className="flex-1 min-w-0">
@@ -275,7 +304,7 @@ export default function MerchClaims() {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
-              {filteredRegistrants.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage).length > 0 ? filteredRegistrants.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage).map((reg) => (
+              {paginatedRegistrants.length > 0 ? paginatedRegistrants.map((reg) => (
                 <tr key={reg.id} className="hover:bg-brand-cream/30 transition-colors">
                   <td className="px-3 lg:px-6 py-4">
                     <p className="font-bold text-brand-brown text-xs lg:text-base leading-tight">{reg.fullName}</p>
@@ -317,10 +346,10 @@ export default function MerchClaims() {
         </div>
 
         {/* Pagination Controls */}
-        {Math.ceil(filteredRegistrants.length / itemsPerPage) > 1 && (
+        {totalPages > 1 && (
           <div className="px-6 py-4 border-t border-gray-100 flex items-center justify-between bg-gray-50/30">
             <span className="text-sm text-gray-500">
-              Showing {(currentPage - 1) * itemsPerPage + 1} to {Math.min(currentPage * itemsPerPage, filteredRegistrants.length)} of {filteredRegistrants.length}
+              Showing {(currentPage - 1) * itemsPerPage + 1} to {Math.min(currentPage * itemsPerPage, total)} of {total}
             </span>
             <div className="flex gap-2">
               <button
@@ -331,8 +360,8 @@ export default function MerchClaims() {
                 Previous
               </button>
               <button
-                onClick={() => setCurrentPage(p => Math.min(Math.ceil(filteredRegistrants.length / itemsPerPage), p + 1))}
-                disabled={currentPage === Math.ceil(filteredRegistrants.length / itemsPerPage)}
+                onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                disabled={currentPage === totalPages}
                 className="px-3 py-1.5 rounded-lg border border-brand-brown text-brand-brown text-sm font-bold disabled:opacity-50"
               >
                 Next

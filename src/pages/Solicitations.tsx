@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import api from '../api/axios';
 import { useAppStore } from '../store';
-import { PlusCircle, Edit2, Trash2, Search, X, ShieldAlert, CheckCircle, Clock, HeartHandshake } from 'lucide-react';
+import { PlusCircle, Edit2, Trash2, Search, X, ShieldAlert, CheckCircle, Clock, HeartHandshake, Loader2 } from 'lucide-react';
 import ConfirmModal from '../components/ConfirmModal';
 import type { Solicitation } from '../types';
 
@@ -11,13 +11,40 @@ export default function Solicitations() {
   // Use global settings with fallback
   const settings = appSettings || {
     churches: [],
-    paymentMethods: []
+    paymentMethods: [],
+    solicitationTypes: []
   } as any;
 
   const [searchTerm, setSearchTerm] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 10;
-  
+  const itemsPerPage = 30;
+  const [pageSolicitations, setPageSolicitations] = useState<Solicitation[]>([]);
+  const [total, setTotal] = useState(0);
+  const [isFetching, setIsFetching] = useState(false);
+
+  const fetchData = async () => {
+    setIsFetching(true);
+    try {
+      const res = await api.get('/api/solicitations', {
+        params: {
+          page: currentPage,
+          limit: itemsPerPage,
+          search: searchTerm
+        }
+      });
+      setPageSolicitations(res.data.solicitations);
+      setTotal(res.data.total);
+    } catch (err) {
+      console.error('Fetch error:', err);
+    } finally {
+      setIsFetching(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchData();
+  }, [currentPage, searchTerm]);
+
   // Reset pagination on search change
   useEffect(() => {
     setCurrentPage(1);
@@ -39,15 +66,10 @@ export default function Solicitations() {
   };
   const [formData, setFormData] = useState<Omit<Solicitation, 'id' | 'verifiedByTreasurer' | 'verifiedAt'>>(initialForm);
 
-
-
   useEffect(() => {
-    // Only trigger network fetches if boot hasn't synced yet (cold start with no cache).
-    // Once hasSyncedLive=true, WebSocket in Layout.tsx handles all real-time updates.
     const { hasSyncedLive } = useAppStore.getState();
     if (!hasSyncedLive) {
-      const isFirstLoad = solicitations.length === 0;
-      fetchSolicitations(!isFirstLoad);
+      fetchSolicitations(solicitations.length > 0);
       fetchGlobalSettings();
     }
   }, []);
@@ -84,9 +106,8 @@ export default function Solicitations() {
       title: 'Delete Solicitation',
       message: 'Are you sure you want to delete this solicitation record? This will alter financial reports.',
       action: () => {
-        // Optimistic delete
         syncSolicitation('deleted', { _id: solId, id: solId });
-        api.delete(`/api/solicitations/${solId}`).catch(err => {
+        api.delete(`/api/solicitations/${solId}`).then(() => fetchData()).catch(err => {
           console.error(err);
           fetchSolicitations(true);
         });
@@ -103,7 +124,6 @@ export default function Solicitations() {
       title: isNowVerified ? 'Confirm Verification' : 'Remove Verification',
       message: `Are you sure you want to mark this as ${isNowVerified ? 'verified' : 'unverified'}? This affects the financial summary.`,
       action: () => {
-        // Optimistic update
         syncSolicitation('updated', { 
           _id: solId, 
           id: solId, 
@@ -114,7 +134,7 @@ export default function Solicitations() {
         api.put(`/api/solicitations/${solId}`, {
           verifiedByTreasurer: isNowVerified,
           verifiedAt: isNowVerified ? new Date().toISOString() : null
-        }).catch(err => {
+        }).then(() => fetchData()).catch(err => {
           console.error(err);
           fetchSolicitations(true);
         });
@@ -157,15 +177,13 @@ export default function Solicitations() {
       };
       
       if (editingId) {
-        // Optimistic update for edit
         syncSolicitation('updated', { ...payload, _id: editingId, id: editingId });
         setIsModalOpen(false);
-        api.put(`/api/solicitations/${editingId}`, payload).catch(err => {
+        api.put(`/api/solicitations/${editingId}`, payload).then(() => fetchData()).catch(err => {
           console.error(err);
-          fetchSolicitations(true); // Silent revert on failure
+          fetchSolicitations(true);
         });
       } else {
-        // Optimistic update for new solicitations
         const tempId = `temp-${Date.now()}`;
         const optimisticNew = {
           ...payload,
@@ -178,12 +196,11 @@ export default function Solicitations() {
         setIsModalOpen(false);
 
         api.post(`/api/solicitations`, payload).then((res) => {
-          // Graceful handoff: Swap temp optimistic UI instantly to prevent duplicates.
           syncSolicitation('deleted', { _id: tempId, id: tempId });
           syncSolicitation('added', res.data);
+          fetchData();
         }).catch(err => {
           console.error(err);
-          // Immediate rollback on error
           syncSolicitation('deleted', { _id: tempId, id: tempId });
           fetchSolicitations(true);
         });
@@ -193,13 +210,16 @@ export default function Solicitations() {
     }
   };
 
-  const filtered = solicitations.filter(s => 
-    s.sourceName.toLowerCase().includes(searchTerm.toLowerCase()) || 
-    s.type.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filtered = pageSolicitations;
+  const totalPages = Math.ceil(total / itemsPerPage);
 
   return (
-    <div className="space-y-6 pb-20 md:pb-6">
+    <div className="space-y-6 pb-20 md:pb-6 relative">
+      {isFetching && (
+        <div className="absolute top-0 right-0 p-2 z-10">
+          <Loader2 className="animate-spin text-brand-brown w-6 h-6" />
+        </div>
+      )}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
         <h2 className="text-2xl md:text-3xl font-display text-brand-brown tracking-wide mb-1 md:mb-0">Solicitations</h2>
         {canAdd && (
@@ -247,7 +267,7 @@ export default function Solicitations() {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
-              {filtered.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage).map(sol => (
+              {filtered.map(sol => (
                 <tr key={sol.id || (sol as any)._id} className="hover:bg-brand-cream/30 transition-colors">
                   <td className="px-2 lg:px-4 py-4 font-black text-brand-brown text-[11px] lg:text-sm leading-tight">{sol.sourceName}</td>
                   <td className="px-2 lg:px-4 py-4 text-center"><span className="px-1.5 py-0.5 rounded-full text-[8px] lg:text-xs font-black uppercase bg-brand-sand/30 text-brand-brown border border-brand-sand/20">{sol.type}</span></td>
@@ -301,7 +321,7 @@ export default function Solicitations() {
         
         {/* Mobile Card View */}
         <div className="md:hidden space-y-2">
-          {filtered.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage).map(sol => (
+          {filtered.map(sol => (
             <div key={sol.id || (sol as any)._id} className="mobile-card flex flex-col gap-2">
               <div className="flex justify-between items-start">
                 <div className="flex-1 min-w-0">
@@ -367,10 +387,10 @@ export default function Solicitations() {
         </div>
 
         {/* Pagination Controls */}
-        {Math.ceil(filtered.length / itemsPerPage) > 1 && (
+        {totalPages > 1 && (
           <div className="mt-4 pt-4 border-t border-gray-100 flex items-center justify-between">
             <span className="text-sm text-gray-500">
-              Showing {(currentPage - 1) * itemsPerPage + 1} to {Math.min(currentPage * itemsPerPage, filtered.length)} of {filtered.length}
+              Showing {(currentPage - 1) * itemsPerPage + 1} to {Math.min(currentPage * itemsPerPage, total)} of {total}
             </span>
             <div className="flex gap-2">
               <button
@@ -381,8 +401,8 @@ export default function Solicitations() {
                 Previous
               </button>
               <button
-                onClick={() => setCurrentPage(p => Math.min(Math.ceil(filtered.length / itemsPerPage), p + 1))}
-                disabled={currentPage === Math.ceil(filtered.length / itemsPerPage)}
+                onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                disabled={currentPage === totalPages}
                 className="px-3 py-1.5 rounded-lg border border-brand-brown text-brand-brown text-sm font-bold disabled:opacity-50 hover:bg-brand-sand/20"
               >
                 Next

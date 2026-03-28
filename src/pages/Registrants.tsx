@@ -1,8 +1,8 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import api from '../api/axios';
 import { useAppStore } from '../store';
 import type { Registrant, ShirtSize, PaymentStatus, PaymentMethod } from '../types';
-import { PlusCircle, Search, Edit2, Trash2, X, Filter, Info, CheckSquare, Square, CheckCircle, Clock, ShieldAlert, Users } from 'lucide-react';
+import { PlusCircle, Search, Edit2, Trash2, X, Filter, Info, CheckSquare, Square, CheckCircle, Clock, ShieldAlert, Users, Loader2 } from 'lucide-react';
 import ConfirmModal from '../components/ConfirmModal';
 
 const NAME_REGEX = /^[A-Z][a-zA-Z]+(?:\s[A-Z][a-zA-Z]+)*,\s[A-Z][a-zA-Z]+(?:\s[A-Z][a-zA-Z]+)*\s[A-Z]\.(?:\s(?:Jr\.|III|IV|V))?$/;
@@ -33,7 +33,25 @@ export default function Registrants() {
   const [filterMinistry, setFilterMinistry] = useState<string>('All');
 
   const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 10;
+  const itemsPerPage = 30;
+  const [pageRegistrants, setPageRegistrants] = useState<Registrant[]>([]);
+  const [total, setTotal] = useState(0);
+  const [isFetching, setIsFetching] = useState(false);
+
+  type ChurchSummary = {
+    total: number;
+    collected: number;
+    expected: number;
+    pending: number;
+  };
+
+  const [summaries, setSummaries] = useState<{ 
+    churchSummaries: Record<string, ChurchSummary>, 
+    totalExpected: number, 
+    totalCollected: number 
+  }>({
+    churchSummaries: {}, totalExpected: 0, totalCollected: 0
+  });
 
   // Modal state
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -97,56 +115,58 @@ export default function Registrants() {
   }, [settings.churches, editingId, formData.church]);
 
   // Derived visible data
-  // All roles now see global registrants
-  const baseRegistrants = registrants;
+  const fetchData = async () => {
+    setIsFetching(true);
+    try {
+      const res = await api.get('/api/registrants', {
+        params: {
+          page: currentPage,
+          limit: itemsPerPage,
+          search: searchTerm,
+          church: filterChurch,
+          status: filterStatus,
+          ministry: filterMinistry
+        }
+      });
+      setPageRegistrants(res.data.registrants);
+      setTotal(res.data.total);
+    } catch (err) {
+      console.error('Fetch error:', err);
+    } finally {
+      setIsFetching(false);
+    }
+  };
 
-  const filteredRegistrants = useMemo(() => {
-    return baseRegistrants.filter(r => {
-      const matchesSearch = r.fullName.toLowerCase().includes(searchTerm.toLowerCase());
-      
-      // Case-insensitive church match for filtering
-      const regChurch = (r.church || '').trim().toLowerCase();
-      const targetChurch = filterChurch === 'All' ? 'all' : (filterChurch || '').trim().toLowerCase();
-      const matchesChurch = targetChurch === 'all' || regChurch === targetChurch;
+  const fetchSummary = async () => {
+    try {
+      const res = await api.get('/api/registrants/summary');
+      setSummaries(res.data);
+    } catch (err) {
+      console.error('Summary fetch error:', err);
+    }
+  };
 
-      const matchesStatus = filterStatus === 'All' || r.paymentStatus === filterStatus;
-      const matchesMinistry = filterMinistry === 'All' || (r.ministry && r.ministry.includes(filterMinistry));
-      
-      return matchesSearch && matchesChurch && matchesStatus && matchesMinistry;
-    }).sort((a, b) => new Date(b.dateRegistered).getTime() - new Date(a.dateRegistered).getTime());
-  }, [baseRegistrants, searchTerm, filterChurch, filterStatus, filterMinistry]);
+  useEffect(() => {
+    fetchData();
+  }, [currentPage, searchTerm, filterChurch, filterStatus, filterMinistry]);
 
-  // Reset pagination on filter change
+  useEffect(() => {
+    fetchSummary();
+  }, []);
+
+  // Derived visible data
+  const baseRegistrants = pageRegistrants;
+
+  // Reset page when filters change
   useEffect(() => {
     setCurrentPage(1);
   }, [searchTerm, filterChurch, filterStatus, filterMinistry]);
 
-  const totalPages = Math.ceil(filteredRegistrants.length / itemsPerPage);
-  const paginatedRegistrants = filteredRegistrants.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
+  const totalPages = Math.ceil(total / itemsPerPage);
+  const paginatedRegistrants = baseRegistrants;
 
-  // Summaries
-  const churchSummaries = useMemo(() => {
-    const sum: Record<string, { total: number, collected: number, expected: number, pending: number }> = {};
-    baseRegistrants.forEach(r => {
-      if (!sum[r.church]) sum[r.church] = { total: 0, collected: 0, expected: 0, pending: 0 };
-      sum[r.church].total += 1;
-      if (r.verifiedByTreasurer) {
-        sum[r.church].collected += (r.amountPaid || 0);
-      } else {
-        sum[r.church].pending += (r.amountPaid || 0);
-      }
-      sum[r.church].expected += r.feeType === 'Early Bird' ? 350 : 500;
-    });
-    return sum;
-  }, [baseRegistrants]);
-
-  const totalExpected = useMemo(() => {
-    return Object.values(churchSummaries).reduce((acc, s) => acc + s.expected, 0);
-  }, [churchSummaries]);
-
-  const totalCollected = useMemo(() => {
-    return Object.values(churchSummaries).reduce((acc, s) => acc + s.collected, 0);
-  }, [churchSummaries]);
+  // Summaries from state
+  const { churchSummaries, totalExpected, totalCollected } = summaries;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -165,7 +185,6 @@ export default function Registrants() {
           console.error('Failed to save edit:', err);
           // Removed global fetch to prevent race conditions during rapid edits
         });
-      } else {
         // Optimistic update for new entries
         const tempId = `temp-${Date.now()}`;
         const optimisticNew = {
@@ -181,6 +200,8 @@ export default function Registrants() {
           // Graceful handoff: Swap temp optimistic UI instantly to prevent duplicates.
           syncRegistrant('deleted', { _id: tempId, id: tempId });
           syncRegistrant('added', res.data);
+          fetchSummary();
+          fetchData();
         }).catch(err => {
           console.error('Failed to register participant:', err);
           // Immediate rollback on error
@@ -232,6 +253,8 @@ export default function Registrants() {
       // Graceful handoff: Swap temp optimistic UI instantly to prevent duplicates.
       tempDocs.forEach(d => syncRegistrant('deleted', { _id: d._id }));
       syncRegistrant('imported', res.data);
+      fetchSummary();
+      fetchData();
     }).catch(err => {
       console.error(err);
       // Immediate rollback on error
@@ -276,9 +299,11 @@ export default function Registrants() {
     // Optimistic instant removal from list
     syncRegistrant('deleted', { _id: deletedId, id: deletedId });
     setConfirmModal({ isOpen: false, id: null });
-    api.delete(`/api/registrants/${deletedId}`).catch(err => {
+    api.delete(`/api/registrants/${deletedId}`).then(() => {
+      fetchSummary();
+      fetchData();
+    }).catch(err => {
       console.error('Delete failed:', err);
-      // Removed global fetch to prevent race conditions on bulk actions
     });
   };
 
@@ -325,7 +350,12 @@ export default function Registrants() {
   const isPartialMismatch = formData.paymentStatus === 'Partial' && formData.amountPaid >= expectedFee;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 relative">
+      {isFetching && (
+        <div className="absolute top-0 right-0 p-2 z-10">
+          <Loader2 className="animate-spin text-brand-brown w-6 h-6" />
+        </div>
+      )}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
         <h2 className="text-2xl md:text-3xl font-display text-brand-brown tracking-wide mb-1 md:mb-0">Delegates</h2>
         
@@ -653,7 +683,7 @@ export default function Registrants() {
         {totalPages > 1 && (
           <div className="px-6 py-4 border-t border-gray-100 flex items-center justify-between bg-gray-50/30">
             <span className="text-sm text-gray-500">
-              Showing {(currentPage - 1) * itemsPerPage + 1} to {Math.min(currentPage * itemsPerPage, filteredRegistrants.length)} of {filteredRegistrants.length}
+              Showing {(currentPage - 1) * itemsPerPage + 1} to {Math.min(currentPage * itemsPerPage, total)} of {total}
             </span>
             <div className="flex gap-2">
               <button
