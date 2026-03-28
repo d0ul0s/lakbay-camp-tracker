@@ -19,34 +19,43 @@ interface Log {
 export default function ActivityLogs() {
   const { currentUser, globalError } = useAppStore();
   const [logs, setLogs] = useState<Log[]>([]);
-  
   const [filterAction, setFilterAction] = useState('All');
   const [filterRole, setFilterRole] = useState('All');
   const [filterDate, setFilterDate] = useState('');
-
+  const [totalLogs, setTotalLogs] = useState(0);
+  const [itemsPerPage] = useState(10);
   const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 10;
+  const [isFetching, setIsFetching] = useState(false);
 
   const fetchLogs = async () => {
     const rolePerms = currentUser?.permissionMatrix?.[currentUser.role]?.activitylogs;
     if (currentUser?.role !== 'admin' && !rolePerms?.view) return; // Not allowed
     try {
+      setIsFetching(true);
       const params = new URLSearchParams();
       if (filterAction !== 'All') params.append('action', filterAction);
       if (filterRole !== 'All') params.append('role', filterRole);
       if (filterDate) params.append('date', filterDate);
+      params.append('page', String(currentPage));
+      params.append('itemsPerPage', String(itemsPerPage));
 
       const res = await api.get(`/api/activity-logs?${params.toString()}`);
-      setLogs(res.data);
+      setLogs(res.data.logs || []);
+      setTotalLogs(res.data.total || 0);
     } catch (err) {
       console.error(err);
+    } finally {
+      setIsFetching(false);
     }
   };
 
   useEffect(() => {
     fetchLogs();
-    setCurrentPage(1);
     // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filterAction, filterRole, filterDate, currentPage]);
+
+  useEffect(() => {
+    setCurrentPage(1);
   }, [filterAction, filterRole, filterDate]);
 
   const rolePerms = currentUser?.permissionMatrix?.[currentUser.role]?.activitylogs;
@@ -189,8 +198,16 @@ export default function ActivityLogs() {
                 <th className="px-6 py-4 font-medium tracking-wider w-1/3">Target Details</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-100">
-              {logs.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage).map((log) => (
+            <tbody className="divide-y divide-gray-100 relative">
+              {isFetching && (
+                <div className="absolute inset-0 bg-white/50 backdrop-blur-[1px] flex items-center justify-center z-10 transition-opacity">
+                  <div className="flex flex-col items-center gap-2">
+                    <Activity className="animate-pulse text-brand-brown" size={32} />
+                    <span className="text-[10px] font-black uppercase text-brand-brown tracking-widest">Loading Logs...</span>
+                  </div>
+                </div>
+              )}
+              {logs.map((log) => (
                 <tr key={log._id} className="hover:bg-brand-cream/30 transition-colors">
                   <td className="px-6 py-4 font-medium text-gray-500 whitespace-nowrap">
                     {format(new Date(log.timestamp), 'MMM d, yyyy h:mm a')}
@@ -238,8 +255,13 @@ export default function ActivityLogs() {
         </div>
 
         {/* Mobile View */}
-        <div className="md:hidden space-y-2 px-1">
-          {logs.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage).map((log) => (
+        <div className="md:hidden space-y-2 px-1 relative min-h-[200px]">
+          {isFetching && (
+             <div className="absolute inset-0 bg-white/50 backdrop-blur-[1px] flex items-center justify-center z-10 transition-opacity">
+                <Activity className="animate-pulse text-brand-brown" size={24} />
+             </div>
+          )}
+          {logs.map((log) => (
             <div key={log._id} className="mobile-card flex flex-col gap-2">
               <div className="flex justify-between items-center bg-gray-50/50 -mx-1 px-2 py-1 rounded-t-lg border-b border-gray-100/50">
                 <span className={`px-1.5 py-0.5 rounded text-[9px] font-black uppercase tracking-tighter shrink-0 border ${getActionColor(log.action)}`}>
@@ -293,23 +315,23 @@ export default function ActivityLogs() {
         </div>
 
         {/* Pagination Controls */}
-        {Math.ceil(logs.length / itemsPerPage) > 1 && (
+        {Math.ceil(totalLogs / itemsPerPage) > 1 && (
           <div className="px-6 py-4 border-t border-gray-100 flex items-center justify-between bg-gray-50/30">
-            <span className="text-sm text-gray-500">
-              Showing {(currentPage - 1) * itemsPerPage + 1} to {Math.min(currentPage * itemsPerPage, logs.length)} of {logs.length}
+            <span className="text-[10px] md:text-sm text-gray-500 font-bold uppercase tracking-tight">
+              Page {currentPage} of {Math.ceil(totalLogs / itemsPerPage)} <span className="text-gray-300 mx-1">|</span> {totalLogs.toLocaleString()} Total Logs
             </span>
             <div className="flex gap-2">
               <button
                 onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-                disabled={currentPage === 1}
-                className="px-3 py-1.5 rounded-lg border border-gray-200 text-sm font-medium disabled:opacity-50"
+                disabled={currentPage === 1 || isFetching}
+                className="px-3 py-1.5 rounded-lg border border-gray-200 text-[10px] md:text-sm font-black uppercase tracking-tighter disabled:opacity-30 active:scale-95 transition-all"
               >
-                Previous
+                Prev
               </button>
               <button
-                onClick={() => setCurrentPage(p => Math.min(Math.ceil(logs.length / itemsPerPage), p + 1))}
-                disabled={currentPage === Math.ceil(logs.length / itemsPerPage)}
-                className="px-3 py-1.5 rounded-lg border border-brand-brown text-brand-brown text-sm font-bold disabled:opacity-50"
+                onClick={() => setCurrentPage(p => Math.min(Math.ceil(totalLogs / itemsPerPage), p + 1))}
+                disabled={currentPage === Math.ceil(totalLogs / itemsPerPage) || isFetching}
+                className="px-3 py-1.5 rounded-lg border-2 border-brand-brown text-brand-brown text-[10px] md:text-sm font-black uppercase tracking-tighter disabled:opacity-30 active:scale-95 transition-all"
               >
                 Next
               </button>

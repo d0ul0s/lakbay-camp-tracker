@@ -6,6 +6,7 @@ const cors = require('cors');
 const cookieParser = require('cookie-parser');
 const helmet = require('helmet');
 const mongoSanitize = require('express-mongo-sanitize');
+const https = require('https'); // For self-pings
 
 const app = express();
 const server = require('http').createServer(app);
@@ -29,7 +30,9 @@ const originCheck = (origin, callback) => {
 };
 
 const io = require('socket.io')(server, {
-  maxHttpBufferSize: 1e7, // 10MB limit to prevent unhandled disconnects
+  maxHttpBufferSize: 1e7, // 10MB limit
+  pingInterval: 15000,   // Heartbeat every 15s
+  pingTimeout: 5000,     // Timeout if 5s late
   cors: {
     origin: originCheck,
     credentials: true
@@ -104,3 +107,18 @@ mongoose.connection.on('disconnected', () => {
 });
 
 connectDB();
+
+// Keep-Alive mechanism to prevent Render from sleeping on Free Tier (15 min inactivity)
+// This hits the local health endpoint every 14 minutes.
+setInterval(() => {
+  https.get(`https://lakbay-camp-tracker.onrender.com/api/health`, (res) => {
+    if (res.statusCode === 200) {
+      console.log('Self-ping successful: Server heartbeat maintained.');
+    } else {
+      console.warn(`Self-ping partial: Status ${res.statusCode}`);
+    }
+  }).on('error', (err) => {
+    console.error('Self-ping failed:', err.message);
+  });
+}, 840000); // 14 mins
+

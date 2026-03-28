@@ -9,6 +9,10 @@ router.use(attachPermissions);
 router.get('/', requirePermission('activitylogs', 'view'), async (req, res) => {
   try {
 
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.itemsPerPage) || 10;
+    const skip = (page - 1) * limit;
+
     const { action, role, date } = req.query;
     let query = {};
 
@@ -28,12 +32,19 @@ router.get('/', requirePermission('activitylogs', 'view'), async (req, res) => {
       query.timestamp = { $gte: startOfDay, $lte: endOfDay };
     }
 
+    const total = await ActivityLog.countDocuments(query);
     const logs = await ActivityLog.find(query)
-      .populate('userId', 'fullName pin') // Populate required fields if needed, but we mainly need name. Since User model doesn't have fullName, it has pin/role. Let's just rely on userRole and userChurch.
+      .populate('userId', 'fullName pin') 
       .sort({ timestamp: -1 })
-      .limit(500); // Limit to top 500 logs to prevent massive payloads
+      .skip(skip)
+      .limit(limit);
 
-    res.json(logs);
+    res.json({
+      logs,
+      total,
+      page,
+      pages: Math.ceil(total / limit)
+    });
   } catch (err) {
     console.error('Activity logs error:', err);
     res.status(500).json({ message: 'Server Error' });

@@ -29,17 +29,26 @@ export default function Layout() {
     const socket = io(socketUrl, {
       withCredentials: true,
       transports: ['websocket', 'polling'],
-      reconnectionAttempts: 5
+      reconnectionAttempts: Infinity, // Keep and hold! Never give up.
+      reconnectionDelay: 1000,
+      reconnectionDelayMax: 5000,
+      randomizationFactor: 0.5
     });
 
     socketRef.current = socket;
 
     socket.on('connect', () => {
       setIsSocketConnected(true);
+      console.log('Socket link established.');
     });
 
-    socket.on('disconnect', () => {
+    socket.on('connect_error', (err: any) => {
+      console.error('Socket link fault:', err.message);
+    });
+
+    socket.on('disconnect', (reason: string) => {
       setIsSocketConnected(false);
+      console.warn('Socket link severed:', reason);
     });
 
     socket.on('DATA_UPDATED', (data: { type: string, action: string, user: string, userId: string, data?: any }) => {
