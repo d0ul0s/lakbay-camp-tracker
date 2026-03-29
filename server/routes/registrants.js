@@ -260,7 +260,10 @@ router.put('/:id', async (req, res) => {
     if (role !== 'admin') {
       const perms = req.permissionMatrix[role].registrants;
       // Check church ownership
-      if (registrant.church !== userChurch && !perms.editAny) {
+      // Case-insensitive/trimmed comparison
+      const uChurch = userChurch?.toLowerCase().trim();
+      const rChurch = registrant.church?.toLowerCase().trim();
+      if (uChurch !== rChurch && !perms.editAny) {
         return res.status(403).json({ message: 'Unauthorized: You can only edit registrants from your own church.' });
       }
 
@@ -323,7 +326,9 @@ router.delete('/:id', async (req, res) => {
     
     if (role !== 'admin') {
       const perms = req.permissionMatrix[role].registrants;
-      if (registrant.church !== userChurch && !perms.deleteAny) {
+      const uChurch = userChurch?.toLowerCase().trim();
+      const rChurch = registrant.church?.toLowerCase().trim();
+      if (uChurch !== rChurch && !perms.deleteAny) {
         return res.status(403).json({ message: `Unauthorized: You can only delete registrants from your own church.` });
       }
     }

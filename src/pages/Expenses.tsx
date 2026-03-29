@@ -6,25 +6,18 @@ import { PlusCircle, Filter, Trash2, Edit2, X, DollarSign, TrendingDown, Trendin
 import { format, parseISO } from 'date-fns';
 import ConfirmModal from '../components/ConfirmModal';
 
-
-
 export default function Expenses() {
   const { 
     currentUser, 
     appSettings, 
-    fetchGlobalSettings, 
-    expenses, 
     fetchExpenses,
-    registrants,
-    fetchRegistrants,
-    solicitations,
-    fetchSolicitations,
     syncExpense,
     lockEntity,
-    unlockEntity
+    unlockEntity,
+    registrants,
+    solicitations
   } = useAppStore();
-  
-  // Use global settings with fallback
+
   const settings = appSettings || {
     churches: [],
     ministries: [],
@@ -33,36 +26,6 @@ export default function Expenses() {
     shirtSizePhoto: null,
     merchCosts: { tshirt: 0, bag: 0, notebook: 0, pen: 0 }
   } as any;
-
-  // Local state for snappy numeric typing without blocking the main event thread
-  // Casted to strings intermediate so React doesn't eat trailing zeros or empty states
-  // We strictly initialize this ONCE from settings to prevent any "snapback" or WebSocket overwrites during an edit session.
-  const [localMerchCosts, setLocalMerchCosts] = useState({
-    tshirt: settings.merchCosts?.tshirt?.toString() || '0',
-    bag: settings.merchCosts?.bag?.toString() || '0',
-    notebook: settings.merchCosts?.notebook?.toString() || '0',
-    pen: settings.merchCosts?.pen?.toString() || '0'
-  });
-
-  const localMerchCostsRef = React.useRef(localMerchCosts);
-  const saveTimeoutRef = React.useRef<NodeJS.Timeout | null>(null);
-
-  // Keep ref identically up to date with RAM state, but DO NOT overwrite RAM with external settings.
-  useEffect(() => {
-    localMerchCostsRef.current = localMerchCosts;
-  }, [localMerchCosts]);
-
-  useEffect(() => {
-    // Only trigger network fetches if boot hasn't synced yet (cold start with no cache).
-    // Once hasSyncedLive=true, WebSocket in Layout.tsx handles all real-time updates.
-    const { hasSyncedLive } = useAppStore.getState();
-    if (!hasSyncedLive) {
-      fetchRegistrants(registrants.length > 0);
-      fetchSolicitations(solicitations.length > 0);
-      fetchExpenses(expenses.length > 0);
-      fetchGlobalSettings(true);
-    }
-  }, []);
 
   // Roles
   const isAdmin = currentUser?.role?.toLowerCase().trim() === 'admin';
@@ -222,14 +185,7 @@ export default function Expenses() {
 
   // Stats calculation (Verified Only)
   const totalIncome = stats.regIncome + stats.solIncome;
-  const totalItemsExpected = stats.totalRegs;
-  const totalMerchProductionCost =
-    ((parseInt(localMerchCosts.tshirt) || 0) * totalItemsExpected) +
-    ((parseInt(localMerchCosts.bag) || 0) * totalItemsExpected) +
-    ((parseInt(localMerchCosts.notebook) || 0) * totalItemsExpected) +
-    ((parseInt(localMerchCosts.pen) || 0) * totalItemsExpected);
-
-  const totalExpenses = stats.expTotal + totalMerchProductionCost;
+  const totalExpenses = stats.expTotal;
   const pendingIncome = stats.pendingInc;
   const pendingExpenses = stats.pendingExp;
   const netBalance = totalIncome - totalExpenses;
@@ -386,39 +342,6 @@ export default function Expenses() {
     setEditingId(null);
   };
 
-  const handleMerchCostChange = (item: string, htmlValue: number) => {
-    if (saveTimeoutRef.current) {
-      clearTimeout(saveTimeoutRef.current);
-    }
-
-    // Force update the ref immediately by bypassing React render cycle guarantees
-    // This perfectly captures blazing fast tabbing without losing adjacent box edits!
-    localMerchCostsRef.current = {
-      ...localMerchCostsRef.current,
-      [item]: htmlValue.toString()
-    };
-
-    const realtimePayload = {
-      tshirt: parseInt(localMerchCostsRef.current.tshirt) || 0,
-      bag: parseInt(localMerchCostsRef.current.bag) || 0,
-      notebook: parseInt(localMerchCostsRef.current.notebook) || 0,
-      pen: parseInt(localMerchCostsRef.current.pen) || 0,
-    };
-
-    // 1. Debounce the server transmission
-    // We intentionally DO NOT update global state here, as synchronously modifying global state
-    // will cause our local useEffect to nuke whatever input box you just tabbed into!
-    saveTimeoutRef.current = setTimeout(async () => {
-      try {
-        await api.put(`/api/settings`, {
-          merchCosts: realtimePayload
-        });
-      } catch (err) {
-        console.error(err);
-      }
-    }, 1000);
-  };
-
   const isNameValid = true;
 
   const totalPages = Math.ceil(total / itemsPerPage);
@@ -497,46 +420,8 @@ export default function Expenses() {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
 
-        {/* Merch Setup Column */}
-        {isAdmin && (
-          <div className="bg-white rounded-2xl shadow-sm border border-brand-beige overflow-hidden lg:col-span-1">
-            <div className="p-5 border-b border-gray-100 bg-brand-cream/30">
-              <h3 className="font-display text-xl text-brand-brown tracking-wide">Merch Production Costs</h3>
-              <p className="text-xs text-gray-500 mt-1">Calculated per registrant ({registrants.length} delegates)</p>
-                      <div className="p-4 space-y-3">
-              <div className="space-y-2">
-                {[
-                  { id: 'tshirt', label: 'T-Shirt', val: localMerchCosts?.tshirt },
-                  { id: 'bag', label: 'Bag', val: localMerchCosts?.bag },
-                  { id: 'notebook', label: 'Notebook', val: localMerchCosts?.notebook },
-                  { id: 'pen', label: 'Pen', val: localMerchCosts?.pen },
-                ].map(item => (
-                  <div key={item.id} className="flex justify-between items-center bg-gray-50 p-2 rounded-lg border border-gray-100">
-                    <span className="text-xs font-medium text-gray-700">{item.label}</span>
-                    <div className="flex items-center gap-1.5">
-                      <span className="text-[10px] text-gray-400">₱</span>
-                      <input
-                        type="number" min="0"
-                        value={item.val}
-                        onChange={(e) => setLocalMerchCosts({ ...localMerchCosts, [item.id]: e.target.value })}
-                        onBlur={(e) => handleMerchCostChange(item.id, parseInt(e.target.value) || 0)}
-                        className="w-20 px-1.5 py-1 text-right rounded-md border border-gray-200 focus:outline-none focus:border-brand-brown text-xs font-bold"
-                      />
-                    </div>
-                  </div>
-                ))}
-              </div>
-              <div className="pt-2 border-t border-gray-100 flex justify-between items-center">
-                <span className="text-xs font-bold text-brand-brown">Total Production</span>
-                <span className="text-base font-black text-gray-800">₱{totalMerchProductionCost.toLocaleString()}</span>
-              </div>
-            </div>
-       </div>
-          </div>
-        )}
-
         {/* Manual Expense Log Column */}
-        <div className={`bg-white rounded-2xl shadow-sm border border-brand-beige overflow-hidden ${isAdmin ? 'lg:col-span-2' : 'lg:col-span-3'}`}>
+        <div className="bg-white rounded-2xl shadow-sm border border-brand-beige overflow-hidden lg:col-span-3">
           <div className="p-3 md:p-4 border-b border-gray-100 flex flex-col md:flex-row justify-between md:items-center gap-3 md:gap-4 bg-gray-50/30">
             <h3 className="font-display text-lg lg:text-xl text-brand-brown tracking-wide px-1">Expense Log</h3>
             <div className="flex items-center gap-2">
@@ -811,8 +696,6 @@ export default function Expenses() {
               </div>
             </form>
 
-            {/* Action buttons anchored to the modal floor — NOT inside the scroll container.         */}
-            {/* This prevents iOS keyboard from pushing them up when a text field is focused.         */}
             <div className="shrink-0 px-4 sm:px-6 py-3 border-t border-brand-beige flex justify-end gap-3 bg-white rounded-b-2xl">
               <button
                 type="button"

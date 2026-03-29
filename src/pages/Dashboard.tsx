@@ -1,9 +1,8 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useMemo } from 'react';
 import { useAppStore } from '../store';
 import { Users, DollarSign, ShoppingBag, PlusCircle, ArrowRight, HeartHandshake, ShieldCheck, Loader2 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, Legend } from 'recharts';
-import type { AppSettings } from '../types';
 
 export default function Dashboard() {
   const { 
@@ -11,17 +10,8 @@ export default function Dashboard() {
     registrants, 
     expenses, 
     solicitations, 
-    appSettings,
     hasBooted
   } = useAppStore();
-
-  const [settings, setSettings] = useState<AppSettings>({ churches: [], merchCosts: { tshirt: 0, bag: 0, notebook: 0, pen: 0 } } as any);
-
-  useEffect(() => {
-    if (appSettings) {
-      setSettings(appSettings);
-    }
-  }, [appSettings]);
 
   const isAdmin = currentUser?.role?.toLowerCase().trim() === 'admin';
   const roleKey = currentUser?.role?.toLowerCase().trim();
@@ -60,19 +50,13 @@ export default function Dashboard() {
     return sum + claimed;
   }, 0);
 
-  const totalMerchProductionCost =
-    ((settings.merchCosts?.tshirt || 0) * totalRegistrants) +
-    ((settings.merchCosts?.bag || 0) * totalRegistrants) +
-    ((settings.merchCosts?.notebook || 0) * totalRegistrants) +
-    ((settings.merchCosts?.pen || 0) * totalRegistrants);
-
   // Derived Totals
   const totalIncomeVerified = verifiedReg + verifiedSol;
-  const totalExpensesVerified = verifiedExp + totalMerchProductionCost;
+  const totalExpensesVerified = verifiedExp;
   const netBalance = totalIncomeVerified - totalExpensesVerified;
   
   const totalIncomeRecorded = totalRegRecorded + totalSolRecorded;
-  const totalExpensesRecorded = totalExpRecorded + totalMerchProductionCost;
+  const totalExpensesRecorded = totalExpRecorded;
 
   // Charts use TOTAL recorded for better visualization of progress
   const incomeBreakdown = useMemo(() => [
@@ -85,14 +69,11 @@ export default function Dashboard() {
     expenses.forEach(e => {
       map.set(e.category, (map.get(e.category) || 0) + e.amount);
     });
-    if (totalMerchProductionCost > 0) {
-      map.set('Merch Production', (map.get('Merch Production') || 0) + totalMerchProductionCost);
-    }
     return Array.from(map.entries())
       .map(([name, value]) => ({ name, value }))
       .filter(item => item.value > 0)
       .sort((a, b) => b.value - a.value);
-  }, [expenses, totalMerchProductionCost]);
+  }, [expenses]);
 
   const EXPENSE_COLORS = ['#8b5c40', '#d4a373', '#e9edc9', '#ccd5ae', '#faedcd', '#fefae0', '#e3d5ca', '#ddbea9'];
   const INCOME_COLORS = ['#4ade80', '#34d399'];
@@ -308,7 +289,6 @@ export default function Dashboard() {
               { label: 'Solicitations', total: totalSolRecorded, verified: verifiedSol, gap: solGap },
               { label: 'TOTAL INCOME', total: totalIncomeRecorded, verified: totalIncomeVerified, gap: totalIncomeRecorded - totalIncomeVerified, isMain: true },
               { label: 'Manual Expenses', total: totalExpRecorded, verified: verifiedExp, gap: expGap },
-              { label: 'Merch Production', total: totalMerchProductionCost, verified: totalMerchProductionCost, gap: 0 },
               { label: 'TOTAL EXPENSES', total: totalExpensesRecorded, verified: totalExpensesVerified, gap: totalExpensesRecorded - totalExpensesVerified, isMain: true }
             ].map(row => (
               <div key={row.label} className={`p-3 ${row.gap > 0 ? 'bg-orange-50/30' : ''} ${row.isMain ? 'bg-gray-50' : ''}`}>
@@ -351,7 +331,6 @@ export default function Dashboard() {
                   { label: 'Solicitations', total: totalSolRecorded, verified: verifiedSol, gap: solGap },
                   { label: 'TOTAL INCOME', total: totalIncomeRecorded, verified: totalIncomeVerified, gap: totalIncomeRecorded - totalIncomeVerified, isMain: true },
                   { label: 'Manual Expenses', total: totalExpRecorded, verified: verifiedExp, gap: expGap },
-                  { label: 'Merch Production', total: totalMerchProductionCost, verified: totalMerchProductionCost, gap: 0 },
                   { label: 'TOTAL EXPENSES', total: totalExpensesRecorded, verified: totalExpensesVerified, gap: totalExpensesRecorded - totalExpensesVerified, isMain: true }
                 ].map(row => (
                   <tr key={row.label} className={`${row.gap > 0 ? 'bg-orange-50/50' : ''} ${(row as any).isMain ? 'bg-gray-50 border-y border-gray-100 font-bold' : ''}`}>

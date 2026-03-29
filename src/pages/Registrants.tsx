@@ -38,7 +38,11 @@ export default function Registrants() {
 
   // Local state for UI
   const [searchTerm, setSearchTerm] = useState('');
-  const [filterChurch, setFilterChurch] = useState<string>('All');
+  const [filterChurch, setFilterChurch] = useState<string>(() => {
+    const role = currentUser?.role?.toLowerCase().trim();
+    if (role === 'coordinator' && currentUser?.church) return currentUser.church;
+    return 'All';
+  });
   const [filterStatus, setFilterStatus] = useState<string>('All');
   const [filterMinistry, setFilterMinistry] = useState<string>('All');
 
@@ -197,6 +201,7 @@ export default function Registrants() {
         
         await api.put(`/api/registrants/${editingId}`, cleanData);
         unlockEntity('registrants', editingId);
+        await Promise.all([fetchData(), fetchSummary()]);
       } else {
         // Optimistic update for new entries
         const tempId = `temp-${Date.now()}`;
@@ -290,8 +295,11 @@ export default function Registrants() {
   };
 
   const openModalForEdit = (reg: Registrant) => {
-    // Double check edit permission for the specific record
-    const canEditOwn = isAdmin || (rolePerms?.editOwn === true && reg.church === currentUser?.church);
+    // Case-insensitive/trimmed comparison for Coordinator/Treasurer roles
+    const userChurch = currentUser?.church?.toLowerCase().trim();
+    const regChurch = reg.church?.toLowerCase().trim();
+    const isOwnChurch = !!userChurch && userChurch === regChurch;
+    const canEditOwn = isAdmin || (rolePerms?.editOwn === true && isOwnChurch);
     if (!canEditAny && !canEditOwn) return;
 
     setFormData(reg);
@@ -599,8 +607,11 @@ export default function Registrants() {
                   </td>
                   <td className="px-2 lg:px-6 py-4 text-right">
                     {(() => {
-                    const canEditThis = isAdmin || canEditAny || (rolePerms?.editOwn && reg.church === user?.church);
-                    const canDeleteThis = isAdmin || canDeleteAny || (rolePerms?.deleteOwn && reg.church === user?.church);
+                    const userChurch = currentUser?.church?.toLowerCase().trim();
+                    const regChurch = reg.church?.toLowerCase().trim();
+                    const isOwnChurch = !!userChurch && userChurch === regChurch;
+                    const canEditThis = isAdmin || canEditAny || (rolePerms?.editOwn && isOwnChurch);
+                    const canDeleteThis = isAdmin || canDeleteAny || (rolePerms?.deleteOwn && isOwnChurch);
                       
                       if (!canEditThis && !canDeleteThis) return null;
 
@@ -673,8 +684,11 @@ export default function Registrants() {
                   <span className="text-[11px] font-black text-brand-brown leading-none">₱{reg.amountPaid} <span className="text-[8px] font-medium text-gray-400">{reg.paymentMethod ? `(${reg.paymentMethod.split(' ')[0]})` : ''}</span></span>
                 </div>
                 {(() => {
-                  const canEditThis = isAdmin || canEditAny || (rolePerms?.editOwn && reg.church === currentUser?.church);
-                  const canDeleteThis = isAdmin || canDeleteAny || (rolePerms?.deleteOwn && reg.church === currentUser?.church);
+                  const userChurch = currentUser?.church?.toLowerCase().trim();
+                  const regChurch = reg.church?.toLowerCase().trim();
+                  const isOwnChurch = !!userChurch && userChurch === regChurch;
+                  const canEditThis = isAdmin || canEditAny || (rolePerms?.editOwn && isOwnChurch);
+                  const canDeleteThis = isAdmin || canDeleteAny || (rolePerms?.deleteOwn && isOwnChurch);
                   
                   if (!canEditThis && !canDeleteThis) return null;
 
