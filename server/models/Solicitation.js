@@ -15,5 +15,7 @@ const SolicitationSchema = new mongoose.Schema({
 SolicitationSchema.index({ sourceName: 1 });
 SolicitationSchema.index({ type: 1 });
 SolicitationSchema.index({ dateReceived: -1 });
+SolicitationSchema.index({ verifiedByTreasurer: 1 });
+SolicitationSchema.index({ createdBy: 1 });
 
 module.exports = mongoose.model('Solicitation', SolicitationSchema);

@@ -9,28 +9,31 @@ export default function ColdStartLoader() {
 
   useEffect(() => {
     if (isServerAwake) {
-      setHasError(false); // Reset error state when awake
+      setHasError(false);
       return;
     }
 
     let isMounted = true;
     let timeoutId: NodeJS.Timeout;
-    const maxWaitTime = 60000; // 60 seconds
+    const maxWaitTime = 60000;
     const startTime = Date.now();
 
     const checkHealth = async () => {
       if (!isMounted) return;
 
       try {
-        const res = await api.get('/api/health', { timeout: 5000 });
-        if (res.status === 200) {
-          setServerAwake(true);
-        }
+        const res = await api.get('/api/health', { 
+          timeout: 5000,
+          validateStatus: (status) => status === 200 || status === 503
+        });
+        
+        // If we get here, the server successfully responded with our code.
+        setServerAwake(true);
       } catch (err) {
         if (Date.now() - startTime > maxWaitTime) {
           setHasError(true);
         } else {
-          timeoutId = setTimeout(checkHealth, 3000); // Poll every 3 seconds
+          timeoutId = setTimeout(checkHealth, 3000);
         }
       }
     };
@@ -59,7 +62,7 @@ export default function ColdStartLoader() {
             <p className="text-gray-600 mb-6">The server is still starting. Please refresh in a moment to try again.</p>
             <button
               onClick={() => window.location.reload()}
-              className="px-6 py-2.5 bg-indigo-600 text-white rounded-lg font-medium hover:bg-indigo-700 transition shadow-sm"
+              className="px-6 py-2.5 bg-brand-brown text-white rounded-lg font-medium hover:bg-brand-light-brown transition shadow-sm"
             >
               Refresh Page
             </button>
@@ -67,10 +70,10 @@ export default function ColdStartLoader() {
         ) : (
           <>
             <div className="relative mb-6">
-              <div className="absolute inset-0 bg-indigo-200 rounded-full blur-xl opacity-50 animate-pulse"></div>
-              <Loader2 className="w-16 h-16 text-indigo-600 animate-spin relative z-10" />
+              <div className="absolute inset-0 bg-brand-sand/20 rounded-full blur-xl opacity-50 animate-pulse"></div>
+              <Loader2 className="w-16 h-16 text-brand-brown animate-spin relative z-10" />
             </div>
-            <h3 className="text-2xl font-bold text-gray-900 mb-3 tracking-wide">Waking up the server...</h3>
+            <h3 className="text-2xl font-bold text-gray-900 mb-3 tracking-wide font-display">Waking up the server...</h3>
             <p className="text-gray-600 text-sm leading-relaxed">
               This may take <span className="font-semibold text-gray-800">10 to 60 seconds</span> on the free plan.<br />
               Please stay on this page.

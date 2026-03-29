@@ -19,7 +19,9 @@ export default function Expenses() {
     fetchRegistrants,
     solicitations,
     fetchSolicitations,
-    syncExpense
+    syncExpense,
+    lockEntity,
+    unlockEntity
   } = useAppStore();
   
   // Use global settings with fallback
@@ -172,6 +174,7 @@ export default function Expenses() {
     
     // Close immediately and optimistically update
     setVerifyConfirm({ isOpen: false, expense: null });
+    lockEntity('expenses', expId);
     syncExpense('updated', { 
       _id: expId, 
       id: expId, 
@@ -183,10 +186,12 @@ export default function Expenses() {
       verifiedByTreasurer: nowVerified,
       verifiedAt: nowVerified ? new Date().toISOString() : null
     }).then(() => {
+      unlockEntity('expenses', expId);
       fetchFinancialStats();
       fetchData();
     }).catch(err => {
       console.error(err);
+      unlockEntity('expenses', expId);
       fetchExpenses(true); // Silent revert on failure
     });
   };
@@ -243,12 +248,18 @@ export default function Expenses() {
     
     if (editingId) {
       // Optimistic update
+      lockEntity('expenses', editingId);
       syncExpense('updated', { ...savePayload, _id: editingId, id: editingId });
       closeModal();
-      api.put(`/api/expenses/${editingId}`, savePayload).catch(err => {
-        console.error(err);
-        fetchExpenses(true); // Silent revert on failure
-      });
+      api.put(`/api/expenses/${editingId}`, savePayload)
+        .then(() => {
+          unlockEntity('expenses', editingId);
+        })
+        .catch(err => {
+          console.error(err);
+          unlockEntity('expenses', editingId);
+          fetchExpenses(true); // Silent revert on failure
+        });
     } else {
       // Optimistic added for new entries
       const tempId = `temp-${Date.now()}`;

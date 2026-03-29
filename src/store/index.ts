@@ -85,8 +85,8 @@ interface AppState {
 
   // In-flight mutation lock — prevents WebSocket echoes from overriding optimistic UI
   pendingMutations: Set<string>;
-  lockRegistrant: (id: string) => void;
-  unlockRegistrant: (id: string) => void;
+  lockEntity: (type: string, id: string) => void;
+  unlockEntity: (type: string, id: string) => void;
 
   fetchBootData: () => Promise<void>;
 
@@ -139,14 +139,14 @@ export const useAppStore = create<AppState>()((set) => {
     setGlobalError: (error: string | null) => set({ globalError: error }),
     setServerAwake: (awake: boolean) => set({ isServerAwake: awake }),
 
-    lockRegistrant: (id: string) => set(state => {
+    lockEntity: (type, id) => set(state => {
       const next = new Set(state.pendingMutations);
-      next.add(id);
+      next.add(`${type}:${id}`);
       return { pendingMutations: next };
     }),
-    unlockRegistrant: (id: string) => set(state => {
+    unlockEntity: (type, id) => set(state => {
       const next = new Set(state.pendingMutations);
-      next.delete(id);
+      next.delete(`${type}:${id}`);
       return { pendingMutations: next };
     }),
 

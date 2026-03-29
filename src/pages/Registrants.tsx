@@ -5,10 +5,20 @@ import type { Registrant, ShirtSize, PaymentStatus, PaymentMethod } from '../typ
 import { PlusCircle, Search, Edit2, Trash2, X, Filter, Info, CheckSquare, Square, CheckCircle, Clock, ShieldAlert, Users, Loader2 } from 'lucide-react';
 import ConfirmModal from '../components/ConfirmModal';
 
-const NAME_REGEX = /^[A-Za-z\s.'-]+,\s[A-Za-z\s.'-]+$/;
+const NAME_REGEX = /^[A-Za-z\s.',-]+$/;
 
 export default function Registrants() {
-  const { currentUser, appSettings, fetchGlobalSettings, registrants, fetchRegistrants, syncRegistrant, updateRegistrant } = useAppStore();
+  const { 
+    currentUser, 
+    appSettings, 
+    fetchGlobalSettings, 
+    registrants, 
+    fetchRegistrants, 
+    syncRegistrant, 
+    updateRegistrant,
+    lockEntity,
+    unlockEntity
+  } = useAppStore();
   const user = currentUser; // Cache for stable null-checks
   
   // Use global settings with an internal fallback for the structure
@@ -171,20 +181,22 @@ export default function Registrants() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!NAME_REGEX.test(formData.fullName)) {
+      setFormError('Please enter a valid name (e.g., "Doe, John" or "John Doe").');
       return;
     }
 
     try {
       setFormError(null);
       const { id, _id, __v, createdAt, updatedAt, ...cleanData } = formData as any;
+      
       if (editingId) {
         // Optimistic update: instantly reflect the edit in the UI before server confirms
+        lockEntity('registrants', editingId);
         updateRegistrant(editingId, cleanData);
         closeModal();
-        api.put(`/api/registrants/${editingId}`, cleanData).catch(err => {
-          console.error('Failed to save edit:', err);
-          // Removed global fetch to prevent race conditions during rapid edits
-        });
+        
+        await api.put(`/api/registrants/${editingId}`, cleanData);
+        unlockEntity('registrants', editingId);
       } else {
         // Optimistic update for new entries
         const tempId = `temp-${Date.now()}`;
@@ -197,21 +209,28 @@ export default function Registrants() {
         syncRegistrant('added', optimisticNew);
         closeModal();
 
-        api.post(`/api/registrants`, cleanData).then((res) => {
+        try {
+          const res = await api.post(`/api/registrants`, cleanData);
           // Graceful handoff: Swap temp optimistic UI instantly to prevent duplicates.
           syncRegistrant('deleted', { _id: tempId, id: tempId });
           syncRegistrant('added', res.data);
           fetchSummary();
           fetchData();
-        }).catch(err => {
+        } catch (err) {
           console.error('Failed to register participant:', err);
           // Immediate rollback on error
           syncRegistrant('deleted', { _id: tempId, id: tempId });
-        });
+          throw err;
+        }
       }
     } catch (err: any) {
       console.error(err);
       setFormError(err.response?.data?.message || 'Failed to save registrant.');
+      // If we were editing and it failed, we need to unlock and sync
+      if (editingId) {
+        unlockEntity('registrants', editingId);
+        fetchData();
+      }
     }
   };
 

@@ -13,7 +13,9 @@ const expenseSchema = new mongoose.Schema({
 });
 
 expenseSchema.index({ category: 1 });
-expenseSchema.index({ date: -1 }); // Index for descending sorting
+expenseSchema.index({ date: -1 });
+expenseSchema.index({ verifiedByTreasurer: 1 });
+expenseSchema.index({ createdBy: 1 });
 
 expenseSchema.set('toJSON', {
   virtuals: true,

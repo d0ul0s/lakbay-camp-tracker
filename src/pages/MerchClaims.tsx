@@ -5,7 +5,7 @@ import { Search, Filter, Check, Shirt, Briefcase, Book, PenTool, ShieldAlert, Sh
 import type { Registrant, AppSettings } from '../types';
 
 export default function MerchClaims() {
-  const { currentUser, registrants, fetchRegistrants, updateRegistrant, appSettings, fetchGlobalSettings, lockRegistrant, unlockRegistrant } = useAppStore();
+  const { currentUser, registrants, fetchRegistrants, updateRegistrant, appSettings, fetchGlobalSettings, lockEntity, unlockEntity } = useAppStore();
   // fetchRegistrants kept in deps to avoid lint warning even though we only use it for cold starts
   const [settings, setSettings] = useState<AppSettings>({ churches: [], merchCosts: {} } as any);
   
@@ -130,7 +130,7 @@ export default function MerchClaims() {
     const newValue = !isClaimed;
 
     // 1. Lock this registrant: any WebSocket echo during this request will be ignored
-    lockRegistrant(regId);
+    lockEntity('registrants', regId);
 
     // 2. Optimistic UI Update using Store
     const updatedClaims = { ...reg.merchClaims, [item]: newValue };
@@ -157,7 +157,7 @@ export default function MerchClaims() {
       });
     } finally {
       // 5. Always unlock, whether success or failure
-      unlockRegistrant(regId);
+      unlockEntity('registrants', regId);
     }
   };
 

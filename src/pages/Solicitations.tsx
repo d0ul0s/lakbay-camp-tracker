@@ -6,7 +6,16 @@ import ConfirmModal from '../components/ConfirmModal';
 import type { Solicitation } from '../types';
 
 export default function Solicitations() {
-  const { currentUser, appSettings, fetchGlobalSettings, solicitations, fetchSolicitations, syncSolicitation } = useAppStore();
+  const { 
+    currentUser, 
+    appSettings, 
+    fetchGlobalSettings, 
+    solicitations, 
+    fetchSolicitations, 
+    syncSolicitation,
+    lockEntity,
+    unlockEntity
+  } = useAppStore();
   
   // Use global settings with fallback
   const settings = appSettings || {
@@ -124,6 +133,7 @@ export default function Solicitations() {
       title: isNowVerified ? 'Confirm Verification' : 'Remove Verification',
       message: `Are you sure you want to mark this as ${isNowVerified ? 'verified' : 'unverified'}? This affects the financial summary.`,
       action: () => {
+        lockEntity('solicitations', solId);
         syncSolicitation('updated', { 
           _id: solId, 
           id: solId, 
@@ -134,8 +144,12 @@ export default function Solicitations() {
         api.put(`/api/solicitations/${solId}`, {
           verifiedByTreasurer: isNowVerified,
           verifiedAt: isNowVerified ? new Date().toISOString() : null
-        }).then(() => fetchData()).catch(err => {
+        }).then(() => {
+          unlockEntity('solicitations', solId);
+          fetchData();
+        }).catch(err => {
           console.error(err);
+          unlockEntity('solicitations', solId);
           fetchSolicitations(true);
         });
       }
@@ -177,12 +191,19 @@ export default function Solicitations() {
       };
       
       if (editingId) {
+        lockEntity('solicitations', editingId);
         syncSolicitation('updated', { ...payload, _id: editingId, id: editingId });
         setIsModalOpen(false);
-        api.put(`/api/solicitations/${editingId}`, payload).then(() => fetchData()).catch(err => {
-          console.error(err);
-          fetchSolicitations(true);
-        });
+        api.put(`/api/solicitations/${editingId}`, payload)
+          .then(() => {
+            unlockEntity('solicitations', editingId);
+            fetchData();
+          })
+          .catch(err => {
+            console.error(err);
+            unlockEntity('solicitations', editingId);
+            fetchSolicitations(true);
+          });
       } else {
         const tempId = `temp-${Date.now()}`;
         const optimisticNew = {

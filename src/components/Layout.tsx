@@ -50,68 +50,6 @@ export default function Layout() {
       setIsSocketConnected(false);
       console.warn('Socket link severed:', reason);
     });
-
-    socket.on('DATA_UPDATED', (data: { type: string, action: string, user: string, userId: string, data?: any }) => {
-      const { 
-        fetchRegistrants, 
-        syncRegistrant,
-        fetchExpenses, 
-        syncExpense,
-        fetchSolicitations, 
-        syncSolicitation,
-        fetchGlobalSettings, 
-        syncSettings,
-        fetchUsers,
-        syncUser,
-        refreshPermissions,
-        pendingMutations
-      } = useAppStore.getState();
-
-      if (data.type === 'registrants') {
-        if (data.data) {
-          // If this registrant has an in-flight mutation, discard the stale broadcast.
-          // Our optimistic UI already has the correct state; the lock will be released
-          // once the API call resolves, at which point future broadcasts will apply normally.
-          const registrantId = data.data._id || data.data.id;
-          if (data.action === 'updated' && registrantId && pendingMutations.has(String(registrantId))) {
-            return;
-          }
-          syncRegistrant(data.action, data.data);
-        } else {
-          fetchRegistrants(true);
-        }
-      }
-      if (data.type === 'expenses') {
-        if (data.data) {
-          syncExpense(data.action, data.data);
-        } else {
-          fetchExpenses(true);
-        }
-      }
-      if (data.type === 'solicitations') {
-        if (data.data) {
-          syncSolicitation(data.action, data.data);
-        } else {
-          fetchSolicitations(true);
-        }
-      }
-      if (data.type === 'settings') {
-        if (data.data) {
-          syncSettings(data.data);
-        } else {
-          fetchGlobalSettings(true);
-          refreshPermissions();
-        }
-      }
-      if (data.type === 'users') {
-        if (data.data) {
-          syncUser(data.action, data.data);
-        } else {
-          fetchUsers(true);
-        }
-      }
-    });
-
     return () => {
       socket.disconnect();
     };
