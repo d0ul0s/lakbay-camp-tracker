@@ -46,6 +46,21 @@ app.use((req, res, next) => {
   next();
 });
 
+// Database status middleware
+app.use((req, res, next) => {
+  const readyState = mongoose.connection.readyState;
+  if (req.path === '/api/health' || req.path.startsWith('/api/auth') || req.path === '/api/boot') {
+    return next();
+  }
+  if (readyState !== 1) {
+    return res.status(503).json({ 
+      message: 'Database connection is still establishing. Please try again in a few seconds.', 
+      status: readyState === 2 ? 'connecting' : 'disconnected' 
+    });
+  }
+  next();
+});
+
 app.set('trust proxy', 1);
 const PORT = process.env.PORT || 5000;
 
@@ -74,7 +89,13 @@ app.use(mongoSanitize());
 const auth = require('./middleware/auth');
 
 app.get('/api/health', (req, res) => {
-  res.status(200).json({ status: 'ok', message: 'Server is awake and running smoothly.' });
+  const dbStatus = mongoose.connection.readyState;
+  const dbLabels = { 0: 'disconnected', 1: 'connected', 2: 'connecting', 3: 'disconnecting' };
+  res.status(dbStatus === 1 ? 200 : 503).json({ 
+    status: dbStatus === 1 ? 'ok' : 'initializing',
+    database: dbLabels[dbStatus] || 'unknown',
+    message: dbStatus === 1 ? 'Server is active and connected.' : 'Server is awake, waiting for database connection.' 
+  });
 });
 
 
@@ -89,15 +110,19 @@ app.use('/api/auth', require('./routes/auth'));
 
 const connectDB = () => {
   if (mongoose.connection.readyState === 1 || mongoose.connection.readyState === 2) return;
-  mongoose.connect(process.env.MONGO_URI, { serverSelectionTimeoutMS: 5000 })
+  
+  const options = {
+    serverSelectionTimeoutMS: 15000,
+    heartbeatFrequencyMS: 10000,
+    socketTimeoutMS: 45000,
+  };
+
+  mongoose.connect(process.env.MONGO_URI, options)
     .then(() => {
       console.log('MongoDB connected systematically.');
-      if (!server.listening) {
-        server.listen(PORT, '0.0.0.0', () => console.log(`Server running on port ${PORT}`));
-      }
     })
     .catch(err => {
-      console.error('MongoDB connection issue during init or retry:', err.message);
+      console.error('MongoDB connection issue:', err.message);
     });
 };
 
@@ -106,7 +131,11 @@ mongoose.connection.on('disconnected', () => {
   setTimeout(connectDB, 5000);
 });
 
-connectDB();
+// Start listening immediately
+server.listen(PORT, '0.0.0.0', () => {
+  console.log(`Server running on port ${PORT}`);
+  connectDB();
+});
 
 // Keep-Alive mechanism to prevent Render from sleeping on Free Tier (15 min inactivity)
 // This hits the local health endpoint every 14 minutes.
