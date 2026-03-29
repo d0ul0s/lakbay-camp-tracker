@@ -22,8 +22,7 @@ const api = axios.create({
 // so we send the token in the header instead. The server middleware accepts both.
 api.interceptors.request.use(config => {
   const token = sessionStorage.getItem('lakbay_token');
-  if (token) {
-    config.headers = config.headers ?? {};
+  if (token && config.headers) {
     config.headers['Authorization'] = `Bearer ${token}`;
   }
   return config;

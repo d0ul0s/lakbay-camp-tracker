@@ -22,7 +22,7 @@ export default function ColdStartLoader() {
       if (!isMounted) return;
 
       try {
-        const res = await api.get('/api/health', { 
+        await api.get('/api/health', { 
           timeout: 5000,
           validateStatus: (status) => status === 200 || status === 503
         });

@@ -13,9 +13,7 @@ export default function Expenses() {
     fetchExpenses,
     syncExpense,
     lockEntity,
-    unlockEntity,
-    registrants,
-    solicitations
+    unlockEntity
   } = useAppStore();
 
   const settings = appSettings || {
