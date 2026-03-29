@@ -5,7 +5,7 @@ import type { Registrant, ShirtSize, PaymentStatus, PaymentMethod } from '../typ
 import { PlusCircle, Search, Edit2, Trash2, X, Filter, Info, CheckSquare, Square, CheckCircle, Clock, ShieldAlert, Users, Loader2 } from 'lucide-react';
 import ConfirmModal from '../components/ConfirmModal';
 
-const NAME_REGEX = /^[A-Z][a-zA-Z]+(?:\s[A-Z][a-zA-Z]+)*,\s[A-Z][a-zA-Z]+(?:\s[A-Z][a-zA-Z]+)*\s[A-Z]\.(?:\s(?:Jr\.|III|IV|V))?$/;
+const NAME_REGEX = /^[A-Za-z\s.'-]+,\s[A-Za-z\s.'-]+$/;
 
 export default function Registrants() {
   const { currentUser, appSettings, fetchGlobalSettings, registrants, fetchRegistrants, syncRegistrant, updateRegistrant } = useAppStore();
@@ -185,6 +185,7 @@ export default function Registrants() {
           console.error('Failed to save edit:', err);
           // Removed global fetch to prevent race conditions during rapid edits
         });
+      } else {
         // Optimistic update for new entries
         const tempId = `temp-${Date.now()}`;
         const optimisticNew = {
@@ -752,7 +753,7 @@ export default function Registrants() {
                         {!isNameValid && (
                           <p className="text-xs text-red-500 mt-1 flex items-start gap-1">
                             <Info size={14} className="shrink-0 mt-0.5" />
-                            Format requirement: Last, First M. (e.g., 'Santos, Maria C.' or 'Reyes, Jose P. Jr.')
+                            Format: Last, First (e.g., 'Santos, Maria' or 'Reyes, Jose Jr.')
                           </p>
                         )}
                       </div>
@@ -1001,7 +1002,7 @@ export default function Registrants() {
               <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-xl flex items-start gap-3">
                 <Info size={18} className="text-blue-500 shrink-0 mt-0.5" />
                 <p className="text-sm text-blue-700">
-                  <span className="font-bold">Format requirement:</span> Last, First M. (e.g., 'Santos, Maria C.' or 'Reyes, Jose P. Jr.')
+                  <span className="font-bold">Format:</span> Last, First (e.g., 'Santos, Maria' or 'Reyes, Jose Jr.')
                 </p>
               </div>
               <div className="space-y-8">
@@ -1041,7 +1042,7 @@ export default function Registrants() {
                                       className={`w-full px-3 py-2 text-sm rounded-lg border focus:outline-none transition-colors ${isValidName ? 'border-gray-200 focus:border-brand-brown' : 'border-red-400 focus:border-red-500 bg-red-50/30'}`} 
                                       placeholder="Dela Cruz, Juan P." 
                                     />
-                                    {!isValidName && <p className="text-[10px] text-red-500 mt-1 font-bold">Incorrect format. Use 'Last, First M.'</p>}
+                                    {!isValidName && <p className="text-[10px] text-red-500 mt-1 font-bold">Incorrect format. Use 'Last, First'</p>}
                                   </div>
 
                                   <div className="grid grid-cols-3 gap-3">
