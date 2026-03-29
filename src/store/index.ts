@@ -88,7 +88,7 @@ interface AppState {
   lockEntity: (type: string, id: string) => void;
   unlockEntity: (type: string, id: string) => void;
 
-  fetchBootData: () => Promise<void>;
+  fetchBootData: (retryCount?: number) => Promise<void>;
 
   // App Loading State
   isLoading: boolean;
@@ -430,9 +430,10 @@ export const useAppStore = create<AppState>()((set) => {
         if (!silent) set({ isLoading: false });
       }
     },
-    fetchBootData: async () => {
+    fetchBootData: async (retryCount = 0) => {
       const { hasBooted } = useAppStore.getState();
-      if (!hasBooted) set({ isLoading: true });
+      if (!hasBooted) set({ isLoading: true, globalError: null });
+
       try {
         const res = await api.get('/api/boot');
         const { registrants, expenses, solicitations, settings } = res.data;
@@ -458,10 +459,23 @@ export const useAppStore = create<AppState>()((set) => {
           ...payload,
           hasBooted: true,
           hasSyncedLive: true,
-          isLoading: false
+          isLoading: false,
+          globalError: null
         });
       } catch (err: any) {
-        set({ globalError: err.response?.data?.message || 'Failed to boot application data', isLoading: false });
+        const status = err.response?.status;
+        const isColdStart = status === 503 || status === 504 || err.code === 'ECONNABORTED';
+        
+        if (isColdStart && retryCount < 4) {
+          const delay = Math.pow(2, retryCount) * 1000;
+          set({ globalError: `Waking up the server (Attempt ${retryCount + 1}/4)...` });
+          setTimeout(() => useAppStore.getState().fetchBootData(retryCount + 1), delay);
+        } else {
+          set({ 
+            globalError: err.response?.data?.message || 'Failed to boot application data. Please refresh and try again.', 
+            isLoading: false 
+          });
+        }
       }
     }
   };

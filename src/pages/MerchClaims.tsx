@@ -1,11 +1,18 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import api from '../api/axios';
 import { useAppStore } from '../store';
 import { Search, Filter, Check, Shirt, Briefcase, Book, PenTool, ShieldAlert, ShoppingBag, Loader2 } from 'lucide-react';
 import type { Registrant, AppSettings } from '../types';
 
 export default function MerchClaims() {
-  const { currentUser, registrants, fetchRegistrants, updateRegistrant, appSettings, fetchGlobalSettings, lockEntity, unlockEntity } = useAppStore();
+  const currentUser = useAppStore(s => s.currentUser);
+  const registrants = useAppStore(s => s.registrants);
+  const updateRegistrant = useAppStore(s => s.updateRegistrant);
+  const appSettings = useAppStore(s => s.appSettings);
+  const fetchGlobalSettings = useAppStore(s => s.fetchGlobalSettings);
+  const fetchRegistrants = useAppStore(s => s.fetchRegistrants);
+  const lockEntity = useAppStore(s => s.lockEntity);
+  const unlockEntity = useAppStore(s => s.unlockEntity);
   // fetchRegistrants kept in deps to avoid lint warning even though we only use it for cold starts
   const [settings, setSettings] = useState<AppSettings>({ churches: [], merchCosts: {} } as any);
   
@@ -110,9 +117,6 @@ export default function MerchClaims() {
   useEffect(() => {
     setCurrentPage(1);
   }, [searchTerm, filterChurch, filterStatus]);
-  
-  // Derived visible data
-  const filteredRegistrants = pageRegistrants; // Server already filtered them
 
   const toggleClaim = async (regId: string, item: keyof typeof registrants[0]['merchClaims']) => {
     // Read directly from the synchronous Zustand store to bypass React's async rendering closure.
@@ -162,7 +166,21 @@ export default function MerchClaims() {
   };
 
   const totalPages = Math.ceil(total / itemsPerPage);
-  const paginatedRegistrants = filteredRegistrants;
+  
+  const paginatedRegistrants = useMemo(() => {
+    return pageRegistrants.map(p => {
+      // Robust ID extraction
+      const pid = p.id || (p as any)._id;
+      if (!pid) return p;
+
+      // Find latest version of this registrant in the global store (handles optimistic & live sync)
+      const fromStore = registrants.find(r => {
+        const rid = r.id || (r as any)._id;
+        return rid === pid;
+      });
+      return fromStore || p;
+    });
+  }, [pageRegistrants, registrants]);
 
   return (
     <div className="space-y-4 md:space-y-6 relative">
@@ -269,15 +287,15 @@ export default function MerchClaims() {
                       key={item.id}
                       disabled={isDisabled}
                       onClick={() => toggleClaim(reg.id || (reg as any)._id, item.id as keyof typeof reg.merchClaims)}
-                      className={`flex flex-col items-center justify-center p-2 rounded-xl border transition-all active:scale-95 relative ${
+                      className={`flex flex-col items-center justify-center p-2 rounded-xl border transition-all active:scale-90 relative ${
                         isClaimed
                           ? 'bg-green-50 border-green-500 text-green-700 shadow-sm'
                           : 'bg-gray-50 border-gray-100 text-gray-300'
                       } ${isDisabled ? 'opacity-40 grayscale cursor-not-allowed' : ''}`}
                     >
-                      <item.icon size={18} className={isClaimed ? 'text-green-600' : 'text-gray-300'} />
+                      <item.icon size={18} className={`${isClaimed ? 'text-green-600 scale-110' : 'text-gray-300'} transition-transform duration-300`} />
                       <span className="text-[8px] font-black uppercase mt-1 tracking-tighter">{item.label}</span>
-                      {isClaimed && <div className="absolute top-1 right-1 text-green-600"><Check size={8} strokeWidth={4} /></div>}
+                      {isClaimed && <div className="absolute top-1 right-1 text-green-600 animate-in bounce-in duration-300"><Check size={8} strokeWidth={4} /></div>}
                     </button>
                   );
                 })}
@@ -311,28 +329,44 @@ export default function MerchClaims() {
                     <p className="text-[10px] lg:text-xs text-gray-500 mt-1 font-medium">{reg.church} <span className="hidden lg:inline">• Size {reg.shirtSize}</span></p>
                   </td>
                   
-                  {['tshirt', 'bag', 'notebook', 'pen'].map((item) => {
-                    const isClaimed = reg.merchClaims[item as keyof Registrant['merchClaims']];
-                    return (
-                      <td key={item} className="px-3 lg:px-6 py-4 text-center">
-                        <button
-                          disabled={(() => {
-                            const canToggleAll = isAdmin || merchPerms?.toggleAll;
-                            const canToggleOwn = merchPerms?.toggleOwn && reg.church === currentUser?.church;
-                            return !canToggleAll && !canToggleOwn;
-                          })()}
-                          onClick={() => toggleClaim(reg.id || (reg as any)._id, item as keyof typeof reg.merchClaims)}
-                          className={`w-10 h-10 lg:w-12 lg:h-12 rounded-xl flex items-center justify-center mx-auto transition-all transform active:scale-95 ${
-                            isClaimed 
-                              ? 'bg-green-100 text-green-600 ring-2 ring-green-500 ring-offset-2' 
-                              : 'bg-gray-100 text-gray-300 hover:bg-gray-200 hover:text-gray-500'
-                          } ${((!isAdmin && !merchPerms?.toggleAll) && (!merchPerms?.toggleOwn || reg.church !== currentUser?.church)) ? 'opacity-50 cursor-not-allowed' : ''}`}
-                        >
-                          {isClaimed && <Check size={20} className="lg:w-6 lg:h-6 stroke-[3]" />}
-                        </button>
-                      </td>
-                    );
-                  })}
+                  {(() => {
+                    const merchItems = [
+                      { id: 'tshirt', icon: Shirt },
+                      { id: 'bag', icon: Briefcase },
+                      { id: 'notebook', icon: Book },
+                      { id: 'pen', icon: PenTool },
+                    ];
+                    
+                    return merchItems.map((item) => {
+                      const isClaimed = reg.merchClaims[item.id as keyof Registrant['merchClaims']];
+                      const Icon = item.icon;
+                      
+                      const canToggleAll = isAdmin || merchPerms?.toggleAll;
+                      const canToggleOwn = merchPerms?.toggleOwn && reg.church === currentUser?.church;
+                      const isDisabled = !canToggleAll && !canToggleOwn;
+                      
+                      return (
+                        <td key={item.id} className="px-3 lg:px-6 py-4 text-center">
+                          <button
+                            disabled={isDisabled}
+                            onClick={() => toggleClaim(reg.id || (reg as any)._id, item.id as keyof typeof reg.merchClaims)}
+                            className={`w-10 h-10 lg:w-12 lg:h-12 rounded-xl flex items-center justify-center mx-auto transition-all active:scale-90 ${
+                              isClaimed 
+                                ? 'bg-green-100 text-green-600 ring-2 ring-green-500 ring-offset-2 scale-110 shadow-sm' 
+                                : 'bg-gray-100/50 text-gray-300 hover:bg-gray-200 hover:text-gray-400'
+                            } ${isDisabled ? 'opacity-40 grayscale cursor-not-allowed' : ''}`}
+                            title={isClaimed ? `Claimed ${item.id}` : `Toggle ${item.id} claim`}
+                          >
+                            {isClaimed ? (
+                              <Check size={20} className="lg:w-6 lg:h-6 stroke-[4] animate-in zoom-in duration-300" />
+                            ) : (
+                              <Icon size={18} className="lg:w-5 lg:h-5 opacity-40 hover:opacity-100 transition-opacity" />
+                            )}
+                          </button>
+                        </td>
+                      );
+                    });
+                  })()}
                 </tr>
               )) : (
                 <tr>

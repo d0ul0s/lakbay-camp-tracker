@@ -1,24 +1,203 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect, memo } from 'react';
 import api from '../api/axios';
 import { useAppStore } from '../store';
 import type { Registrant, ShirtSize, PaymentStatus, PaymentMethod } from '../types';
 import { PlusCircle, Search, Edit2, Trash2, X, Filter, Info, CheckSquare, Square, CheckCircle, Clock, ShieldAlert, Users, Loader2 } from 'lucide-react';
 import ConfirmModal from '../components/ConfirmModal';
 
+// Memoized Row Component for Desktop
+const RegistrantRow = memo(({ 
+  reg, 
+  canVerify, 
+  handleToggleVerify, 
+  openModalForEdit, 
+  handleDelete,
+  isAdmin,
+  canEditAny,
+  canDeleteAny,
+  rolePerms,
+  currentUserChurch
+}: { 
+  reg: Registrant, 
+  canVerify: boolean, 
+  handleToggleVerify: (reg: Registrant) => void,
+  openModalForEdit: (reg: Registrant) => void,
+  handleDelete: (reg: Registrant) => void,
+  isAdmin: boolean,
+  canEditAny: boolean,
+  canDeleteAny: boolean,
+  rolePerms: any,
+  currentUserChurch: string | null
+}) => {
+  const userChurch = currentUserChurch?.toLowerCase().trim();
+  const regChurch = reg.church?.toLowerCase().trim();
+  const isOwnChurch = !!userChurch && userChurch === regChurch;
+  const canEditThis = isAdmin || canEditAny || (rolePerms?.editOwn && isOwnChurch);
+  const canDeleteThis = isAdmin || canDeleteAny || (rolePerms?.deleteOwn && isOwnChurch);
+
+  return (
+    <tr className="hover:bg-brand-cream/30 transition-colors">
+      <td className="px-2 lg:px-6 py-4 font-bold text-brand-brown truncate max-w-[80px] md:max-w-[120px] xl:max-w-none text-[10px] lg:text-base leading-tight">{reg.fullName}</td>
+      <td className="px-2 lg:px-6 py-4 text-center">
+        <span className="font-medium text-gray-800 text-[9px] lg:text-sm">{reg.age} • {reg.sex?.charAt(0) || 'M'}</span>
+        <span className="text-[8px] text-gray-400 block mt-0.5 font-bold">{reg.shirtSize}</span>
+      </td>
+      <td className="px-2 lg:px-6 py-4 max-w-[120px] lg:max-w-[200px]">
+        <div className="truncate font-medium text-gray-800 text-[10px] lg:text-sm" title={reg.church}>{reg.church}</div>
+        <div className="flex flex-wrap gap-0.5 mt-1">
+          {reg.ministry && reg.ministry.length > 0 ? reg.ministry.map(m => (
+            <span key={m} className="px-1 py-0.5 bg-brand-sand/30 text-brand-brown border border-brand-sand rounded text-[7px] lg:text-[10px] uppercase font-bold tracking-wider">{m}</span>
+          )) : <span className="text-[8px] text-gray-300 italic">None</span>}
+        </div>
+      </td>
+      <td className="px-2 lg:px-6 py-4 text-[10px] lg:text-sm">
+        <span className="block text-gray-800 font-medium leading-tight">{reg.feeType}</span>
+        <span className="text-[9px] text-gray-400">₱{reg.feeType === 'Early Bird' ? 350 : 500}</span>
+      </td>
+      <td className="px-2 lg:px-6 py-4">
+        <div className="flex flex-col items-center">
+          <span className={`px-1.5 py-0.5 lg:px-2.5 lg:py-1 rounded-full text-[8px] lg:text-xs font-bold ${reg.paymentStatus === 'Paid' ? 'bg-green-100 text-green-700' :
+              reg.paymentStatus === 'Partial' ? 'bg-yellow-100 text-yellow-700' :
+                'bg-red-100 text-red-700'
+            }`}>
+            {reg.paymentStatus}
+          </span>
+          {reg.paymentStatus !== 'Unpaid' && (
+            <span className="text-[7px] lg:text-[10px] text-gray-400 font-medium mt-1 uppercase tracking-wider text-center leading-tight">₱{reg.amountPaid} <br className="lg:hidden" /> {reg.paymentMethod?.split(' ')[0]}</span>
+          )}
+        </div>
+      </td>
+      <td className="px-2 lg:px-6 py-4 text-center">
+        {canVerify ? (
+          <button
+            onClick={() => handleToggleVerify(reg)}
+            className={`inline-flex items-center justify-center p-1 rounded-lg transition-colors ${reg.verifiedByTreasurer ? 'bg-green-100 text-green-700 hover:bg-green-200' : 'bg-orange-100 text-orange-600 hover:bg-orange-200'
+              }`}
+            title={reg.verifiedByTreasurer ? 'Verified by Treasurer' : 'Pending Verification'}
+          >
+            {reg.verifiedByTreasurer ? <CheckCircle size={14} className="lg:w-5 lg:h-5" /> : <Clock size={14} className="lg:w-5 lg:h-5" />}
+          </button>
+        ) : (
+          <div className={`inline-flex items-center justify-center p-1 rounded-lg ${reg.verifiedByTreasurer ? 'text-green-500' : 'text-orange-400'}`} title={reg.verifiedByTreasurer ? 'Verified by Treasurer' : 'Pending Verification'}>
+            {reg.verifiedByTreasurer ? <CheckCircle size={14} className="lg:w-5 lg:h-5" /> : <Clock size={14} className="lg:w-5 lg:h-5" />}
+          </div>
+        )}
+      </td>
+      <td className="px-2 lg:px-6 py-4 text-right">
+        {(canEditThis || canDeleteThis) && (
+          <div className="flex items-center justify-end gap-0.5 lg:gap-2">
+            {canEditThis && (
+              <button onClick={() => openModalForEdit(reg)} className="p-1 lg:p-2 text-gray-400 hover:text-brand-brown hover:bg-brand-sand/20 rounded-lg transition-colors">
+                <Edit2 size={14} className="lg:w-4 lg:h-4" />
+              </button>
+            )}
+            {canDeleteThis && (
+              <button onClick={() => handleDelete(reg)} className="p-1 lg:p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors">
+                <Trash2 size={14} className="lg:w-4 lg:h-4" />
+              </button>
+            )}
+          </div>
+        )}
+      </td>
+    </tr>
+  );
+});
+
+// Memoized Card Component for Mobile
+const RegistrantCard = memo(({ 
+  reg, 
+  canVerify, 
+  handleToggleVerify, 
+  openModalForEdit, 
+  handleDelete,
+  isAdmin,
+  canEditAny,
+  canDeleteAny,
+  rolePerms,
+  currentUserChurch
+}: { 
+  reg: Registrant, 
+  canVerify: boolean, 
+  handleToggleVerify: (reg: Registrant) => void,
+  openModalForEdit: (reg: Registrant) => void,
+  handleDelete: (reg: Registrant) => void,
+  isAdmin: boolean,
+  canEditAny: boolean,
+  canDeleteAny: boolean,
+  rolePerms: any,
+  currentUserChurch: string | null
+}) => {
+  const userChurch = currentUserChurch?.toLowerCase().trim();
+  const regChurch = reg.church?.toLowerCase().trim();
+  const isOwnChurch = !!userChurch && userChurch === regChurch;
+  const canEditThis = isAdmin || canEditAny || (rolePerms?.editOwn && isOwnChurch);
+  const canDeleteThis = isAdmin || canDeleteAny || (rolePerms?.deleteOwn && isOwnChurch);
+
+  return (
+    <div className="mobile-card flex flex-col gap-1.5 !p-2">
+      <div className="flex justify-between items-start">
+        <div className="flex-1 min-w-0">
+          <p className="font-black text-brand-brown text-[13px] leading-tight truncate">{reg.fullName}</p>
+          <p className="text-[8px] text-gray-400 font-bold uppercase tracking-wider mt-0.5 truncate">{reg.church}</p>
+        </div>
+        <div className={`shrink-0 p-1 rounded-lg transition-all shadow-sm ${reg.verifiedByTreasurer ? 'bg-green-100 text-green-700 border border-green-200' : 'bg-orange-50 text-orange-500 border border-orange-100'}`}>
+          {canVerify ? (
+            <button onClick={() => handleToggleVerify(reg)} className="flex items-center justify-center">
+              {reg.verifiedByTreasurer ? <CheckCircle size={15} /> : <Clock size={15} />}
+            </button>
+          ) : (
+            <div className="flex items-center justify-center">
+              {reg.verifiedByTreasurer ? <CheckCircle size={15} /> : <Clock size={15} />}
+            </div>
+          )}
+        </div>
+      </div>
+      
+      <div className="flex items-center gap-1 flex-wrap">
+        <span className="px-1 py-0.5 bg-brand-cream border border-brand-sand/30 text-brand-brown rounded text-[8px] font-black uppercase leading-none">{reg.age}Y • {reg.sex?.charAt(0) || 'M'}</span>
+        <span className="px-1 py-0.5 bg-brand-brown text-brand-cream rounded text-[8px] font-black uppercase tracking-tighter leading-none">Size {reg.shirtSize}</span>
+        <span className={`px-1 py-0.5 rounded text-[8px] font-black uppercase border leading-none ${reg.paymentStatus === 'Paid' ? 'bg-green-50 text-green-700 border-green-200' :
+            reg.paymentStatus === 'Partial' ? 'bg-yellow-50 text-yellow-700 border-yellow-200' :
+              'bg-red-50 text-red-700 border-red-200'
+          }`}>{reg.paymentStatus}</span>
+        <span className="px-1 py-0.5 bg-blue-50 text-blue-700 rounded text-[8px] font-bold uppercase border border-blue-100 leading-none">{reg.feeType}</span>
+        {reg.ministry && reg.ministry.length > 0 && reg.ministry.map(m => (
+          <span key={m} className="px-1 py-0.5 bg-gray-50 text-gray-400 text-[8px] font-bold rounded border border-gray-100">{m}</span>
+        ))}
+      </div>
+
+      <div className="flex items-center justify-between mt-0.5 pt-1.5 border-t border-gray-100">
+        <div className="flex items-center gap-1.5">
+          <span className="text-[8px] text-gray-400 font-bold uppercase tracking-tighter shrink-0">Paid</span>
+          <span className="text-[11px] font-black text-brand-brown leading-none">₱{reg.amountPaid} <span className="text-[8px] font-medium text-gray-400">{reg.paymentMethod ? `(${reg.paymentMethod.split(' ')[0]})` : ''}</span></span>
+        </div>
+        {(canEditThis || canDeleteThis) && (
+          <div className="flex gap-1">
+            {canEditThis && (
+              <button onClick={() => openModalForEdit(reg)} className="p-1 lg:p-1.5 bg-gray-50 text-gray-400 hover:text-brand-brown rounded-lg border border-gray-100 active:bg-brand-sand/20 transition-colors"><Edit2 size={12} /></button>
+            )}
+            {canDeleteThis && (
+              <button onClick={() => handleDelete(reg)} className="p-1 lg:p-1.5 bg-red-50 text-red-300 hover:text-red-500 rounded-lg border border-red-100 active:bg-red-100 transition-colors"><Trash2 size={12} /></button>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+});
+
 const NAME_REGEX = /^[A-Za-z\s.',-]+$/;
 
 export default function Registrants() {
-  const { 
-    currentUser, 
-    appSettings, 
-    fetchGlobalSettings, 
-    registrants, 
-    fetchRegistrants, 
-    syncRegistrant, 
-    updateRegistrant,
-    lockEntity,
-    unlockEntity
-  } = useAppStore();
+  const currentUser = useAppStore(s => s.currentUser);
+  const appSettings = useAppStore(s => s.appSettings);
+  const fetchGlobalSettings = useAppStore(s => s.fetchGlobalSettings);
+  const registrants = useAppStore(s => s.registrants);
+  const fetchRegistrants = useAppStore(s => s.fetchRegistrants);
+  const syncRegistrant = useAppStore(s => s.syncRegistrant);
+  const updateRegistrant = useAppStore(s => s.updateRegistrant);
+  const lockEntity = useAppStore(s => s.lockEntity);
+  const unlockEntity = useAppStore(s => s.unlockEntity);
   const user = currentUser; // Cache for stable null-checks
   
   // Use global settings with an internal fallback for the structure
@@ -37,6 +216,7 @@ export default function Registrants() {
   }, []);
 
   // Local state for UI
+  const [searchInput, setSearchInput] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
   const [filterChurch, setFilterChurch] = useState<string>(() => {
     const role = currentUser?.role?.toLowerCase().trim();
@@ -45,6 +225,14 @@ export default function Registrants() {
   });
   const [filterStatus, setFilterStatus] = useState<string>('All');
   const [filterMinistry, setFilterMinistry] = useState<string>('All');
+
+  // Debounce search input
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setSearchTerm(searchInput);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [searchInput]);
 
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 30;
@@ -494,8 +682,8 @@ export default function Registrants() {
             <input
               type="text"
               placeholder="Search delegate..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
+              value={searchInput}
+              onChange={(e) => setSearchInput(e.target.value)}
               className="w-full pl-10 pr-4 py-2 rounded-lg border border-gray-200 focus:outline-none focus:border-brand-brown focus:ring-1 focus:ring-brand-brown transition-all bg-white"
             />
           </div>
@@ -558,80 +746,19 @@ export default function Registrants() {
             </thead>
             <tbody className="divide-y divide-gray-100">
               {paginatedRegistrants.length > 0 ? paginatedRegistrants.map((reg) => (
-                <tr key={reg.id || (reg as any)._id} className="hover:bg-brand-cream/30 transition-colors">
-                  <td className="px-2 lg:px-6 py-4 font-bold text-brand-brown truncate max-w-[80px] md:max-w-[120px] xl:max-w-none text-[10px] lg:text-base leading-tight">{reg.fullName}</td>
-                  <td className="px-2 lg:px-6 py-4 text-center">
-                    <span className="font-medium text-gray-800 text-[9px] lg:text-sm">{reg.age} • {reg.sex?.charAt(0) || 'M'}</span>
-                    <span className="text-[8px] text-gray-400 block mt-0.5 font-bold">{reg.shirtSize}</span>
-                  </td>
-                  <td className="px-2 lg:px-6 py-4 max-w-[120px] lg:max-w-[200px]">
-                    <div className="truncate font-medium text-gray-800 text-[10px] lg:text-sm" title={reg.church}>{reg.church}</div>
-                    <div className="flex flex-wrap gap-0.5 mt-1">
-                      {reg.ministry && reg.ministry.length > 0 ? reg.ministry.map(m => (
-                        <span key={m} className="px-1 py-0.5 bg-brand-sand/30 text-brand-brown border border-brand-sand rounded text-[7px] lg:text-[10px] uppercase font-bold tracking-wider">{m}</span>
-                      )) : <span className="text-[8px] text-gray-300 italic">None</span>}
-                    </div>
-                  </td>
-                  <td className="px-2 lg:px-6 py-4 text-[10px] lg:text-sm">
-                    <span className="block text-gray-800 font-medium leading-tight">{reg.feeType}</span>
-                    <span className="text-[9px] text-gray-400">₱{reg.feeType === 'Early Bird' ? 350 : 500}</span>
-                  </td>
-                  <td className="px-2 lg:px-6 py-4">
-                    <div className="flex flex-col items-center">
-                      <span className={`px-1.5 py-0.5 lg:px-2.5 lg:py-1 rounded-full text-[8px] lg:text-xs font-bold ${reg.paymentStatus === 'Paid' ? 'bg-green-100 text-green-700' :
-                          reg.paymentStatus === 'Partial' ? 'bg-yellow-100 text-yellow-700' :
-                            'bg-red-100 text-red-700'
-                        }`}>
-                        {reg.paymentStatus}
-                      </span>
-                      {reg.paymentStatus !== 'Unpaid' && (
-                        <span className="text-[7px] lg:text-[10px] text-gray-400 font-medium mt-1 uppercase tracking-wider text-center leading-tight">₱{reg.amountPaid} <br className="lg:hidden" /> {reg.paymentMethod?.split(' ')[0]}</span>
-                      )}
-                    </div>
-                  </td>
-                  <td className="px-2 lg:px-6 py-4 text-center">
-                    {canVerify ? (
-                      <button
-                        onClick={() => handleToggleVerify(reg)}
-                        className={`inline-flex items-center justify-center p-1 rounded-lg transition-colors ${reg.verifiedByTreasurer ? 'bg-green-100 text-green-700 hover:bg-green-200' : 'bg-orange-100 text-orange-600 hover:bg-orange-200'
-                          }`}
-                        title={reg.verifiedByTreasurer ? 'Verified by Treasurer' : 'Pending Verification'}
-                      >
-                        {reg.verifiedByTreasurer ? <CheckCircle size={14} className="lg:w-5 lg:h-5" /> : <Clock size={14} className="lg:w-5 lg:h-5" />}
-                      </button>
-                    ) : (
-                      <div className={`inline-flex items-center justify-center p-1 rounded-lg ${reg.verifiedByTreasurer ? 'text-green-500' : 'text-orange-400'}`} title={reg.verifiedByTreasurer ? 'Verified by Treasurer' : 'Pending Verification'}>
-                        {reg.verifiedByTreasurer ? <CheckCircle size={14} className="lg:w-5 lg:h-5" /> : <Clock size={14} className="lg:w-5 lg:h-5" />}
-                      </div>
-                    )}
-                  </td>
-                  <td className="px-2 lg:px-6 py-4 text-right">
-                    {(() => {
-                    const userChurch = currentUser?.church?.toLowerCase().trim();
-                    const regChurch = reg.church?.toLowerCase().trim();
-                    const isOwnChurch = !!userChurch && userChurch === regChurch;
-                    const canEditThis = isAdmin || canEditAny || (rolePerms?.editOwn && isOwnChurch);
-                    const canDeleteThis = isAdmin || canDeleteAny || (rolePerms?.deleteOwn && isOwnChurch);
-                      
-                      if (!canEditThis && !canDeleteThis) return null;
-
-                      return (
-                        <div className="flex items-center justify-end gap-0.5 lg:gap-2">
-                          {canEditThis && (
-                            <button onClick={() => openModalForEdit(reg)} className="p-1 lg:p-2 text-gray-400 hover:text-brand-brown hover:bg-brand-sand/20 rounded-lg transition-colors">
-                              <Edit2 size={14} className="lg:w-4 lg:h-4" />
-                            </button>
-                          )}
-                          {canDeleteThis && (
-                            <button onClick={() => handleDelete(reg)} className="p-1 lg:p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors">
-                              <Trash2 size={14} className="lg:w-4 lg:h-4" />
-                            </button>
-                          )}
-                        </div>
-                      );
-                    })()}
-                  </td>
-                </tr>
+                <RegistrantRow 
+                  key={reg.id || (reg as any)._id}
+                  reg={reg}
+                  canVerify={!!canVerify}
+                  handleToggleVerify={handleToggleVerify}
+                  openModalForEdit={openModalForEdit}
+                  handleDelete={handleDelete}
+                  isAdmin={isAdmin}
+                  canEditAny={canEditAny}
+                  canDeleteAny={canDeleteAny}
+                  rolePerms={rolePerms}
+                  currentUserChurch={currentUser?.church || null}
+                />
               )) : (
                 <tr>
                   <td colSpan={7} className="px-6 py-12 text-center text-gray-400">
@@ -646,65 +773,19 @@ export default function Registrants() {
         {/* Mobile Cards */}
         <div className="md:hidden space-y-1.5 px-0.5 pb-32">
           {paginatedRegistrants.length > 0 ? paginatedRegistrants.map(reg => (
-            <div key={(reg as any)._id || reg.id} className="mobile-card flex flex-col gap-1.5 !p-2">
-              <div className="flex justify-between items-start">
-                <div className="flex-1 min-w-0">
-                  <p className="font-black text-brand-brown text-[13px] leading-tight truncate">{reg.fullName}</p>
-                  <p className="text-[8px] text-gray-400 font-bold uppercase tracking-wider mt-0.5 truncate">{reg.church}</p>
-                </div>
-                <div className={`shrink-0 p-1 rounded-lg transition-all shadow-sm ${reg.verifiedByTreasurer ? 'bg-green-100 text-green-700 border border-green-200' : 'bg-orange-50 text-orange-500 border border-orange-100'}`}>
-                  {canVerify ? (
-                    <button onClick={() => handleToggleVerify(reg)} className="flex items-center justify-center">
-                      {reg.verifiedByTreasurer ? <CheckCircle size={15} /> : <Clock size={15} />}
-                    </button>
-                  ) : (
-                    <div className="flex items-center justify-center">
-                      {reg.verifiedByTreasurer ? <CheckCircle size={15} /> : <Clock size={15} />}
-                    </div>
-                  )}
-                </div>
-              </div>
-              
-              <div className="flex items-center gap-1 flex-wrap">
-                <span className="px-1 py-0.5 bg-brand-cream border border-brand-sand/30 text-brand-brown rounded text-[8px] font-black uppercase leading-none">{reg.age}Y • {reg.sex?.charAt(0) || 'M'}</span>
-                <span className="px-1 py-0.5 bg-brand-brown text-brand-cream rounded text-[8px] font-black uppercase tracking-tighter leading-none">Size {reg.shirtSize}</span>
-                <span className={`px-1 py-0.5 rounded text-[8px] font-black uppercase border leading-none ${reg.paymentStatus === 'Paid' ? 'bg-green-50 text-green-700 border-green-200' :
-                    reg.paymentStatus === 'Partial' ? 'bg-yellow-50 text-yellow-700 border-yellow-200' :
-                      'bg-red-50 text-red-700 border-red-200'
-                  }`}>{reg.paymentStatus}</span>
-                <span className="px-1 py-0.5 bg-blue-50 text-blue-700 rounded text-[8px] font-bold uppercase border border-blue-100 leading-none">{reg.feeType}</span>
-                {reg.ministry && reg.ministry.length > 0 && reg.ministry.map(m => (
-                  <span key={m} className="px-1 py-0.5 bg-gray-50 text-gray-400 text-[8px] font-bold rounded border border-gray-100">{m}</span>
-                ))}
-              </div>
-
-              <div className="flex items-center justify-between mt-0.5 pt-1.5 border-t border-gray-100">
-                <div className="flex items-center gap-1.5">
-                  <span className="text-[8px] text-gray-400 font-bold uppercase tracking-tighter shrink-0">Paid</span>
-                  <span className="text-[11px] font-black text-brand-brown leading-none">₱{reg.amountPaid} <span className="text-[8px] font-medium text-gray-400">{reg.paymentMethod ? `(${reg.paymentMethod.split(' ')[0]})` : ''}</span></span>
-                </div>
-                {(() => {
-                  const userChurch = currentUser?.church?.toLowerCase().trim();
-                  const regChurch = reg.church?.toLowerCase().trim();
-                  const isOwnChurch = !!userChurch && userChurch === regChurch;
-                  const canEditThis = isAdmin || canEditAny || (rolePerms?.editOwn && isOwnChurch);
-                  const canDeleteThis = isAdmin || canDeleteAny || (rolePerms?.deleteOwn && isOwnChurch);
-                  
-                  if (!canEditThis && !canDeleteThis) return null;
-
-                  return (
-                    <div className="flex gap-1">
-                      {canEditThis && (
-                        <button onClick={() => openModalForEdit(reg)} className="p-1 lg:p-1.5 bg-gray-50 text-gray-400 hover:text-brand-brown rounded-lg border border-gray-100 active:bg-brand-sand/20 transition-colors"><Edit2 size={12} /></button>
-                      )}
-                      {canDeleteThis && (
-                        <button onClick={() => handleDelete(reg)} className="p-1 lg:p-1.5 bg-red-50 text-red-300 hover:text-red-500 rounded-lg border border-red-100 active:bg-red-100 transition-colors"><Trash2 size={12} /></button>
-                      )}
-                    </div>
-                  );
-                })()}
-              </div>
-            </div>
+            <RegistrantCard 
+              key={(reg as any)._id || reg.id}
+              reg={reg}
+              canVerify={!!canVerify}
+              handleToggleVerify={handleToggleVerify}
+              openModalForEdit={openModalForEdit}
+              handleDelete={handleDelete}
+              isAdmin={isAdmin}
+              canEditAny={canEditAny}
+              canDeleteAny={canDeleteAny}
+              rolePerms={rolePerms}
+              currentUserChurch={currentUser?.church || null}
+            />
           )) : (
             <div className="mobile-card py-12 text-center text-gray-400">
               <Users size={48} className="mx-auto opacity-10 mb-2" />

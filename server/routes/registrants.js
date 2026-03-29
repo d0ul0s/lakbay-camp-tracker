@@ -74,7 +74,7 @@ router.get('/', requirePermission('registrants', 'view'), async (req, res) => {
     const skip = (pageNum - 1) * limitNum;
 
     const total = await Registrant.countDocuments(query);
-    const registrants = await Registrant.find(query)
+    const registrants = await Registrant.find(query, 'fullName age sex shirtSize church ministry feeType paymentStatus amountPaid paymentMethod verifiedByTreasurer gcRef merchClaims _id')
       .sort({ fullName: 1 })
       .skip(skip)
       .limit(limitNum);

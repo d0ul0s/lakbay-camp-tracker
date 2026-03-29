@@ -5,13 +5,11 @@ import { Link } from 'react-router-dom';
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 
 export default function Dashboard() {
-  const { 
-    currentUser, 
-    registrants, 
-    expenses, 
-    solicitations, 
-    hasBooted
-  } = useAppStore();
+  const currentUser = useAppStore(s => s.currentUser);
+  const registrants = useAppStore(s => s.registrants);
+  const expenses = useAppStore(s => s.expenses);
+  const solicitations = useAppStore(s => s.solicitations);
+  const hasBooted = useAppStore(s => s.hasBooted);
 
   const isAdmin = currentUser?.role?.toLowerCase().trim() === 'admin';
   const roleKey = currentUser?.role?.toLowerCase().trim();
@@ -21,42 +19,77 @@ export default function Dashboard() {
   const canAddRegistrants = isAdmin || rolePerms?.registrants?.add === true;
   const canViewFinancials = isAdmin || rolePerms?.reports?.view === true || rolePerms?.expenses?.viewAll === true;
 
-  // Filter data based on role
-  // All roles now see global stats on dashboard
-  const visibleRegistrants = registrants;
-  const totalRegistrants = visibleRegistrants.length;
-  
-  // Financial stats (Base Values)
-  const totalRegRecorded = visibleRegistrants.reduce((sum, r) => sum + (r.amountPaid || 0), 0);
-  const verifiedReg = visibleRegistrants.filter(r => r.verifiedByTreasurer).reduce((sum, r) => sum + (r.amountPaid || 0), 0);
-  const regGap = totalRegRecorded - verifiedReg;
+  // Financial stats (Memoized)
+  const stats = useMemo(() => {
+    const totalRegRecorded = registrants.reduce((sum, r) => sum + (r.amountPaid || 0), 0);
+    const verifiedReg = registrants.filter(r => r.verifiedByTreasurer).reduce((sum, r) => sum + (r.amountPaid || 0), 0);
+    const regGap = totalRegRecorded - verifiedReg;
 
-  const totalSolRecorded = solicitations.reduce((sum, s) => sum + (s.amount || 0), 0);
-  const verifiedSol = solicitations.filter(s => s.verifiedByTreasurer).reduce((sum, s) => sum + (s.amount || 0), 0);
-  const solGap = totalSolRecorded - verifiedSol;
+    const totalSolRecorded = solicitations.reduce((sum, s) => sum + (s.amount || 0), 0);
+    const verifiedSol = solicitations.filter(s => s.verifiedByTreasurer).reduce((sum, s) => sum + (s.amount || 0), 0);
+    const solGap = totalSolRecorded - verifiedSol;
 
-  const totalExpRecorded = expenses.reduce((sum, e) => sum + (e.amount || 0), 0);
-  const verifiedExp = expenses.filter(e => e.verifiedByTreasurer).reduce((sum, e) => sum + (e.amount || 0), 0);
-  const expGap = totalExpRecorded - verifiedExp;
+    const totalExpRecorded = expenses.reduce((sum, e) => sum + (e.amount || 0), 0);
+    const verifiedExp = expenses.filter(e => e.verifiedByTreasurer).reduce((sum, e) => sum + (e.amount || 0), 0);
+    const expGap = totalExpRecorded - verifiedExp;
 
-  // Merch stats
-  const totalItemsExpected = totalRegistrants * 4;
-  const totalItemsClaimed = visibleRegistrants.reduce((sum, r) => {
-    let claimed = 0;
-    if (r.merchClaims.tshirt) claimed++;
-    if (r.merchClaims.bag) claimed++;
-    if (r.merchClaims.notebook) claimed++;
-    if (r.merchClaims.pen) claimed++;
-    return sum + claimed;
-  }, 0);
+    const totalItemsExpected = registrants.length * 4;
+    const totalItemsClaimed = registrants.reduce((sum, r) => {
+      let claimed = 0;
+      if (r.merchClaims.tshirt) claimed++;
+      if (r.merchClaims.bag) claimed++;
+      if (r.merchClaims.notebook) claimed++;
+      if (r.merchClaims.pen) claimed++;
+      return sum + claimed;
+    }, 0);
 
-  // Derived Totals
-  const totalIncomeVerified = verifiedReg + verifiedSol;
-  const totalExpensesVerified = verifiedExp;
-  const netBalance = totalIncomeVerified - totalExpensesVerified;
-  
-  const totalIncomeRecorded = totalRegRecorded + totalSolRecorded;
-  const totalExpensesRecorded = totalExpRecorded;
+    const totalIncomeVerified = verifiedReg + verifiedSol;
+    const totalExpensesVerified = verifiedExp;
+    const netBalance = totalIncomeVerified - totalExpensesVerified;
+    
+    const totalIncomeRecorded = totalRegRecorded + totalSolRecorded;
+    const totalExpensesRecorded = totalExpRecorded;
+
+    return {
+      totalRegistrants: registrants.length,
+      totalRegRecorded,
+      verifiedReg,
+      regGap,
+      totalSolRecorded,
+      verifiedSol,
+      solGap,
+      totalExpRecorded,
+      verifiedExp,
+      expGap,
+      totalItemsExpected,
+      totalItemsClaimed,
+      totalIncomeVerified,
+      totalExpensesVerified,
+      netBalance,
+      totalIncomeRecorded,
+      totalExpensesRecorded
+    };
+  }, [registrants, solicitations, expenses]);
+
+  const {
+    totalRegistrants,
+    totalRegRecorded,
+    verifiedReg,
+    regGap,
+    totalSolRecorded,
+    verifiedSol,
+    solGap,
+    totalExpRecorded,
+    verifiedExp,
+    expGap,
+    totalItemsExpected,
+    totalItemsClaimed,
+    totalIncomeVerified,
+    totalExpensesVerified,
+    netBalance,
+    totalIncomeRecorded,
+    totalExpensesRecorded
+  } = stats;
 
   // Charts use TOTAL recorded for better visualization of progress
   const incomeBreakdown = useMemo(() => [

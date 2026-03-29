@@ -13,6 +13,7 @@ if (window.location.hostname === 'localhost' || window.location.hostname.startsW
 const api = axios.create({
   baseURL: defaultBaseUrl,
   withCredentials: true,
+  timeout: 30000,
 });
 
 // Attach stored JWT as Authorization Bearer header on every request.
