@@ -67,6 +67,10 @@ router.get('/summary', requirePermission('solicitations', 'view'), async (req, r
 
 
 router.post('/', requirePermission('solicitations', 'add'), async (req, res) => {
+  if (req.user.role !== 'admin') {
+    delete req.body.verifiedByTreasurer;
+    delete req.body.verifiedAt;
+  }
   const record = new Solicitation({ ...req.body, createdBy: req.user.id });
   try {
     const newRecord = await record.save();

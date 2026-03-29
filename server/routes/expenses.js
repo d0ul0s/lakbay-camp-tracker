@@ -65,6 +65,10 @@ router.get('/summary', requirePermission('expenses', 'view'), async (req, res) =
 
 
 router.post('/', requirePermission('expenses', 'add'), async (req, res) => {
+  if (req.user.role !== 'admin') {
+    delete req.body.verifiedByTreasurer;
+    delete req.body.verifiedAt;
+  }
   const expense = new Expense({ ...req.body, createdBy: req.user.id });
   try {
     const newExpense = await expense.save();
@@ -93,6 +97,10 @@ router.post('/batch', requirePermission('expenses', 'add'), async (req, res) => 
     
     const savedDocs = [];
     for (const data of expenses) {
+      if (req.user.role !== 'admin') {
+        delete data.verifiedByTreasurer;
+        delete data.verifiedAt;
+      }
       const expense = new Expense({ ...data, createdBy: req.user.id });
       const newExpense = await expense.save();
       savedDocs.push(newExpense);

@@ -158,8 +158,11 @@ router.post('/', requirePermission('registrants', 'add'), async (req, res) => {
       return res.status(400).json({ message: `Registrant "${fullName}" already exists in the system.` });
     }
 
-    if (role !== 'admin' && userChurch) {
-      req.body.church = userChurch;
+    if (role !== 'admin') {
+      if (userChurch) req.body.church = userChurch;
+      // Security: Prevent auto-verifying new records
+      delete req.body.verifiedByTreasurer;
+      delete req.body.verifiedAt;
     }
 
     const registrant = new Registrant(req.body);
@@ -213,8 +216,11 @@ router.post('/batch', requirePermission('registrants', 'add'), async (req, res) 
         return res.status(400).json({ message: `Registrant "${trimmedName}" already exists in the system.` });
       }
 
-      if (role !== 'admin' && userChurch) {
-        data.church = userChurch;
+      if (role !== 'admin') {
+        if (userChurch) data.church = userChurch;
+        // Security: Prevent auto-verifying batch imported records
+        delete data.verifiedByTreasurer;
+        delete data.verifiedAt;
       }
       const registrant = new Registrant(data);
       const newRegistrant = await registrant.save();
@@ -288,6 +294,10 @@ router.put('/:id', async (req, res) => {
         delete req.body.merchClaims;
         delete req.body.merchClaimDates;
       }
+
+      // 4. Verification Security
+      // Prevent coordinators from bypassing verification by silently passing it in the edit payload
+      delete req.body.verifiedByTreasurer;
     }
 
     const updatedRegistrant = await Registrant.findByIdAndUpdate(req.params.id, req.body, { new: true });

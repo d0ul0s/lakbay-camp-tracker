@@ -429,7 +429,7 @@ export default function Registrants() {
   const openModalForNew = () => {
     setFormData({
       ...initialForm,
-      church: (roleKey === 'coordinator' || roleKey === 'treasurer') && user?.church ? user.church : (settings.churches[0] || '')
+      church: (roleKey === 'coordinator') && user?.church ? user.church : (settings.churches[0] || '')
     });
     setEditingId(null);
     setFormError(null);
@@ -439,7 +439,7 @@ export default function Registrants() {
   const openBatchModal = () => {
     setBatchData([{ 
       ...initialForm, 
-      church: (roleKey === 'coordinator' || roleKey === 'treasurer') && user?.church ? user.church : (settings.churches[0] || '') 
+      church: (roleKey === 'coordinator') && user?.church ? user.church : (settings.churches[0] || '') 
     }]);
     setBatchError(null);
     setIsBatchModalOpen(true);
@@ -477,7 +477,7 @@ export default function Registrants() {
   const addBatchRow = () => {
     setBatchData([...batchData, { 
       ...initialForm, 
-      church: (roleKey === 'coordinator' || roleKey === 'treasurer') && user?.church ? user.church : (settings.churches[0] || '') 
+      church: (roleKey === 'coordinator') && user?.church ? user.church : (settings.churches[0] || '') 
     }]);
   };
 
