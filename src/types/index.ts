@@ -76,7 +76,7 @@ export interface AppSettings {
   permissionMatrix?: PermissionMatrix;
 }
 
-export type UserRole = 'admin' | 'coordinator' | 'treasurer';
+export type UserRole = 'admin' | 'coordinator';
 
 export interface PermissionMatrixRole {
   dashboard: { view: boolean };

@@ -13,10 +13,9 @@ export default function Reports() {
   const [solicitations, setSolicitations] = useState<Solicitation[]>([]);
   
   const isAdmin = currentUser?.role?.toLowerCase().trim() === 'admin';
-  const isTreasurer = currentUser?.role?.toLowerCase().trim() === 'treasurer';
   const rolePerms = currentUser?.permissionMatrix?.[currentUser.role!];
-  const canViewExpenses = isAdmin || isTreasurer || (rolePerms?.expenses?.view === true);
-  const canViewSolicitations = isAdmin || isTreasurer || (rolePerms?.solicitations?.view === true);
+  const canViewExpenses = isAdmin || (rolePerms?.expenses?.view === true);
+  const canViewSolicitations = isAdmin || (rolePerms?.solicitations?.view === true);
   useEffect(() => {
     const fetchData = async () => {
       try {
@@ -46,7 +45,7 @@ export default function Reports() {
 
   const exportRegistrants = () => {
     const dataList = Array.isArray(registrants) ? registrants : [];
-    const filtered = (isAdmin || isTreasurer ? dataList : dataList.filter(r => r.church === currentUser?.church));
+    const filtered = (isAdmin ? dataList : dataList.filter(r => r.church === currentUser?.church));
     const data = filtered.map(r => ({
       'Full Name': r.fullName,
       'Age': r.age,

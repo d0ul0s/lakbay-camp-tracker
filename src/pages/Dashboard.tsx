@@ -308,12 +308,12 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* Verified Gap Table (Admin/Treasurer) */}
+      {/* Verified Gap Table (Admin) */}
       {canViewFinancials && (
-        <div className="bg-white rounded-2xl shadow-sm border border-brand-beige overflow-hidden">
+        <div className="bg-white rounded-2xl shadow-sm border border-brand-beige overflow-hidden col-span-1 lg:col-span-2">
           <div className="px-6 py-4 border-b border-gray-100 bg-gray-50/50 flex items-center gap-2">
             <ShieldCheck size={20} className="text-brand-brown" />
-            <h3 className="font-display text-xl text-brand-brown tracking-wide">Treasurer Verification Gap</h3>
+            <h3 className="font-display text-xl text-brand-brown tracking-wide">Verification Gap</h3>
           </div>
           {/* Mobile Card List */}
           <div className="md:hidden divide-y divide-gray-100">

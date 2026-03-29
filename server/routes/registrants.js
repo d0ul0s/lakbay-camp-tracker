@@ -259,28 +259,34 @@ router.put('/:id', async (req, res) => {
 
     if (role !== 'admin') {
       const perms = req.permissionMatrix[role].registrants;
-      // Check church ownership
-      // Case-insensitive/trimmed comparison
+      
+      // 1. Church Ownership Check
       const uChurch = userChurch?.toLowerCase().trim();
       const rChurch = registrant.church?.toLowerCase().trim();
+      
       if (uChurch !== rChurch && !perms.editAny) {
         return res.status(403).json({ message: 'Unauthorized: You can only edit registrants from your own church.' });
       }
 
-      // Check merch edit permission
-      const merchPerms = req.permissionMatrix[role].merch;
-      if (req.body.merchClaims || req.body.merchClaimDates) {
-        if (!merchPerms.toggleAll && (!merchPerms.toggleOwn || registrant.church !== userChurch)) {
-          return res.status(403).json({ message: 'Unauthorized: You do not have permission to update merch claims.' });
-        }
-      }
-    }
-
-    // Secure backend: enforce own church if not editAny
-    if (role !== 'admin') {
-      const perms = req.permissionMatrix[role].registrants;
+      // 2. Enforce Church Field Security
       if (!perms.editAny && userChurch) {
          req.body.church = userChurch;
+      }
+
+      // 3. Merch Claims Security (Graceful fallback instead of 403 crash)
+      const merchPerms = req.permissionMatrix[role].merch;
+      let canEditMerch = false;
+      if (merchPerms.toggleAll) {
+         canEditMerch = true;
+      } else if (merchPerms.toggleOwn && uChurch === rChurch) {
+         canEditMerch = true;
+      }
+
+      if (!canEditMerch) {
+        // Automatically drop merch fields from the update payload if they lack permission.
+        // This allows them to successfully save name/age/shirt edits without the backend crashing.
+        delete req.body.merchClaims;
+        delete req.body.merchClaimDates;
       }
     }
 

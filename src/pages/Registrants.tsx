@@ -73,12 +73,12 @@ const RegistrantRow = memo(({
             onClick={() => handleToggleVerify(reg)}
             className={`inline-flex items-center justify-center p-1 rounded-lg transition-colors ${reg.verifiedByTreasurer ? 'bg-green-100 text-green-700 hover:bg-green-200' : 'bg-orange-100 text-orange-600 hover:bg-orange-200'
               }`}
-            title={reg.verifiedByTreasurer ? 'Verified by Treasurer' : 'Pending Verification'}
+            title={reg.verifiedByTreasurer ? 'Verified' : 'Pending Verification'}
           >
             {reg.verifiedByTreasurer ? <CheckCircle size={14} className="lg:w-5 lg:h-5" /> : <Clock size={14} className="lg:w-5 lg:h-5" />}
           </button>
         ) : (
-          <div className={`inline-flex items-center justify-center p-1 rounded-lg ${reg.verifiedByTreasurer ? 'text-green-500' : 'text-orange-400'}`} title={reg.verifiedByTreasurer ? 'Verified by Treasurer' : 'Pending Verification'}>
+          <div className={`inline-flex items-center justify-center p-1 rounded-lg ${reg.verifiedByTreasurer ? 'text-green-500' : 'text-orange-400'}`} title={reg.verifiedByTreasurer ? 'Verified' : 'Pending Verification'}>
             {reg.verifiedByTreasurer ? <CheckCircle size={14} className="lg:w-5 lg:h-5" /> : <Clock size={14} className="lg:w-5 lg:h-5" />}
           </div>
         )}
@@ -267,7 +267,6 @@ export default function Registrants() {
   const [batchError, setBatchError] = useState<string | null>(null);
 
   const isAdmin = currentUser?.role?.toLowerCase().trim() === 'admin';
-  const isTreasurer = currentUser?.role?.toLowerCase().trim() === 'treasurer';
   const roleKey = currentUser?.role?.toLowerCase().trim();
   const rolePerms = roleKey ? currentUser?.permissionMatrix?.[roleKey]?.registrants : undefined;
   
@@ -275,7 +274,7 @@ export default function Registrants() {
   const canAdd = isAdmin || (rolePerms?.add === true);
   const canEditAny = isAdmin || (rolePerms?.editAny === true);
   const canDeleteAny = isAdmin || (rolePerms?.deleteAny === true);
-  const canVerify = isAdmin || (isTreasurer && currentUser?.permissionMatrix?.[currentUser.role]?.registrants?.viewAll); // Custom logic for treasurer verification if needed or just use treasurer role
+  const canVerify = isAdmin;
 
   if (!canView) {
     return (
@@ -296,7 +295,7 @@ export default function Registrants() {
     sex: 'Male',
     ministry: [],
     shirtSize: 'M',
-    church: (roleKey === 'coordinator' || roleKey === 'treasurer') && user?.church ? user.church : '',
+    church: (roleKey === 'coordinator') && user?.church ? user.church : '',
     feeType: 'Regular',
     paymentStatus: 'Unpaid',
     paymentMethod: 'Cash' as any,
@@ -596,8 +595,8 @@ export default function Registrants() {
         </div>
       </div>
 
-      {/* Per-Church Summary (For Admins & Treasurers) */}
-      {(isAdmin || isTreasurer) && (
+      {/* Per-Church Summary (For Admins) */}
+      {(isAdmin) && (
         <div className="bg-white p-5 rounded-2xl shadow-sm border border-brand-beige">
           <div className="flex items-center justify-between mb-4 border-b border-gray-100 pb-2">
             <h3 className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Financial Performance Snapshot</h3>

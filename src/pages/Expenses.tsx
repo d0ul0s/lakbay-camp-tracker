@@ -34,7 +34,7 @@ export default function Expenses() {
   const canAdd = isAdmin || (rolePerms?.add === true);
   const canEditAny = isAdmin || (rolePerms?.editAny === true);
   const canDeleteAny = isAdmin || (rolePerms?.deleteAny === true);
-  const canVerify = isAdmin || (roleKey === 'treasurer' && rolePerms?.viewAll);
+  const canVerify = isAdmin;
 
   if (!canView) {
     return (
@@ -511,7 +511,7 @@ export default function Expenses() {
                 <tr className="bg-green-50/40 text-xs border-b border-gray-100">
                   <td colSpan={6} className="px-6 py-1.5 text-gray-500">
                     <span className="flex items-center gap-4">
-                      <span className="flex items-center gap-1.5"><CheckCircle size={13} className="text-green-600" /> Verified by Treasurer</span>
+                      <span className="flex items-center gap-1.5"><CheckCircle size={13} className="text-green-600" /> Verified</span>
                       <span className="flex items-center gap-1.5"><Clock size={13} className="text-orange-500" /> Pending verification</span>
                     </span>
                   </td>
@@ -539,12 +539,12 @@ export default function Expenses() {
                           onClick={() => handleToggleVerify(exp)}
                           className={`inline-flex items-center justify-center p-1.5 rounded-lg transition-colors ${exp.verifiedByTreasurer ? 'bg-green-100 text-green-700 hover:bg-green-200' : 'bg-orange-100 text-orange-600 hover:bg-orange-200'
                             }`}
-                          title={exp.verifiedByTreasurer ? 'Verified by Treasurer' : 'Pending Verification'}
+                          title={exp.verifiedByTreasurer ? 'Verified' : 'Pending Verification'}
                         >
                           {exp.verifiedByTreasurer ? <CheckCircle size={18} className="lg:w-5 lg:h-5" /> : <Clock size={18} className="lg:w-5 lg:h-5" />}
                         </button>
                       ) : (
-                        <div className={`inline-flex items-center justify-center p-1.5 rounded-lg ${exp.verifiedByTreasurer ? 'text-green-500' : 'text-orange-400'}`} title={exp.verifiedByTreasurer ? 'Verified by Treasurer' : 'Pending Verification'}>
+                        <div className={`inline-flex items-center justify-center p-1.5 rounded-lg ${exp.verifiedByTreasurer ? 'text-green-500' : 'text-orange-400'}`} title={exp.verifiedByTreasurer ? 'Verified' : 'Pending Verification'}>
                           {exp.verifiedByTreasurer ? <CheckCircle size={18} className="lg:w-5 lg:h-5" /> : <Clock size={18} className="lg:w-5 lg:h-5" />}
                         </div>
                       )}

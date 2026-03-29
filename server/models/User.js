@@ -6,7 +6,7 @@ const userSchema = new mongoose.Schema({
   pin: { type: String, required: true },
   role: {
     type: String,
-    enum: ['admin', 'coordinator', 'treasurer'],
+    enum: ['admin', 'coordinator'],
     required: true
   }
 });

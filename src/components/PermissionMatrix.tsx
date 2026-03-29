@@ -69,7 +69,7 @@ const PAGES = [
   },
 ];
 
-const ROLES: ('treasurer' | 'coordinator')[] = ['treasurer', 'coordinator'];
+const ROLES: ('coordinator')[] = ['coordinator'];
 
 export default function PermissionMatrixUI() {
   const { appSettings, fetchGlobalSettings, refreshPermissions, setGlobalError } = useAppStore();
@@ -303,7 +303,7 @@ export default function PermissionMatrixUI() {
       <ConfirmModal
         isOpen={isConfirmOpen}
         title="Apply Permission Changes?"
-        message="This will immediately update access rights for all coordinators and treasurers across the system. Users may need to refresh their page to see UI changes."
+        message="This will immediately update access rights for all coordinators across the system. Users may need to refresh their page to see UI changes."
         confirmLabel="Save & Apply"
         onCancel={() => setIsConfirmOpen(false)}
         onConfirm={handleSave}
