@@ -262,6 +262,19 @@ export default function PublicOrganization() {
                       )}
                     </div>
 
+                    {(g.grabMasters?.[0] || g.grabMasters?.[1]) && (
+                      <div className="grid grid-cols-2 gap-3 mt-2">
+                        <div className="flex flex-col justify-center gap-1.5 p-2.5 bg-gray-50/80 rounded-xl border border-gray-100 hover:bg-gray-50 transition-colors">
+                          <div className="flex items-center gap-1.5"><Hand size={14} className="text-gray-500"/> <p className="text-[9px] font-black uppercase text-gray-500 tracking-widest leading-none truncate">Grab Master 1</p></div>
+                          <p className="text-xs md:text-sm font-bold text-gray-800 truncate px-1">{g.grabMasters[0] || '-'}</p>
+                        </div>
+                        <div className="flex flex-col justify-center gap-1.5 p-2.5 bg-gray-50/80 rounded-xl border border-gray-100 hover:bg-gray-50 transition-colors">
+                          <div className="flex items-center gap-1.5"><Hand size={14} className="text-gray-500"/> <p className="text-[9px] font-black uppercase text-gray-500 tracking-widest leading-none truncate">Grab Master 2</p></div>
+                          <p className="text-xs md:text-sm font-bold text-gray-800 truncate px-1">{g.grabMasters[1] || '-'}</p>
+                        </div>
+                      </div>
+                    )}
+
                     {g.facilitators?.length > 0 && (
                       <div className="mt-5 border-t border-gray-100 pt-4 bg-indigo-50/30 -mx-6 px-6 pb-2">
                          <h5 className="text-[10px] font-black uppercase text-indigo-400 tracking-widest mb-3 flex items-center gap-2">
@@ -275,16 +288,6 @@ export default function PublicOrganization() {
                       </div>
                     )}
 
-                    {g.grabMasters?.length > 0 && (
-                      <div className="mt-5 border-t border-gray-100 pt-4">
-                         <h5 className="text-[10px] font-black uppercase text-brand-brown/50 tracking-widest flex items-center gap-1.5 mb-3"><Hand size={14} className="text-brand-brown/70" /> Grab Masters</h5>
-                         <div className="flex flex-wrap gap-2">
-                           {g.grabMasters.map((gm, i) => (
-                             <span key={i} className="bg-gray-100 text-gray-800 border border-gray-200 text-xs px-2.5 py-1 rounded-md font-bold">{gm}</span>
-                           ))}
-                         </div>
-                      </div>
-                    )}
 
                     {g.members?.length > 0 && (
                       <div className="mt-5 border-t border-gray-100 pt-4 pb-2">

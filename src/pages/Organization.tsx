@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAppStore } from '../store';
-import { Users, Shield, X, Edit2, Map, Tent, Star, Flag, Target, Hand, Loader2, ExternalLink } from 'lucide-react';
+import { Users, Shield, X, Edit2, Map, Tent, Star, Flag, Target, Hand, Loader2, ExternalLink, Search, Check, ChevronDown } from 'lucide-react';
 import api from '../api/axios';
 
 interface CampLeader {
@@ -35,12 +35,89 @@ const getCategories = (l: CampLeader) => {
   return [];
 };
 
+// Searchable Input Component for Group Roles
+const SearchableRoleInput = ({ label, icon, value, onChange, options, placeholder }: { label: string, icon: React.ReactNode, value: string, onChange: (val: string) => void, options: any[], placeholder: string }) => {
+   const [isOpen, setIsOpen] = useState(false);
+   const [search, setSearch] = useState('');
+   
+   const filtered = options.filter(o => o.fullName.toLowerCase().includes(search.toLowerCase()));
+
+   return (
+      <div className="relative group/role">
+         <label className="block text-[11px] text-gray-500 font-bold mb-1 uppercase tracking-tight flex items-center">{icon}{label}</label>
+         <div className="relative">
+            <input 
+               type="text" 
+               value={value} 
+               onChange={e => onChange(e.target.value)}
+               onFocus={() => setIsOpen(true)}
+               className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:border-brand-brown outline-none font-medium pr-8" 
+               placeholder={placeholder}
+            />
+            <button 
+               type="button" 
+               onClick={() => setIsOpen(!isOpen)} 
+               className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-brand-brown"
+            >
+               <ChevronDown size={14} className={`transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+            </button>
+         </div>
+
+         {isOpen && (
+            <>
+               <div className="fixed inset-0 z-[110]" onClick={() => setIsOpen(false)}></div>
+               <div className="absolute left-0 right-0 top-full mt-1 bg-white border border-gray-200 rounded-xl shadow-xl z-[120] max-h-48 overflow-y-auto custom-scrollbar animate-in fade-in zoom-in-95 duration-100">
+                  <div className="p-2 sticky top-0 bg-white border-b border-gray-50">
+                     <div className="flex items-center gap-2 bg-gray-50 rounded-lg px-2 py-1.5">
+                        <Search size={12} className="text-gray-400" />
+                        <input 
+                           type="text" 
+                           placeholder="Filter participants..." 
+                           className="bg-transparent text-xs outline-none w-full font-medium"
+                           value={search}
+                           onChange={e => setSearch(e.target.value)}
+                           autoFocus
+                        />
+                     </div>
+                  </div>
+                  <div className="py-1">
+                     {filtered.length === 0 ? (
+                        <p className="p-3 text-[10px] text-gray-400 italic text-center">No participants found.</p>
+                     ) : (
+                        filtered.map(o => (
+                           <button 
+                              key={o.id}
+                              type="button"
+                              onClick={() => {
+                                 onChange(o.fullName);
+                                 setIsOpen(false);
+                                 setSearch('');
+                              }}
+                              className="w-full text-left px-3 py-2 hover:bg-brand-cream hover:text-brand-brown transition-colors flex items-center justify-between group"
+                           >
+                              <div className="min-w-0">
+                                 <p className="text-xs font-bold leading-tight truncate">{o.fullName}</p>
+                                 <p className="text-[9px] text-gray-400 font-medium truncate uppercase tracking-tighter">{o.church}</p>
+                              </div>
+                              {value === o.fullName && <Check size={12} className="text-brand-brown" />}
+                           </button>
+                        ))
+                     )}
+                  </div>
+               </div>
+            </>
+         )}
+      </div>
+   );
+};
+
 export default function Organization() {
   const { currentUser, appSettings, isServerAwake } = useAppStore();
   const isAdmin = currentUser?.role === 'admin';
 
   const [leaders, setLeaders] = useState<CampLeader[]>([]);
   const [groups, setGroups] = useState<CampGroup[]>([]);
+  const [registrants, setRegistrants] = useState<{ id: string, fullName: string, church: string }[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   // Modals
@@ -53,16 +130,14 @@ export default function Organization() {
 
   // Local raw input states for comma-separated fields to fix space-typing bug
   const [facilRaw, setFacilRaw] = useState('');
-  const [grabRaw, setGrabRaw] = useState('');
   const [membersRaw, setMembersRaw] = useState('');
 
   useEffect(() => {
     if (groupModal.isOpen && groupModal.group) {
       setFacilRaw(groupModal.group.facilitators?.join(', ') || '');
-      setGrabRaw(groupModal.group.grabMasters?.join(', ') || '');
       setMembersRaw(groupModal.group.members?.join(', ') || '');
     } else if (groupModal.isOpen) {
-      setFacilRaw(''); setGrabRaw(''); setMembersRaw('');
+      setFacilRaw(''); setMembersRaw('');
     }
   }, [groupModal.isOpen, groupModal.group]);
 
@@ -75,12 +150,14 @@ export default function Organization() {
   const fetchData = async () => {
     setIsLoading(true);
     try {
-      const [leadersRes, groupsRes] = await Promise.all([
+      const [leadersRes, groupsRes, registrantsRes] = await Promise.all([
         api.get('/api/org/leaders'),
-        api.get('/api/org/groups')
+        api.get('/api/org/groups'),
+        api.get('/api/org/registrants')
       ]);
       setLeaders(leadersRes.data);
       setGroups(groupsRes.data);
+      setRegistrants(registrantsRes.data);
     } catch (err) {
       console.error('Failed to load org data', err);
     } finally {
@@ -412,6 +489,25 @@ export default function Organization() {
                       )}
                     </div>
 
+                    {(g.grabMasters?.[0] || g.grabMasters?.[1]) && (
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="flex items-center gap-2 p-2 bg-gray-50/80 rounded-xl border border-gray-100">
+                          <div className="bg-gray-200 p-1 rounded-md text-gray-600 shrink-0"><Hand size={14} /></div>
+                          <div className="min-w-0">
+                            <p className="text-[9px] font-black uppercase text-gray-500 tracking-widest leading-none mb-0.5 truncate">Grab Master 1</p>
+                            <p className="text-xs font-bold text-gray-800 truncate">{g.grabMasters[0] || '-'}</p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2 p-2 bg-gray-50/80 rounded-xl border border-gray-100">
+                          <div className="bg-gray-200 p-1 rounded-md text-gray-600 shrink-0"><Hand size={14} /></div>
+                          <div className="min-w-0">
+                            <p className="text-[9px] font-black uppercase text-gray-500 tracking-widest leading-none mb-0.5 truncate">Grab Master 2</p>
+                            <p className="text-xs font-bold text-gray-800 truncate">{g.grabMasters[1] || '-'}</p>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
                     {g.facilitators?.length > 0 && (
                       <div className="mt-4 border-t border-gray-100 pt-3">
                          <h5 className="text-[10px] font-black uppercase text-gray-400 tracking-widest mb-2 flex items-center gap-1.5">
@@ -420,17 +516,6 @@ export default function Organization() {
                          <div className="flex flex-wrap gap-1.5">
                            {g.facilitators.map((facil, i) => (
                              <span key={i} className="bg-indigo-50/80 text-indigo-700 border border-indigo-100 text-[11px] px-2.5 py-1 rounded-md font-bold shadow-sm">{facil}</span>
-                           ))}
-                         </div>
-                      </div>
-                    )}
-
-                    {g.grabMasters?.length > 0 && (
-                      <div className="mt-4 border-t border-gray-100 pt-3">
-                         <h5 className="text-[10px] font-black uppercase text-gray-400 tracking-widest flex items-center gap-1.5 mb-2"><Hand size={12} className="text-brand-brown" /> Grab Masters</h5>
-                         <div className="flex flex-wrap gap-1.5">
-                           {g.grabMasters.map((gm, i) => (
-                             <span key={i} className="bg-gray-100 text-gray-700 text-[11px] px-2 py-1 rounded-md font-bold">{gm}</span>
                            ))}
                          </div>
                       </div>
@@ -545,22 +630,63 @@ export default function Organization() {
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-gray-50 p-4 rounded-2xl border border-gray-100">
                      <h4 className="md:col-span-2 text-[10px] font-black uppercase text-brand-brown tracking-widest border-b border-gray-200 pb-2 mb-2">Key Core Roles</h4>
-                     <div>
-                        <label className="block text-[11px] text-gray-500 font-bold mb-1"><Star size={12} className="inline mr-1 text-orange-500" />Leader Name</label>
-                        <input type="text" value={groupForm.leader} onChange={e => setGroupForm({...groupForm, leader: e.target.value})} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:border-orange-400 outline-none" />
-                     </div>
-                     <div>
-                        <label className="block text-[11px] text-gray-500 font-bold mb-1"><Shield size={12} className="inline mr-1 text-amber-500" />Assistant Leader Name</label>
-                        <input type="text" value={groupForm.assistantLeader} onChange={e => setGroupForm({...groupForm, assistantLeader: e.target.value})} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:border-amber-400 outline-none" />
-                     </div>
-                     <div>
-                        <label className="block text-[11px] text-gray-500 font-bold mb-1"><Target size={12} className="inline mr-1 text-blue-500" />Point Keeper Name</label>
-                        <input type="text" value={groupForm.pointKeeper} onChange={e => setGroupForm({...groupForm, pointKeeper: e.target.value})} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:border-blue-400 outline-none" />
-                     </div>
-                     <div>
-                        <label className="block text-[11px] text-gray-500 font-bold mb-1"><Flag size={12} className="inline mr-1 text-red-500" />Flag Bearer Name</label>
-                        <input type="text" value={groupForm.flagBearer} onChange={e => setGroupForm({...groupForm, flagBearer: e.target.value})} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:border-red-400 outline-none" />
-                     </div>
+                     {/* SEARCHABLE CORE ROLES */}
+                     <SearchableRoleInput 
+                        label="Leader Name" 
+                        icon={<Star size={12} className="inline mr-1 text-orange-500" />} 
+                        value={groupForm.leader || ''} 
+                        onChange={val => setGroupForm({...groupForm, leader: val})} 
+                        options={registrants}
+                        placeholder="Search participant..."
+                     />
+                     <SearchableRoleInput 
+                        label="Assistant Leader Name" 
+                        icon={<Shield size={12} className="inline mr-1 text-amber-500" />} 
+                        value={groupForm.assistantLeader || ''} 
+                        onChange={val => setGroupForm({...groupForm, assistantLeader: val})} 
+                        options={registrants}
+                        placeholder="Search participant..."
+                     />
+                     <SearchableRoleInput 
+                        label="Point Keeper Name" 
+                        icon={<Target size={12} className="inline mr-1 text-blue-500" />} 
+                        value={groupForm.pointKeeper || ''} 
+                        onChange={val => setGroupForm({...groupForm, pointKeeper: val})} 
+                        options={registrants}
+                        placeholder="Search participant..."
+                     />
+                     <SearchableRoleInput 
+                        label="Flag Bearer Name" 
+                        icon={<Flag size={12} className="inline mr-1 text-red-500" />} 
+                        value={groupForm.flagBearer || ''} 
+                        onChange={val => setGroupForm({...groupForm, flagBearer: val})} 
+                        options={registrants}
+                        placeholder="Search participant..."
+                     />
+                     <SearchableRoleInput 
+                        label="Grab Master 1" 
+                        icon={<Hand size={12} className="inline mr-1 text-gray-500" />} 
+                        value={groupForm.grabMasters?.[0] || ''} 
+                        onChange={val => {
+                           const next = [...(groupForm.grabMasters || [])];
+                           next[0] = val;
+                           setGroupForm({...groupForm, grabMasters: next});
+                        }} 
+                        options={registrants}
+                        placeholder="Search participant..."
+                     />
+                     <SearchableRoleInput 
+                        label="Grab Master 2" 
+                        icon={<Hand size={12} className="inline mr-1 text-gray-500" />} 
+                        value={groupForm.grabMasters?.[1] || ''} 
+                        onChange={val => {
+                           const next = [...(groupForm.grabMasters || [])];
+                           next[1] = val;
+                           setGroupForm({...groupForm, grabMasters: next});
+                        }} 
+                        options={registrants}
+                        placeholder="Search participant..."
+                     />
                   </div>
 
                   <div className="space-y-4">
@@ -632,22 +758,60 @@ export default function Organization() {
                   </div>
 
                   <div className="space-y-4">
-                     <label className="block text-[11px] text-gray-500 font-bold uppercase tracking-widest flex items-center gap-1"><Hand size={14} className="text-gray-400" /> Grab Masters (Youths)</label>
-                     <input 
-                        type="text" 
-                        value={grabRaw} 
-                        onChange={e => {
-                           const val = e.target.value;
-                           setGrabRaw(val);
-                           setGroupForm({...groupForm, grabMasters: val.split(',').map(s=>s.trim()).filter(Boolean)});
-                        }} 
-                        className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:border-brand-brown outline-none font-medium bg-white" 
-                        placeholder="Type youth names separated by comma..." 
-                     />
-                  </div>
+                     <div className="flex items-center justify-between">
+                        <label className="block text-[11px] text-gray-500 font-bold mb-1 uppercase tracking-widest">Normal Members (Comma separated)</label>
+                        <span className="text-[10px] text-gray-400 font-bold uppercase">Click names below to add/remove:</span>
+                     </div>
+                     
+                     {/* MEMBER PICKER GRID */}
+                     <div className="bg-gray-50/50 border border-gray-100 rounded-2xl p-4 overflow-hidden">
+                        <div className="flex items-center gap-2 mb-3 bg-white border border-gray-200 rounded-xl px-3 py-2 shadow-sm">
+                           <Search size={14} className="text-gray-400" />
+                           <input 
+                              type="text" 
+                              placeholder="Search participant list..." 
+                              className="text-xs bg-transparent outline-none w-full font-medium" 
+                              id="memberFilter"
+                              onChange={(e) => {
+                                 const val = e.target.value.toLowerCase();
+                                 const items = document.querySelectorAll('.member-pick-item');
+                                 items.forEach((item: any) => {
+                                    const name = item.dataset.name.toLowerCase();
+                                    item.style.display = name.includes(val) ? 'flex' : 'none';
+                                 });
+                              }}
+                           />
+                        </div>
+                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5 max-h-48 overflow-y-auto custom-scrollbar pr-2">
+                           {registrants.map(r => {
+                              const isSelected = (groupForm.members || []).includes(r.fullName);
+                              return (
+                                 <button 
+                                    key={r.id} 
+                                    type="button"
+                                    data-name={r.fullName}
+                                    onClick={() => {
+                                       const current = groupForm.members || [];
+                                       const next = isSelected ? current.filter(m => m !== r.fullName) : [...current, r.fullName];
+                                       setGroupForm({...groupForm, members: next});
+                                       setMembersRaw(next.join(', '));
+                                    }}
+                                    className={`member-pick-item flex items-center gap-2 px-2.5 py-1.5 rounded-lg border text-[10px] font-bold transition-all text-left ${
+                                       isSelected 
+                                          ? 'bg-brand-brown border-brand-brown text-white shadow-sm' 
+                                          : 'bg-white border-gray-200 text-gray-600 hover:border-gray-400 hover:bg-gray-50'
+                                    }`}
+                                 >
+                                    <div className={`w-3 h-3 rounded flex items-center justify-center border shrink-0 ${isSelected ? 'bg-white border-white text-brand-brown' : 'bg-gray-50 border-gray-300'}`}>
+                                       {isSelected && <Check size={8} strokeWidth={4} />}
+                                    </div>
+                                    <span className="truncate">{r.fullName}</span>
+                                 </button>
+                              );
+                           })}
+                        </div>
+                     </div>
 
-                  <div>
-                     <label className="block text-[11px] text-gray-500 font-bold mb-1 uppercase tracking-widest">Normal Members (Comma separated)</label>
                      <textarea 
                         value={membersRaw} 
                         onChange={e => {
@@ -657,7 +821,7 @@ export default function Organization() {
                         }} 
                         rows={4} 
                         className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:border-brand-brown outline-none font-medium leading-relaxed custom-scrollbar" 
-                        placeholder="Paste all member names here separated by commas..." 
+                        placeholder="Or paste names here separated by commas..." 
                      />
                   </div>
 

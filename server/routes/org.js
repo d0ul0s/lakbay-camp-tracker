@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const CampLeader = require('../models/CampLeader');
 const CampGroup = require('../models/CampGroup');
+const Registrant = require('../models/Registrant');
 const auth = require('../middleware/auth');
 const logActivity = require('../utils/logger');
 
@@ -12,6 +13,20 @@ const requireAdmin = (req, res, next) => {
   }
   next();
 };
+
+// ===============================
+// REGISTRANTS (Participants)
+// ===============================
+
+// GET all registrant names for group sorting (Authenticated only)
+router.get('/registrants', auth, async (req, res) => {
+  try {
+    const registrants = await Registrant.find({}, 'fullName church').sort({ fullName: 1 });
+    res.json(registrants);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
 
 // ===============================
 // LEADERS/STAFF ROUTES
