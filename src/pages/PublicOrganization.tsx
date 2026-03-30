@@ -4,7 +4,8 @@ import { Users, Shield, Map, Tent, Star, Flag, Target, Hand, Loader2, ArrowLeft,
 import api from '../api/axios';
 
 interface CampLeader {
-  _id: string;
+  _id?: string;
+  id?: string;
   name: string;
   churchRef: string | null;
   category: string;
@@ -14,7 +15,8 @@ interface CampLeader {
 }
 
 interface CampGroup {
-  _id: string;
+  _id?: string;
+  id?: string;
   name: string;
   leader: string;
   assistantLeader: string;
@@ -98,9 +100,9 @@ export default function PublicOrganization() {
                  <h4 className="font-black uppercase text-[11px] md:text-xs tracking-widest text-brand-brown mb-4 border-b border-gray-100 pb-3 flex items-center gap-2">
                    <div className="w-2 h-2 rounded-full bg-brand-light-brown shadow-sm shadow-brand-brown/30"></div> {category}
                  </h4>
-                 <div className="flex flex-col gap-2">
+                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
                    {staff.filter(s => s.category === category).map(s => (
-                     <div key={s._id} className="flex items-center justify-between group p-2 hover:bg-brand-cream/50 rounded-xl transition-colors">
+                     <div key={s._id || s.id} className="flex items-center justify-between group p-2 hover:bg-brand-cream/50 rounded-xl transition-colors">
                         <div className="flex items-center gap-3">
                           <div className="w-10 h-10 rounded-full bg-gradient-to-br from-brand-sand/30 to-brand-cream flex items-center justify-center shrink-0 overflow-hidden border border-brand-sand/50 shadow-inner">
                             {s.image ? <img src={s.image} alt={s.name} className="w-full h-full object-cover" /> : <span className="font-display text-brand-brown text-base">{s.name.charAt(0)}</span>}
@@ -139,9 +141,10 @@ export default function PublicOrganization() {
                 return (
                   <div key={church} className="bg-gradient-to-br from-white to-gray-50 border border-brand-beige rounded-2xl p-5 shadow-sm hover:shadow-md transition-shadow">
                      <h4 className="text-[11px] font-black uppercase text-gray-400 tracking-widest mb-3 border-b border-gray-100 pb-2">{church}</h4>
-                     <div className="space-y-3">
+                     <div className="p-5 pt-0">
+                     <div className="grid grid-cols-1 gap-3">
                        {churchLeaders.map(cl => (
-                         <div key={cl._id} className="flex items-center justify-between group bg-white border border-gray-50 p-2.5 rounded-lg shadow-sm">
+                         <div key={cl._id || cl.id} className="flex items-center justify-between group bg-white border border-gray-50 p-2.5 rounded-lg shadow-sm">
                            <div className="flex items-center gap-2.5">
                              <div className="w-8 h-8 rounded-full bg-white flex items-center justify-center shrink-0 overflow-hidden border border-brand-sand/30 shadow-inner">
                                {cl.image ? <img src={cl.image} alt={cl.name} className="w-full h-full object-cover" /> : <span className="font-display text-brand-brown text-[10px]">{cl.name.charAt(0)}</span>}
@@ -159,6 +162,7 @@ export default function PublicOrganization() {
                            </div>
                          </div>
                        ))}
+                     </div>
                      </div>
                   </div>
                 );
@@ -185,10 +189,10 @@ export default function PublicOrganization() {
                <p className="text-white/60 text-lg font-medium tracking-wide uppercase">Groupings are not yet finalized.</p>
             </div>
           ) : (
-            <div className="columns-1 lg:columns-2 xl:columns-3 gap-8 space-y-8 relative z-10">
+            <div className="columns-1 md:columns-2 xl:columns-3 gap-6 space-y-6 relative z-10">
               {groups.map(g => (
-                <div key={g._id} className="break-inside-avoid bg-white rounded-3xl p-6 shadow-2xl relative transform transition-all duration-300 border-[3px] border-brand-cream/90 overflow-hidden hover:scale-[1.01] hover:-translate-y-1">
-                  <div className="absolute top-0 left-0 w-full h-2.5 bg-gradient-to-r from-brand-brown via-brand-sand to-brand-brown"></div>
+                <div key={g._id || g.id} className="break-inside-avoid bg-white rounded-3xl p-6 shadow-2xl relative border-[3px] border-brand-cream/30 overflow-hidden group">
+                  <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-brand-brown via-brand-sand to-brand-brown"></div>
                   
                   <h4 className="text-2xl md:text-3xl font-display text-brand-brown tracking-wide mb-6 flex items-center gap-2 drop-shadow-sm">
                     {g.name}

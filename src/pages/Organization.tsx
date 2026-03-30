@@ -4,7 +4,8 @@ import { Users, Shield, X, Edit2, Map, Tent, Star, Flag, Target, Hand, Loader2, 
 import api from '../api/axios';
 
 interface CampLeader {
-  _id: string;
+  _id?: string;
+  id?: string;
   name: string;
   churchRef: string | null;
   category: string;
@@ -14,7 +15,8 @@ interface CampLeader {
 }
 
 interface CampGroup {
-  _id: string;
+  _id?: string;
+  id?: string;
   name: string;
   leader: string;
   assistantLeader: string;
@@ -65,7 +67,8 @@ export default function Organization() {
     e.preventDefault();
     try {
       if (leaderModal.leader) {
-        await api.put(`/api/org/leaders/${leaderModal.leader._id}`, leaderForm);
+        const leaderId = leaderModal.leader._id || leaderModal.leader.id;
+        await api.put(`/api/org/leaders/${leaderId}`, leaderForm);
       } else {
         await api.post('/api/org/leaders', leaderForm);
       }
@@ -92,7 +95,8 @@ export default function Organization() {
     e.preventDefault();
     try {
       if (groupModal.group) {
-        await api.put(`/api/org/groups/${groupModal.group._id}`, groupForm);
+        const groupId = groupModal.group._id || groupModal.group.id;
+        await api.put(`/api/org/groups/${groupId}`, groupForm);
       } else {
         await api.post('/api/org/groups', groupForm);
       }
@@ -163,9 +167,9 @@ export default function Organization() {
                  <h4 className="font-black uppercase text-[10px] lg:text-xs tracking-widest text-brand-brown/60 mb-3 border-b border-gray-100 pb-2 flex items-center gap-2">
                    <div className="w-1.5 h-1.5 rounded-full bg-brand-brown"></div> {category}
                  </h4>
-                 <div className="flex flex-col gap-1.5">
+                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
                    {staff.filter(s => s.category === category).map(s => (
-                     <div key={s._id} className="flex items-center justify-between group p-2 hover:bg-gray-50 rounded-xl transition-colors border border-transparent hover:border-brand-beige">
+                     <div key={s._id || s.id} className="flex items-center justify-between group p-2 hover:bg-gray-50 rounded-xl transition-colors border border-transparent hover:border-brand-beige">
                         <div className="flex items-center gap-3">
                           <div className="w-8 h-8 rounded-full bg-brand-cream flex items-center justify-center shrink-0 overflow-hidden border border-brand-sand/30 shadow-inner">
                             {s.image ? <img src={s.image} alt={s.name} className="w-full h-full object-cover" /> : <span className="font-display text-brand-brown text-sm">{s.name.charAt(0)}</span>}
@@ -183,8 +187,18 @@ export default function Organization() {
                         </div>
                         {isAdmin && (
                           <div className="opacity-0 group-hover:opacity-100 flex gap-1 bg-white shadow-sm border border-gray-100 p-0.5 rounded-lg shrink-0">
-                            <button onClick={() => { setLeaderForm(s); setLeaderModal({ isOpen: true, leader: s }); }} className="text-gray-400 hover:text-brand-brown p-1.5"><Edit2 size={12} /></button>
-                            <button onClick={() => handleDeleteLeader(s._id)} className="text-red-300 hover:text-red-500 p-1.5"><X size={12} /></button>
+                            <button 
+                                onClick={() => { setLeaderForm(s); setLeaderModal({ isOpen: true, leader: s }); }}
+                                className="p-2 text-blue-600 hover:bg-blue-50 bg-white rounded-lg transition-colors opacity-0 group-hover:opacity-100 shadow-sm border border-brand-beige"
+                              >
+                                <Edit2 size={14} />
+                              </button>
+                              <button 
+                                onClick={() => handleDeleteLeader(s._id || s.id as string)}
+                                className="p-2 text-red-600 hover:bg-red-50 bg-white rounded-lg transition-colors opacity-0 group-hover:opacity-100 shadow-sm border border-brand-beige"
+                              >
+                                <X size={14} />
+                              </button>
                           </div>
                         )}
                      </div>
@@ -209,37 +223,49 @@ export default function Organization() {
               return (
                 <div key={church} className="bg-gradient-to-br from-white to-gray-50 border border-brand-beige rounded-2xl p-5 shadow-sm">
                    <h4 className="text-[10px] font-black uppercase text-gray-400 tracking-widest mb-3 border-b border-gray-100 pb-2">{church}</h4>
-                   {churchLeaders.length > 0 ? (
+                   <div className="p-4 pt-0">
                      <div className="space-y-2">
-                       {churchLeaders.map(cl => (
-                         <div key={cl._id} className="flex items-center justify-between group">
-                           <div className="flex items-center gap-2.5">
-                             <div className="w-7 h-7 rounded-full bg-white flex items-center justify-center shrink-0 overflow-hidden border border-brand-sand shadow-inner">
-                              {cl.image ? <img src={cl.image} alt={cl.name} className="w-full h-full object-cover" /> : <span className="font-display text-brand-brown text-[10px]">{cl.name.charAt(0)}</span>}
+                       {churchLeaders.length > 0 ? (
+                         churchLeaders.map(cl => (
+                           <div key={cl._id || cl.id} className="flex items-center justify-between group">
+                             <div className="flex items-center gap-2.5">
+                               <div className="w-7 h-7 rounded-full bg-white flex items-center justify-center shrink-0 overflow-hidden border border-brand-sand shadow-inner">
+                                {cl.image ? <img src={cl.image} alt={cl.name} className="w-full h-full object-cover" /> : <span className="font-display text-brand-brown text-[10px]">{cl.name.charAt(0)}</span>}
+                               </div>
+                               <div>
+                                 <p className="text-sm font-bold text-brand-brown leading-none flex items-center gap-1.5">
+                                   {cl.socialLink ? (
+                                     <a href={cl.socialLink} target="_blank" rel="noopener noreferrer" className="hover:text-blue-600 hover:underline flex items-center gap-1" title="View Social Profile">{cl.name} <ExternalLink size={10} className="text-gray-400" /></a>
+                                   ) : (
+                                     cl.name
+                                   )}
+                                 </p>
+                                 {cl.roleTitle && <p className="text-[9px] uppercase font-bold text-gray-400 tracking-wider mt-1">{cl.roleTitle}</p>}
+                               </div>
                              </div>
-                             <div>
-                               <p className="text-sm font-bold text-brand-brown leading-none flex items-center gap-1.5">
-                                 {cl.socialLink ? (
-                                   <a href={cl.socialLink} target="_blank" rel="noopener noreferrer" className="hover:text-blue-600 hover:underline flex items-center gap-1" title="View Social Profile">{cl.name} <ExternalLink size={10} className="text-gray-400" /></a>
-                                 ) : (
-                                   cl.name
-                                 )}
-                               </p>
-                               {cl.roleTitle && <p className="text-[9px] uppercase font-bold text-gray-400 tracking-wider mt-1">{cl.roleTitle}</p>}
-                             </div>
+                             {isAdmin && (
+                               <div className="opacity-0 group-hover:opacity-100 flex gap-1">
+                                  <button 
+                                    onClick={() => { setLeaderForm(cl); setLeaderModal({ isOpen: true, leader: cl }); }}
+                                    className="p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors opacity-0 group-hover:opacity-100"
+                                  >
+                                    <Edit2 size={12} />
+                                  </button>
+                                  <button 
+                                    onClick={() => handleDeleteLeader(cl._id || cl.id as string)}
+                                    className="p-1.5 text-red-600 hover:bg-red-50 rounded-lg transition-colors opacity-0 group-hover:opacity-100"
+                                  >
+                                    <X size={12} />
+                                  </button>
+                               </div>
+                             )}
                            </div>
-                           {isAdmin && (
-                             <div className="opacity-0 group-hover:opacity-100 flex gap-1">
-                                <button onClick={() => { setLeaderForm(cl); setLeaderModal({ isOpen: true, leader: cl }); }} className="text-gray-400 hover:text-brand-brown p-1"><Edit2 size={12} /></button>
-                                <button onClick={() => handleDeleteLeader(cl._id)} className="text-red-300 hover:text-red-500 p-1"><X size={12} /></button>
-                             </div>
-                           )}
-                         </div>
-                       ))}
+                         ))
+                       ) : (
+                         <p className="text-xs text-brand-brown/40 italic font-medium">No youth leader assigned yet.</p>
+                       )}
                      </div>
-                   ) : (
-                     <p className="text-xs text-brand-brown/40 italic font-medium">No youth leader assigned yet.</p>
-                   )}
+                   </div>
                 </div>
               );
             })}
@@ -265,12 +291,22 @@ export default function Organization() {
           ) : (
             <div className="columns-1 md:columns-2 xl:columns-3 gap-6 space-y-6 relative z-10 p-1">
               {groups.map(g => (
-                <div key={g._id} className="break-inside-avoid bg-white rounded-3xl p-6 shadow-2xl relative group transform hover:-translate-y-1 transition-all duration-300 border-[3px] border-brand-cream overflow-hidden">
+                <div key={g._id || g.id} className="break-inside-avoid bg-white rounded-3xl p-6 shadow-2xl relative group transform hover:-translate-y-1 transition-all duration-300 border-[3px] border-brand-cream overflow-hidden">
                   <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-brand-brown via-brand-sand to-brand-brown"></div>
                   {isAdmin && (
                     <div className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity flex gap-1 bg-white/90 backdrop-blur rounded p-1 shadow-sm border border-brand-beige">
-                       <button onClick={() => { setGroupForm(g); setGroupModal({ isOpen: true, group: g }); }} className="text-gray-500 hover:text-brand-brown p-1.5"><Edit2 size={14} /></button>
-                       <button onClick={() => handleDeleteGroup(g._id)} className="text-red-400 hover:text-red-600 p-1.5"><X size={14} /></button>
+                           <button 
+                             onClick={() => { setGroupForm(g); setGroupModal({ isOpen: true, group: g }); }}
+                             className="p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors opacity-0 group-hover:opacity-100"
+                           >
+                             <Edit2 size={16} />
+                           </button>
+                           <button 
+                             onClick={() => handleDeleteGroup(g._id || g.id as string)}
+                             className="p-1.5 text-red-600 hover:bg-red-50 rounded-lg transition-colors opacity-0 group-hover:opacity-100"
+                           >
+                             <X size={16} />
+                           </button>
                     </div>
                   )}
                   
