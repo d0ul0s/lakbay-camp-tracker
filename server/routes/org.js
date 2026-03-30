@@ -38,21 +38,27 @@ router.get('/leaders', async (req, res) => {
 // POST new leader
 router.post('/leaders', auth, requireAdmin, async (req, res) => {
   try {
-    const body = { ...req.body };
-    // Normalize: if only old `category` string sent, promote to `categories` array
-    if (body.categories && body.categories.length > 0) {
-      body.category = body.categories[0]; // keep legacy field in sync
-    } else if (body.category) {
-      body.categories = [body.category];
-    }
-    const newLeader = new CampLeader(body);
+    const { name, churchRef, categories, category, image, socialLink } = req.body;
+    // Normalize: build a clean categories array
+    let cats = Array.isArray(categories) && categories.length > 0
+      ? categories
+      : (category ? [category] : []);
+
+    const newLeader = new CampLeader({
+      name,
+      churchRef: churchRef || null,
+      categories: cats,
+      category: cats[0] || null,
+      image: image || '',
+      socialLink: socialLink || '',
+    });
     await newLeader.save();
     
     await logActivity(
       req.user.id,
       req.user.role,
       'Added Organization Role',
-      `Added ${body.name} to: ${(body.categories || [body.category]).join(', ')}`,
+      `Added ${name} to: ${cats.join(', ')}`,
       req.ip
     );
     
@@ -65,20 +71,35 @@ router.post('/leaders', auth, requireAdmin, async (req, res) => {
 // PUT update leader
 router.put('/leaders/:id', auth, requireAdmin, async (req, res) => {
   try {
-    const body = { ...req.body };
-    // Normalize categories array ↔ legacy category field
-    if (body.categories && body.categories.length > 0) {
-      body.category = body.categories[0];
-    } else if (body.category) {
-      body.categories = [body.category];
-    }
-    const leader = await CampLeader.findByIdAndUpdate(req.params.id, body, { new: true });
+    const { name, churchRef, categories, category, image, socialLink } = req.body;
+    // Build clean categories array — this is the source of truth
+    let cats = Array.isArray(categories) && categories.length > 0
+      ? categories
+      : (category ? [category] : []);
+
+    // Use $set with explicit fields to avoid Mongoose enum/id conflicts
+    const updatePayload = {
+      $set: {
+        name,
+        churchRef: churchRef || null,
+        categories: cats,
+        category: cats[0] || null,   // keep legacy field in sync
+        image: image || '',
+        socialLink: socialLink || '',
+      }
+    };
+
+    const leader = await CampLeader.findByIdAndUpdate(
+      req.params.id,
+      updatePayload,
+      { new: true, runValidators: false } // skip enum validation on legacy field
+    );
     
     await logActivity(
       req.user.id,
       req.user.role,
       'Updated Organization Role',
-      `Updated role details for ${leader.name}`,
+      `Updated role details for ${leader.name} (${cats.join(', ')})`,
       req.ip
     );
     

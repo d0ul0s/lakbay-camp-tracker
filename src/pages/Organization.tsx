@@ -47,7 +47,7 @@ export default function Organization() {
   const ALL_CATEGORIES = [
     'Camp Head', 'Registration', 'Food', 'Arts & Decorations',
     'Media', 'Music', 'Marshall', 'Runners', 'Game Masters',
-    'Point Masters', 'Medic', 'Awards', 'Finance', 'Youth Leader'
+    'Point Masters', 'Medic', 'Awards', 'Finance', 'Facilitator/Counselor', 'Youth Leader'
   ];
 
   const fetchData = async () => {
@@ -130,8 +130,9 @@ export default function Organization() {
     }
   };
 
-  const staff = leaders.filter(l => !l.categories?.includes('Youth Leader') && !(l.category === 'Youth Leader'));
-  const youthLeaders = leaders.filter(l => l.categories?.includes('Youth Leader') || l.category === 'Youth Leader');
+  // For the staff section, we allow all leaders but we only render their non-"Youth Leader" roles
+  const staff = leaders;
+  const youthLeaders = leaders.filter(l => getCategories(l).includes('Youth Leader'));
 
   // Helper: get effective categories for a leader
   const getCategories = (l: CampLeader) => {
@@ -181,53 +182,70 @@ export default function Organization() {
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 lg:gap-6">
             {staff.length === 0 && <p className="text-gray-400 text-sm italic col-span-full">No staff assigned yet.</p>}
-            {Array.from(new Set(staff.flatMap(s => getCategories(s)))).sort().map(category => (
-              <div key={category} className="bg-white rounded-2xl p-4 lg:p-5 shadow-sm border border-brand-sand/50 h-max">
-                 <h4 className="font-black uppercase text-[10px] lg:text-xs tracking-widest text-brand-brown/60 mb-3 border-b border-gray-100 pb-2 flex items-center gap-2">
-                   <div className="w-1.5 h-1.5 rounded-full bg-brand-brown"></div> {category}
-                 </h4>
-                 <div className="flex flex-col gap-1.5">
-                   {staff.filter(s => getCategories(s).includes(category)).map(s => (
-                     <div key={s._id || s.id} className="flex items-center justify-between group p-2 hover:bg-gray-50 rounded-xl transition-colors border border-transparent hover:border-brand-beige">
-                        <div className="flex items-center gap-3">
-                          <div className="w-8 h-8 rounded-full bg-brand-cream flex items-center justify-center shrink-0 overflow-hidden border border-brand-sand/30 shadow-inner">
-                            {s.image ? <img src={s.image} alt={s.name} className="w-full h-full object-cover" /> : <span className="font-display text-brand-brown text-sm">{s.name.charAt(0)}</span>}
+            {Array.from(new Set(staff.flatMap(s => getCategories(s))))
+              .filter(cat => cat !== 'Youth Leader') // Staff section only shows staff roles
+              .sort((a, b) => a === 'Camp Head' ? -1 : b === 'Camp Head' ? 1 : a.localeCompare(b))
+              .map(category => {
+                const isCampHead = category === 'Camp Head';
+                return (
+                  <div key={category} className={`rounded-2xl p-4 lg:p-5 shadow-sm h-max border ${
+                    isCampHead
+                      ? 'bg-gradient-to-br from-amber-50 to-yellow-50 border-amber-300 shadow-amber-100'
+                      : 'bg-white border-brand-sand/50'
+                  }`}>
+                    <h4 className={`font-black uppercase text-[10px] lg:text-xs tracking-widest mb-3 border-b pb-2 flex items-center gap-2 ${
+                      isCampHead ? 'text-amber-700 border-amber-200' : 'text-brand-brown/60 border-gray-100'
+                    }`}>
+                      {isCampHead
+                        ? <Star size={12} className="text-amber-500" fill="currentColor" />
+                        : <div className="w-1.5 h-1.5 rounded-full bg-brand-brown"></div>
+                      }
+                      {category}
+                      {isCampHead && <span className="ml-auto text-[9px] font-bold text-amber-600 bg-amber-100 px-2 py-0.5 rounded-full tracking-widest">LEADERSHIP</span>}
+                    </h4>
+                    <div className="flex flex-col gap-1.5">
+                      {staff.filter(s => getCategories(s).includes(category)).map(s => (
+                        <div key={s._id || s.id} className="flex items-center justify-between group p-2 hover:bg-gray-50 rounded-xl transition-colors border border-transparent hover:border-brand-beige">
+                          <div className="flex items-center gap-3">
+                            <div className="w-8 h-8 rounded-full bg-brand-cream flex items-center justify-center shrink-0 overflow-hidden border border-brand-sand/30 shadow-inner">
+                              {s.image ? <img src={s.image} alt={s.name} className="w-full h-full object-cover" /> : <span className="font-display text-brand-brown text-sm">{s.name.charAt(0)}</span>}
+                            </div>
+                            <div>
+                              <p className="font-bold text-gray-900 leading-tight flex items-center gap-1.5">
+                                {s.socialLink ? (
+                                  <a href={s.socialLink} target="_blank" rel="noopener noreferrer" className="hover:text-blue-600 hover:underline flex items-center gap-1" title="View Social Profile">{s.name} <ExternalLink size={10} className="text-gray-400" /></a>
+                                ) : (
+                                  s.name
+                                )}
+                              </p>
+                              {s.roleTitle && <p className="text-[9px] lg:text-[10px] uppercase font-bold text-gray-400 tracking-wider mt-0.5">{s.roleTitle}</p>}
+                            </div>
                           </div>
-                          <div>
-                            <p className="font-bold text-gray-900 leading-tight flex items-center gap-1.5">
-                              {s.socialLink ? (
-                                <a href={s.socialLink} target="_blank" rel="noopener noreferrer" className="hover:text-blue-600 hover:underline flex items-center gap-1" title="View Social Profile">{s.name} <ExternalLink size={10} className="text-gray-400" /></a>
-                              ) : (
-                                s.name
-                              )}
-                            </p>
-                            {s.roleTitle && <p className="text-[9px] lg:text-[10px] uppercase font-bold text-gray-400 tracking-wider mt-0.5">{s.roleTitle}</p>}
-                          </div>
-                        </div>
-                        {isAdmin && (
-                          <div className="opacity-0 group-hover:opacity-100 flex gap-1 bg-white shadow-sm border border-gray-100 p-0.5 rounded-lg shrink-0">
-                            <button 
-                                onClick={() => {
-                                  const norm = { ...s, categories: s.categories?.length > 0 ? s.categories : (s.category ? [s.category] : []) };
-                                  setLeaderForm(norm); setLeaderModal({ isOpen: true, leader: s });
-                                }}
-                                className="p-2 text-blue-600 hover:bg-blue-50 bg-white rounded-lg transition-colors opacity-0 group-hover:opacity-100 shadow-sm border border-brand-beige"
-                              >
-                                <Edit2 size={14} />
-                              </button>
+                          {isAdmin && (
+                            <div className="opacity-0 group-hover:opacity-100 flex gap-1 bg-white shadow-sm border border-gray-100 p-0.5 rounded-lg shrink-0">
                               <button 
-                                onClick={() => handleDeleteLeader(s._id || s.id as string)}
-                                className="p-2 text-red-600 hover:bg-red-50 bg-white rounded-lg transition-colors opacity-0 group-hover:opacity-100 shadow-sm border border-brand-beige"
-                              >
-                                <X size={14} />
-                              </button>
-                          </div>
-                        )}
-                     </div>
-                   ))}
-                 </div>
-              </div>
-            ))}
+                                  onClick={() => {
+                                    const norm = { ...s, categories: s.categories?.length > 0 ? s.categories : (s.category ? [s.category] : []) };
+                                    setLeaderForm(norm); setLeaderModal({ isOpen: true, leader: s });
+                                  }}
+                                  className="p-2 text-blue-600 hover:bg-blue-50 bg-white rounded-lg transition-colors opacity-0 group-hover:opacity-100 shadow-sm border border-brand-beige"
+                                >
+                                  <Edit2 size={14} />
+                                </button>
+                                <button 
+                                  onClick={() => handleDeleteLeader(s._id || s.id as string)}
+                                  className="p-2 text-red-600 hover:bg-red-50 bg-white rounded-lg transition-colors opacity-0 group-hover:opacity-100 shadow-sm border border-brand-beige"
+                                >
+                                  <X size={14} />
+                                </button>
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })}
           </div>
         </section>
 
@@ -442,7 +460,7 @@ export default function Organization() {
                                 categories: e.target.checked
                                   ? [...current, cat]
                                   : current.filter(c => c !== cat)
-                              });
+                                });
                             }}
                           />
                           <span className="text-sm text-gray-700 group-hover:text-brand-brown font-medium leading-tight">{cat}</span>
@@ -505,50 +523,138 @@ export default function Organization() {
               </div>
               
               <form onSubmit={handleSaveGroup} className="p-6 overflow-y-auto space-y-6">
-                 <div>
-                    <label className="block text-xs text-gray-500 uppercase tracking-widest font-black mb-1">Group Name</label>
-                    <input type="text" required value={groupForm.name} onChange={e => setGroupForm({...groupForm, name: e.target.value})} className="w-full border-2 border-brand-sand rounded-xl px-4 py-3 text-lg font-bold focus:border-brand-brown outline-none" placeholder="e.g. Group 1, Wildcats" />
-                 </div>
+                  <div>
+                     <label className="block text-xs text-gray-500 uppercase tracking-widest font-black mb-1">Group Name</label>
+                     <input type="text" required value={groupForm.name} onChange={e => setGroupForm({...groupForm, name: e.target.value})} className="w-full border-2 border-brand-sand rounded-xl px-4 py-3 text-lg font-bold focus:border-brand-brown outline-none" placeholder="e.g. Group 1, Wildcats" />
+                  </div>
 
-                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-gray-50 p-4 rounded-2xl border border-gray-100">
-                    <h4 className="md:col-span-2 text-[10px] font-black uppercase text-brand-brown tracking-widest border-b border-gray-200 pb-2 mb-2">Key Core Roles</h4>
-                    <div>
-                       <label className="block text-[11px] text-gray-500 font-bold mb-1"><Star size={12} className="inline mr-1 text-orange-500" />Leader Name</label>
-                       <input type="text" value={groupForm.leader} onChange={e => setGroupForm({...groupForm, leader: e.target.value})} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:border-orange-400 outline-none" />
-                    </div>
-                    <div>
-                       <label className="block text-[11px] text-gray-500 font-bold mb-1"><Shield size={12} className="inline mr-1 text-amber-500" />Assistant Leader Name</label>
-                       <input type="text" value={groupForm.assistantLeader} onChange={e => setGroupForm({...groupForm, assistantLeader: e.target.value})} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:border-amber-400 outline-none" />
-                    </div>
-                    <div>
-                       <label className="block text-[11px] text-gray-500 font-bold mb-1"><Target size={12} className="inline mr-1 text-blue-500" />Point Keeper Name</label>
-                       <input type="text" value={groupForm.pointKeeper} onChange={e => setGroupForm({...groupForm, pointKeeper: e.target.value})} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:border-blue-400 outline-none" />
-                    </div>
-                    <div>
-                       <label className="block text-[11px] text-gray-500 font-bold mb-1"><Flag size={12} className="inline mr-1 text-red-500" />Flag Bearer Name</label>
-                       <input type="text" value={groupForm.flagBearer} onChange={e => setGroupForm({...groupForm, flagBearer: e.target.value})} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:border-red-400 outline-none" />
-                    </div>
-                 </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-gray-50 p-4 rounded-2xl border border-gray-100">
+                     <h4 className="md:col-span-2 text-[10px] font-black uppercase text-brand-brown tracking-widest border-b border-gray-200 pb-2 mb-2">Key Core Roles</h4>
+                     <div>
+                        <label className="block text-[11px] text-gray-500 font-bold mb-1"><Star size={12} className="inline mr-1 text-orange-500" />Leader Name</label>
+                        <input type="text" value={groupForm.leader} onChange={e => setGroupForm({...groupForm, leader: e.target.value})} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:border-orange-400 outline-none" />
+                     </div>
+                     <div>
+                        <label className="block text-[11px] text-gray-500 font-bold mb-1"><Shield size={12} className="inline mr-1 text-amber-500" />Assistant Leader Name</label>
+                        <input type="text" value={groupForm.assistantLeader} onChange={e => setGroupForm({...groupForm, assistantLeader: e.target.value})} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:border-amber-400 outline-none" />
+                     </div>
+                     <div>
+                        <label className="block text-[11px] text-gray-500 font-bold mb-1"><Target size={12} className="inline mr-1 text-blue-500" />Point Keeper Name</label>
+                        <input type="text" value={groupForm.pointKeeper} onChange={e => setGroupForm({...groupForm, pointKeeper: e.target.value})} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:border-blue-400 outline-none" />
+                     </div>
+                     <div>
+                        <label className="block text-[11px] text-gray-500 font-bold mb-1"><Flag size={12} className="inline mr-1 text-red-500" />Flag Bearer Name</label>
+                        <input type="text" value={groupForm.flagBearer} onChange={e => setGroupForm({...groupForm, flagBearer: e.target.value})} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:border-red-400 outline-none" />
+                     </div>
+                  </div>
 
-                 <div>
-                    <label className="block text-[11px] text-gray-500 font-bold mb-1 uppercase tracking-widest flex items-center gap-1"><Shield size={14} className="text-indigo-400" /> Facilitators/Counselors (Comma separated)</label>
-                    <input type="text" value={groupForm.facilitators?.join(', ')} onChange={e => setGroupForm({...groupForm, facilitators: e.target.value.split(',').map(s=>s.trim()).filter(Boolean)})} className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:border-indigo-300 outline-none font-medium bg-indigo-50/10" placeholder="e.g. John, Mary (Counselors not part of the tribe but guiding it)" />
-                 </div>
+                  <div className="space-y-4">
+                     <div className="flex items-center justify-between">
+                        <label className="block text-[11px] text-gray-500 font-bold uppercase tracking-widest flex items-center gap-1"><Shield size={14} className="text-indigo-400" /> Facilitators/Counselors</label>
+                        <span className="text-[10px] text-gray-400 font-bold uppercase text-right">Quick add from staff:</span>
+                     </div>
+                     
+                     <div className="flex flex-wrap gap-1.5 p-3 bg-indigo-50/30 rounded-xl border border-indigo-100/50">
+                        {leaders.length === 0 && <p className="text-[10px] text-gray-400 italic">No registered staff found.</p>}
+                        {/* 1. Facilitators/Counselors */}
+                        {leaders.filter(l => getCategories(l).includes('Facilitator/Counselor')).map(l => (
+                           <button 
+                              key={l._id || l.id}
+                              type="button"
+                              onClick={() => {
+                                 const current = groupForm.facilitators || [];
+                                 const next = current.includes(l.name) ? current.filter(n => n !== l.name) : [...current, l.name];
+                                 setGroupForm({...groupForm, facilitators: next});
+                              }}
+                              className={`text-[10px] px-2.5 py-1 rounded-lg font-bold border transition-all ${
+                                 (groupForm.facilitators || []).includes(l.name)
+                                    ? 'bg-indigo-600 border-indigo-600 text-white shadow-sm'
+                                    : 'bg-white border-indigo-200 text-indigo-600 hover:border-indigo-400'
+                              }`}
+                           >
+                              {l.name}
+                           </button>
+                        ))}
+                        {leaders.filter(l => getCategories(l).includes('Facilitator/Counselor')).length > 0 && <div className="w-full h-px bg-indigo-100/50 my-1"></div>}
+                        
+                        {/* 2. Other Staff */}
+                        <span className="w-full text-[9px] text-indigo-400 uppercase font-bold tracking-tighter">Other Staff:</span>
+                        <div className="flex flex-wrap gap-1.5">
+                          {leaders.filter(l => !getCategories(l).includes('Facilitator/Counselor') && !getCategories(l).includes('Youth Leader')).map(l => (
+                             <button 
+                                key={l._id || l.id}
+                                type="button"
+                                onClick={() => {
+                                   const current = groupForm.facilitators || [];
+                                   const next = current.includes(l.name) ? current.filter(n => n !== l.name) : [...current, l.name];
+                                   setGroupForm({...groupForm, facilitators: next});
+                                }}
+                                className={`text-[10px] px-2.5 py-1 rounded-lg font-bold border transition-all ${
+                                   (groupForm.facilitators || []).includes(l.name)
+                                      ? 'bg-indigo-600 border-indigo-600 text-white shadow-sm'
+                                      : 'bg-white border-indigo-200 text-indigo-600 hover:border-indigo-400'
+                                }`}
+                             >
+                                {l.name}
+                             </button>
+                          ))}
+                        </div>
+                     </div>
 
-                 <div>
-                    <label className="block text-[11px] text-gray-500 font-bold mb-1 uppercase tracking-widest flex items-center gap-1"><Hand size={14} className="text-gray-400" /> Grab Masters (Comma separated)</label>
-                    <input type="text" value={groupForm.grabMasters?.join(', ')} onChange={e => setGroupForm({...groupForm, grabMasters: e.target.value.split(',').map(s=>s.trim()).filter(Boolean)})} className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:border-brand-brown outline-none font-medium" placeholder="e.g. John, Mary, Steve" />
-                 </div>
+                     <input 
+                        type="text" 
+                        value={groupForm.facilitators?.join(', ')} 
+                        onChange={e => setGroupForm({...groupForm, facilitators: e.target.value.split(',').map(s=>s.trim()).filter(Boolean)})} 
+                        className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:border-indigo-300 outline-none font-medium bg-white" 
+                        placeholder="Or type manual names separated by comma..." 
+                     />
+                  </div>
 
-                 <div>
-                    <label className="block text-[11px] text-gray-500 font-bold mb-1 uppercase tracking-widest">Normal Members (Comma separated)</label>
-                    <textarea value={groupForm.members?.join(', ')} onChange={e => setGroupForm({...groupForm, members: e.target.value.split(',').map(s=>s.trim()).filter(Boolean)})} rows={4} className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:border-brand-brown outline-none font-medium leading-relaxed custom-scrollbar" placeholder="Paste all member names here separated by commas..." />
-                 </div>
+                  <div className="space-y-4">
+                     <div className="flex items-center justify-between">
+                        <label className="block text-[11px] text-gray-500 font-bold uppercase tracking-widest flex items-center gap-1"><Hand size={14} className="text-gray-400" /> Grab Masters</label>
+                        <span className="text-[10px] text-gray-400 font-bold uppercase text-right">Quick add:</span>
+                     </div>
+                     
+                     <div className="flex flex-wrap gap-1.5 p-3 bg-gray-50 rounded-xl border border-gray-200/50">
+                        {leaders.filter(l => !getCategories(l).includes('Youth Leader')).map(l => (
+                           <button 
+                              key={l._id || l.id}
+                              type="button"
+                              onClick={() => {
+                                 const current = groupForm.grabMasters || [];
+                                 const next = current.includes(l.name) ? current.filter(n => n !== l.name) : [...current, l.name];
+                                 setGroupForm({...groupForm, grabMasters: next});
+                              }}
+                              className={`text-[10px] px-2.5 py-1 rounded-lg font-bold border transition-all ${
+                                 (groupForm.grabMasters || []).includes(l.name)
+                                    ? 'bg-brand-brown border-brand-brown text-white shadow-sm'
+                                    : 'bg-white border-gray-200 text-gray-600 hover:border-gray-400'
+                              }`}
+                           >
+                              {l.name}
+                           </button>
+                        ))}
+                     </div>
 
-                 <div className="pt-4 border-t border-gray-100 flex justify-end">
-                    <button type="submit" className="px-6 py-3 rounded-xl bg-brand-brown text-white font-bold hover:bg-brand-light-brown transition-colors shadow-sm">{groupModal.group ? 'Save Group Layout' : 'Create Organization Group'}</button>
-                 </div>
-              </form>
+                     <input 
+                        type="text" 
+                        value={groupForm.grabMasters?.join(', ')} 
+                        onChange={e => setGroupForm({...groupForm, grabMasters: e.target.value.split(',').map(s=>s.trim()).filter(Boolean)})} 
+                        className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:border-brand-brown outline-none font-medium bg-white" 
+                        placeholder="Or type manual names separated by comma..." 
+                     />
+                  </div>
+
+                  <div>
+                     <label className="block text-[11px] text-gray-500 font-bold mb-1 uppercase tracking-widest">Normal Members (Comma separated)</label>
+                     <textarea value={groupForm.members?.join(', ')} onChange={e => setGroupForm({...groupForm, members: e.target.value.split(',').map(s=>s.trim()).filter(Boolean)})} rows={4} className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:border-brand-brown outline-none font-medium leading-relaxed custom-scrollbar" placeholder="Paste all member names here separated by commas..." />
+                  </div>
+
+                  <div className="pt-4 border-t border-gray-100 flex justify-end">
+                     <button type="submit" className="px-6 py-3 rounded-xl bg-brand-brown text-white font-bold hover:bg-brand-light-brown transition-colors shadow-sm">{groupModal.group ? 'Save Group Layout' : 'Create Organization Group'}</button>
+                  </div>
+               </form>
            </div>
         </div>
       )}

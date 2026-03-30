@@ -66,7 +66,8 @@ export default function PublicOrganization() {
     return [];
   };
 
-  const staff = leaders.filter(l => !getCategories(l).includes('Youth Leader'));
+  // For the staff section, we allow all leaders but we only render their non-"Youth Leader" roles
+  const staff = leaders;
   const youthLeaders = leaders.filter(l => getCategories(l).includes('Youth Leader'));
   
   // Dynamically extract churches with youth leaders assigned to them
@@ -109,11 +110,27 @@ export default function PublicOrganization() {
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4 lg:gap-6">
             {staff.length === 0 && <p className="text-gray-400 text-sm italic col-span-full bg-white p-6 rounded-2xl border border-dashed border-gray-300">Staff structures are currently being finalized.</p>}
-            {Array.from(new Set(staff.flatMap(s => getCategories(s)))).sort().map(category => (
-              <div key={category} className="bg-white rounded-2xl p-5 md:p-6 shadow-md shadow-brand-brown/5 border border-brand-sand/50 transform hover:-translate-y-1 transition-all duration-300">
-                 <h4 className="font-black uppercase text-[11px] md:text-xs tracking-widest text-brand-brown mb-4 border-b border-gray-100 pb-3 flex items-center gap-2">
-                   <div className="w-2 h-2 rounded-full bg-brand-light-brown shadow-sm shadow-brand-brown/30"></div> {category}
-                 </h4>
+            {Array.from(new Set(staff.flatMap(s => getCategories(s))))
+              .filter(cat => cat !== 'Youth Leader') // Staff section only shows staff roles
+              .sort((a, b) => a === 'Camp Head' ? -1 : b === 'Camp Head' ? 1 : a.localeCompare(b))
+              .map(category => {
+                const isCampHead = category === 'Camp Head';
+                return (
+                  <div key={category} className={`rounded-2xl p-5 md:p-6 shadow-md shadow-brand-brown/5 border transform hover:-translate-y-1 transition-all duration-300 ${
+                    isCampHead 
+                      ? 'bg-gradient-to-br from-amber-50 to-yellow-50 border-amber-300 shadow-amber-100' 
+                      : 'bg-white border-brand-sand/50'
+                  }`}>
+                    <h4 className={`font-black uppercase text-[11px] md:text-xs tracking-widest mb-4 border-b pb-3 flex items-center gap-2 ${
+                      isCampHead ? 'text-amber-700 border-amber-200' : 'text-brand-brown border-gray-100'
+                    }`}>
+                      {isCampHead 
+                        ? <Star size={14} className="text-amber-500" fill="currentColor" /> 
+                        : <div className="w-2 h-2 rounded-full bg-brand-light-brown shadow-sm shadow-brand-brown/30"></div>
+                      }
+                      {category}
+                      {isCampHead && <span className="ml-auto text-[10px] font-bold text-amber-600 bg-amber-100 px-2.5 py-0.5 rounded-full tracking-widest">LEADERSHIP</span>}
+                    </h4>
                  <div className="flex flex-col gap-2">
                     {staff.filter(s => getCategories(s).includes(category)).map(s => (
                      <div key={s._id || s.id} className="flex items-center justify-between group p-2 hover:bg-brand-cream/50 rounded-xl transition-colors">
@@ -136,7 +153,8 @@ export default function PublicOrganization() {
                    ))}
                  </div>
               </div>
-            ))}
+                );
+              })}
           </div>
         </section>
 
