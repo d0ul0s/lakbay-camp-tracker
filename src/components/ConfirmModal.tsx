@@ -1,4 +1,5 @@
 import React from 'react';
+import { createPortal } from 'react-dom';
 import { AlertTriangle, Trash2, CheckCircle, Loader2 } from 'lucide-react';
 import { useAppStore } from '../store';
 
@@ -27,8 +28,8 @@ export default function ConfirmModal({
 
   if (!isOpen) return null;
 
-  return (
-    <div className="fixed inset-0 bg-brand-brown/40 backdrop-blur-sm z-[150] flex items-center justify-center p-4">
+  return createPortal(
+    <div className="fixed inset-0 bg-brand-brown/40 backdrop-blur-sm z-[2000] flex items-center justify-center p-4">
       <div 
         className="bg-white rounded-2xl shadow-xl w-full max-w-sm overflow-hidden border border-brand-sand transform transition-all mx-auto"
         role="dialog"
@@ -75,7 +76,7 @@ export default function ConfirmModal({
           </div>
         </div>
       </div>
-    </div>
-
+    </div>,
+    document.body
   );
 }

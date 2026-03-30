@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { useAppStore } from '../store';
 import { Link } from 'react-router-dom';
 import { Users, Shield, X, Edit2, Map, Tent, Star, Flag, Target, Hand, Loader2, Search, Check, ChevronDown, ArrowLeft } from 'lucide-react';
+import ConfirmModal from '../components/ConfirmModal';
 import api from '../api/axios';
 
 interface CampLeader {
@@ -189,6 +191,19 @@ export default function Organization() {
   // Modals
   const [leaderModal, setLeaderModal] = useState<{ isOpen: boolean, leader: CampLeader | null }>({ isOpen: false, leader: null });
   const [groupModal, setGroupModal] = useState<{ isOpen: boolean, group: CampGroup | null }>({ isOpen: false, group: null });
+  const [confirmState, setConfirmState] = useState<{ 
+    isOpen: boolean, 
+    title: string, 
+    message: string, 
+    onConfirm: () => void,
+    isDestructive?: boolean 
+  }>({
+    isOpen: false,
+    title: '',
+    message: '',
+    onConfirm: () => {},
+    isDestructive: true
+  });
 
   // Form States
   const [leaderForm, setLeaderForm] = useState<Partial<CampLeader>>({ categories: ['Registration'], name: '', roleTitle: '', churchRef: '', image: '', socialLink: '' });
@@ -268,14 +283,28 @@ export default function Organization() {
   };
 
   const handleDeleteLeader = async (id: string) => {
-    if (!confirm('Are you sure you want to remove this role?')) return;
-    try {
-      await api.delete(`/api/org/leaders/${id}`);
-      fetchData();
-    } catch (err) {
-      console.error(err);
-      alert('Failed to delete leader');
-    }
+    setConfirmState({
+      isOpen: true,
+      title: 'Remove Personnel Role',
+      message: 'Are you sure you want to remove this role? This will not delete the registrant, only their administrative assignment.',
+      isDestructive: true,
+      onConfirm: async () => {
+        setConfirmState(prev => ({ ...prev, isOpen: false }));
+        try {
+          await api.delete(`/api/org/leaders/${id}`);
+          fetchData();
+        } catch (err) {
+          console.error(err);
+          setConfirmState({
+             isOpen: true,
+             title: 'Error',
+             message: 'Failed to delete leader assignment.',
+             onConfirm: () => setConfirmState(prev => ({ ...prev, isOpen: false })),
+             isDestructive: false
+          });
+        }
+      }
+    });
   };
 
   const handleSaveGroup = async (e: React.FormEvent) => {
@@ -296,13 +325,21 @@ export default function Organization() {
   };
 
   const handleDeleteGroup = async (id: string) => {
-    if (!confirm('Are you sure you want to delete this group?')) return;
-    try {
-      await api.delete(`/api/org/groups/${id}`);
-      fetchData();
-    } catch (err) {
-      console.error(err);
-    }
+    setConfirmState({
+      isOpen: true,
+      title: 'Delete Official Group',
+      message: 'Are you sure you want to dissolve this tribe? All role assignments for this group will be cleared.',
+      isDestructive: true,
+      onConfirm: async () => {
+        setConfirmState(prev => ({ ...prev, isOpen: false }));
+        try {
+          await api.delete(`/api/org/groups/${id}`);
+          fetchData();
+        } catch (err) {
+          console.error(err);
+        }
+      }
+    });
   };
 
   // Roles processing
@@ -312,9 +349,22 @@ export default function Organization() {
   // Logic: Tribe Integrity Audit (Ungrouped & Duplicates)
   const memberAssignments: Record<string, string[]> = {};
   groups.forEach((g: CampGroup) => {
-    (g.members || []).forEach((m: string) => {
-      if (!memberAssignments[m]) memberAssignments[m] = [];
-      memberAssignments[m].push(g.name);
+    const allGroupedNames = [
+      g.leader,
+      g.assistantLeader,
+      g.pointKeeper,
+      g.flagBearer,
+      ...(g.facilitators || []),
+      ...(g.grabMasters || []),
+      ...(g.members || [])
+    ].filter(Boolean);
+
+    allGroupedNames.forEach((name: string) => {
+      const normalized = name.trim();
+      if (!memberAssignments[normalized]) memberAssignments[normalized] = [];
+      if (!memberAssignments[normalized].includes(g.name)) {
+        memberAssignments[normalized].push(g.name);
+      }
     });
   });
 
@@ -637,7 +687,7 @@ export default function Organization() {
                    {groups.map(g => (
                     <div key={g._id || g.id} className="break-inside-avoid bg-white rounded-3xl p-3 shadow-sm border border-brand-sand/20 relative group transition-all hover:shadow-md hover:border-brand-sand/50">
                       {isAdmin && (
-                        <div className="absolute top-2.5 right-2.5 opacity-0 group-hover:opacity-100 transition-opacity flex gap-0.5 bg-white/80 backdrop-blur rounded p-1 border border-brand-sand/10 shadow-sm">
+                        <div className="absolute top-2.5 right-2.5 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity flex gap-0.5 bg-white/80 backdrop-blur rounded p-1 border border-brand-sand/10 shadow-sm">
                           <button
                             onClick={() => { setGroupForm(g); setGroupModal({ isOpen: true, group: g }); }}
                             className="p-1 px-1.5 text-gray-400 hover:text-brand-brown hover:bg-white rounded-lg transition-colors border border-transparent"
@@ -756,9 +806,9 @@ export default function Organization() {
       </div>
 
       {/* Leader Modal */}
-      {isAdmin && leaderModal.isOpen && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-brand-brown/50 backdrop-blur-sm p-4">
-          <div className="bg-white rounded-2xl p-6 w-full max-w-md shadow-2xl relative">
+      {isAdmin && leaderModal.isOpen && createPortal(
+        <div className="fixed inset-0 z-[1000] flex items-center justify-center bg-brand-brown/50 backdrop-blur-sm p-4 overflow-y-auto">
+          <div className="bg-white rounded-2xl p-6 w-full max-w-md shadow-2xl relative my-auto">
             <button type="button" onClick={() => setLeaderModal({ isOpen: false, leader: null })} className="absolute top-4 right-4 text-gray-400 hover:text-black focus:outline-none"><X size={24} /></button>
             <h3 className="text-2xl font-display text-brand-brown mb-6">{leaderModal.leader ? 'Edit Role' : 'Add New Role'}</h3>
             <form onSubmit={handleSaveLeader} className="space-y-4">
@@ -828,19 +878,20 @@ export default function Organization() {
               <button type="submit" className="w-full py-3 rounded-xl bg-brand-brown text-white font-bold hover:bg-brand-light-brown transition-colors mt-2">{leaderModal.leader ? 'Save Changes' : 'Add Role'}</button>
             </form>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* Group Modal */}
-      {isAdmin && groupModal.isOpen && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-brand-brown/50 backdrop-blur-sm p-2 sm:p-4 overflow-y-auto">
-          <div className="bg-white rounded-2xl w-full max-w-3xl shadow-2xl relative border border-brand-sand/50 my-6 max-h-[90vh] flex flex-col">
+      {isAdmin && groupModal.isOpen && createPortal(
+        <div className="fixed inset-0 z-[1000] flex items-center justify-center bg-brand-brown/50 backdrop-blur-sm p-1 sm:p-4 overflow-y-auto">
+          <div className="bg-white rounded-2xl w-full max-w-3xl shadow-2xl relative border border-brand-sand/50 my-auto flex flex-col pointer-events-auto">
             <div className="px-6 py-4 border-b border-gray-100 flex justify-between items-center shrink-0">
               <h3 className="text-2xl font-display text-brand-brown tracking-wide flex items-center gap-2"><Tent size={24} className="text-brand-brown" /> {groupModal.group ? 'Edit Official Group' : 'Create Official Group'}</h3>
               <button type="button" onClick={() => setGroupModal({ isOpen: false, group: null })} className="text-gray-400 hover:text-brand-brown transition-colors p-1"><X size={24} /></button>
             </div>
 
-            <form onSubmit={handleSaveGroup} className="p-6 overflow-y-auto space-y-6">
+            <form onSubmit={handleSaveGroup} className="p-6 overflow-y-auto space-y-6 max-h-[75vh]">
               <div>
                 <label className="block text-xs text-gray-500 uppercase tracking-widest font-black mb-1">Group Name</label>
                 <input type="text" required value={groupForm.name} onChange={e => setGroupForm({ ...groupForm, name: e.target.value })} className="w-full border-2 border-brand-sand rounded-xl px-4 py-3 text-lg font-bold focus:border-brand-brown outline-none" placeholder="e.g. Group 1, Wildcats" />
@@ -1007,7 +1058,8 @@ export default function Organization() {
               <button type="submit" className="w-full py-4 rounded-xl bg-brand-brown text-white font-black uppercase tracking-widest hover:bg-brand-light-brown transition-all shadow-lg hover:shadow-xl active:scale-[0.98] mt-2">Save Tribe Data</button>
             </form>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* FABs (Only for Admin) */}
@@ -1029,6 +1081,16 @@ export default function Organization() {
           </button>
         </div>
       )}
+
+      {/* Custom Confirmation Modal */}
+      <ConfirmModal
+        isOpen={confirmState.isOpen}
+        title={confirmState.title}
+        message={confirmState.message}
+        onConfirm={confirmState.onConfirm}
+        onCancel={() => setConfirmState(prev => ({ ...prev, isOpen: false }))}
+        isDestructive={confirmState.isDestructive}
+      />
     </>
   );
 }

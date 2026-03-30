@@ -1,4 +1,5 @@
 import React, { useState, useEffect, memo } from 'react';
+import { createPortal } from 'react-dom';
 import api from '../api/axios';
 import { useAppStore } from '../store';
 import type { Registrant, ShirtSize, PaymentStatus, PaymentMethod } from '../types';
@@ -195,6 +196,7 @@ const NAME_REGEX = /^[A-Za-z\s.',-]+$/;
 
 export default function Registrants() {
   const currentUser = useAppStore(s => s.currentUser);
+  const currentUserId = currentUser?._id; // Stable dependency for effects
   const appSettings = useAppStore(s => s.appSettings);
   const fetchGlobalSettings = useAppStore(s => s.fetchGlobalSettings);
   const registrants = useAppStore(s => s.registrants);
@@ -218,7 +220,7 @@ export default function Registrants() {
       fetchGlobalSettings();
       fetchRegistrants(registrants.length > 0);
     }
-  }, []);
+  }, [currentUserId, hasSyncedLive]);
 
   // Local state for UI
   const [searchInput, setSearchInput] = useState('');
@@ -369,7 +371,7 @@ export default function Registrants() {
 
   useEffect(() => {
     fetchSummary();
-  }, []);
+  }, [currentUserId]);
 
   // Derived visible data
   const baseRegistrants = pageRegistrants;
@@ -889,9 +891,9 @@ export default function Registrants() {
         )}
       </div>
 
-      {isModalOpen && (
-        <div className="fixed inset-0 bg-brand-brown/50 backdrop-blur-sm z-[100] flex items-center justify-center p-2 sm:p-4 overflow-y-auto">
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-3xl overflow-hidden my-4 md:my-8 border border-brand-sand max-h-[95vh] sm:max-h-[90vh] flex flex-col">
+      {isModalOpen && createPortal(
+        <div className="fixed inset-0 bg-brand-brown/50 backdrop-blur-sm z-[1000] flex items-center justify-center p-2 sm:p-4 overflow-y-auto">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-3xl overflow-hidden my-auto border border-brand-sand max-h-[90vh] flex flex-col pointer-events-auto">
             <div className="px-4 sm:px-6 py-4 border-b border-gray-100 flex justify-between items-center bg-brand-cream/50 sticky top-0 z-20">
               <h3 className="text-2xl font-display text-brand-brown tracking-wide">
                 {editingId ? 'Edit Registrant' : 'Add New Registrant'}
@@ -1163,12 +1165,13 @@ export default function Registrants() {
               </div>
             </form>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
-      {isBatchModalOpen && (
-        <div className="fixed inset-0 bg-brand-brown/50 backdrop-blur-sm z-[100] flex items-center justify-center p-2 sm:p-4 overflow-y-auto">
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-6xl overflow-hidden my-4 md:my-8 border border-brand-sand max-h-[95vh] sm:max-h-[90vh] flex flex-col">
+      {isBatchModalOpen && createPortal(
+        <div className="fixed inset-0 bg-brand-brown/50 backdrop-blur-sm z-[1000] flex items-center justify-center p-2 sm:p-4 overflow-y-auto">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-6xl overflow-hidden my-auto border border-brand-sand max-h-[95vh] sm:max-h-[90vh] flex flex-col pointer-events-auto">
             <div className="px-4 sm:px-6 py-4 border-b border-gray-100 flex justify-between items-center bg-brand-cream/50 sticky top-0 z-20">
               <h3 className="text-2xl font-display text-brand-brown tracking-wide flex items-center gap-2">
                 <Users className="text-brand-brown" /> Batch Registration
@@ -1383,8 +1386,8 @@ export default function Registrants() {
 
                                      {row.paymentMethod?.toLowerCase().includes('gcash') && (
                                        <div className="col-span-2">
-                                         <label className="block text-xs text-gray-500 mb-1">GCash Ref No.</label>
-                                         <input type="text" value={row.gcRef || ''} onChange={(e) => setBatchData(batchData.map((d, i) => i === idx ? { ...d, gcRef: e.target.value } : d))} className="w-full px-3 py-2 text-sm rounded-lg border border-gray-200 focus:outline-none focus:border-brand-brown font-mono" placeholder="000 000 000000" />
+                                          <label className="block text-xs text-gray-500 mb-1">GCash Ref No.</label>
+                                          <input type="text" value={row.gcRef || ''} onChange={(e) => setBatchData(batchData.map((d, i) => i === idx ? { ...d, gcRef: e.target.value } : d))} className="w-full px-3 py-2 text-sm rounded-lg border border-gray-200 focus:outline-none focus:border-brand-brown font-mono" placeholder="000 000 000000" />
                                        </div>
                                      )}
                                   </div>
@@ -1418,12 +1421,13 @@ export default function Registrants() {
               </div>
             </form>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* Shirt Size Photo Modal */}
-      {shirtModalOpen && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[120] flex items-center justify-center p-2 sm:p-4" onClick={() => setShirtModalOpen(false)}>
+      {shirtModalOpen && createPortal(
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[1100] flex items-center justify-center p-2 sm:p-4" onClick={() => setShirtModalOpen(false)}>
           <div className="bg-white rounded-2xl shadow-2xl p-4 sm:p-6 max-w-lg w-full relative max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
             <button
               onClick={() => setShirtModalOpen(false)}
@@ -1449,7 +1453,8 @@ export default function Registrants() {
               </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
 
