@@ -17,10 +17,16 @@ router.get('/', requirePermission('registrants', 'view'), async (req, res) => {
       church = 'All', 
       status = 'All', 
       ministry = 'All',
-      merchStatus = 'All' 
+      merchStatus = 'All',
+      verification = 'All'
     } = req.query;
 
     const query = {};
+
+    if (verification !== 'All') {
+      query.verifiedByTreasurer = verification === 'Verified';
+    }
+    console.log('DEBUG: Registrants Query:', { verification, query });
     
     // Role-based visibility: Non-admins might only see their own church depending on permissions
     // But the current controller design seems to return all by default for 'view' permission.
@@ -109,14 +115,22 @@ router.get('/summary', requirePermission('registrants', 'view'), async (req, res
 
     const sizeStats = {};
 
+    const verifiedSizeStats = {};
+    const unverifiedSizeStats = {};
+
     all.forEach(r => {
       if (!sum[r.church]) sum[r.church] = { total: 0, collected: 0, expected: 0, pending: 0 };
       sum[r.church].total += 1;
+      
+      const size = r.shirtSize || 'Unknown';
+      
       if (r.verifiedByTreasurer) {
         sum[r.church].collected += (r.amountPaid || 0);
         totalCollected += (r.amountPaid || 0);
+        verifiedSizeStats[size] = (verifiedSizeStats[size] || 0) + 1;
       } else {
         sum[r.church].pending += (r.amountPaid || 0);
+        unverifiedSizeStats[size] = (unverifiedSizeStats[size] || 0) + 1;
       }
       const fee = r.feeType === 'Early Bird' ? 350 : 500;
       sum[r.church].expected += fee;
@@ -129,8 +143,7 @@ router.get('/summary', requirePermission('registrants', 'view'), async (req, res
       if (r.merchClaims?.notebook) merchStats.notebook++;
       if (r.merchClaims?.pen) merchStats.pen++;
 
-      // Size stats
-      const size = r.shirtSize || 'Unknown';
+      // Global size stats (legacy support)
       sizeStats[size] = (sizeStats[size] || 0) + 1;
     });
 
@@ -139,7 +152,9 @@ router.get('/summary', requirePermission('registrants', 'view'), async (req, res
       totalExpected,
       totalCollected,
       merchStats,
-      sizeStats
+      sizeStats,
+      verifiedSizeStats,
+      unverifiedSizeStats
     });
   } catch (err) {
     res.status(500).json({ message: err.message });

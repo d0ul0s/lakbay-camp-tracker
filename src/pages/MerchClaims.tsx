@@ -64,12 +64,16 @@ export default function MerchClaims() {
   const [isFetching, setIsFetching] = useState(false);
   const [stats, setStats] = useState<{
     sizes: Record<string, number>;
+    verifiedSizes: Record<string, number>;
+    unverifiedSizes: Record<string, number>;
     tshirts: { claimed: number; total: number };
     bags: { claimed: number; total: number };
     notebooks: { claimed: number; total: number };
     pens: { claimed: number; total: number };
   }>({
     sizes: {},
+    verifiedSizes: {},
+    unverifiedSizes: {},
     tshirts: { claimed: 0, total: 0 },
     bags: { claimed: 0, total: 0 },
     notebooks: { claimed: 0, total: 0 },
@@ -103,6 +107,8 @@ export default function MerchClaims() {
       const m = res.data.merchStats;
       setStats({
         sizes: res.data.sizeStats || {},
+        verifiedSizes: res.data.verifiedSizeStats || {},
+        unverifiedSizes: res.data.unverifiedSizeStats || {},
         tshirts: { claimed: m.tshirt, total: m.total },
         bags: { claimed: m.bag, total: m.total },
         notebooks: { claimed: m.notebook, total: m.total },
@@ -227,20 +233,52 @@ export default function MerchClaims() {
         ))}
       </div>
 
-      {/* Size Breakdown */}
-      {Object.keys(stats.sizes || {}).length > 0 && (
-        <div className="flex flex-wrap gap-2 pt-2">
-          {Object.entries(stats.sizes || {}).sort(([a], [b]) => {
-            const order = ['XS', 'S', 'M', 'L', 'XL', 'XXL', '3XL', '4XL', '5XL'];
-            return (order.indexOf(a) !== -1 ? order.indexOf(a) : 99) - (order.indexOf(b) !== -1 ? order.indexOf(b) : 99);
-          }).map(([size, count]) => (
-            <div key={size} className="bg-white border border-brand-sand/50 rounded-lg px-3 py-1.5 flex items-center justify-between gap-3 shadow-sm min-w-[70px]">
-              <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest leading-none">{size}</span>
-              <span className="text-sm font-black text-brand-brown leading-none">{count}</span>
-            </div>
-          ))}
+      {/* Size Selection Section */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
+        {/* Verified Sizes - Production Ready */}
+        <div className="bg-green-50/10 border border-green-200 rounded-2xl p-4">
+          <div className="flex items-center gap-2 mb-3">
+            <Check size={16} className="text-green-600" />
+            <h3 className="text-[10px] font-black text-green-700 uppercase tracking-widest leading-none">Verified Shirts (Ready for Order)</h3>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {Object.entries(stats.verifiedSizes || {}).sort(([a], [b]) => {
+              const order = ['XS', 'S', 'M', 'L', 'XL', 'XXL', '3XL', '4XL', '5XL'];
+              return (order.indexOf(a) !== -1 ? order.indexOf(a) : 99) - (order.indexOf(b) !== -1 ? order.indexOf(b) : 99);
+            }).map(([size, count]) => (
+              <div key={size} className="bg-white border-2 border-green-200 rounded-xl px-3 py-2 flex items-center justify-between gap-3 shadow-md min-w-[85px] group hover:border-green-400 transition-all">
+                <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest leading-none">{size}</span>
+                <span className="text-sm font-black text-green-700 leading-none">{count}</span>
+              </div>
+            ))}
+            {Object.keys(stats.verifiedSizes || {}).length === 0 && (
+              <p className="text-[11px] text-gray-400 italic font-medium py-2">No verified sizes yet.</p>
+            )}
+          </div>
         </div>
-      )}
+
+        {/* Unverified Sizes - Pending */}
+        <div className="bg-orange-50/10 border border-orange-200 rounded-2xl p-4">
+          <div className="flex items-center gap-2 mb-3">
+            <Loader2 size={16} className="text-orange-500 hover:rotate-180 transition-transform" />
+            <h3 className="text-[10px] font-black text-orange-700 uppercase tracking-widest leading-none">Unverified Shirts (Draft/Pending)</h3>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {Object.entries(stats.unverifiedSizes || {}).sort(([a], [b]) => {
+              const order = ['XS', 'S', 'M', 'L', 'XL', 'XXL', '3XL', '4XL', '5XL'];
+              return (order.indexOf(a) !== -1 ? order.indexOf(a) : 99) - (order.indexOf(b) !== -1 ? order.indexOf(b) : 99);
+            }).map(([size, count]) => (
+              <div key={size} className="bg-white/50 border border-orange-100 rounded-xl px-3 py-2 flex items-center justify-between gap-3 shadow-sm min-w-[85px] opacity-70">
+                <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest leading-none">{size}</span>
+                <span className="text-sm font-black text-orange-600 leading-none">{count}</span>
+              </div>
+            ))}
+            {Object.keys(stats.unverifiedSizes || {}).length === 0 && (
+              <p className="text-[11px] text-gray-400 italic font-medium py-2">No unverified sizes yet.</p>
+            )}
+          </div>
+        </div>
+      </div>
 
       <div className="bg-white rounded-2xl shadow-sm border border-brand-beige overflow-hidden">
         {/* Toolbar */}

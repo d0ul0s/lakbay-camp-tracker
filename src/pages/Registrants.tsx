@@ -16,7 +16,8 @@ const RegistrantRow = memo(({
   canEditAny,
   canDeleteAny,
   rolePerms,
-  currentUserChurch
+  currentUserChurch,
+  isSyncing
 }: { 
   reg: Registrant, 
   canVerify: boolean, 
@@ -27,7 +28,8 @@ const RegistrantRow = memo(({
   canEditAny: boolean,
   canDeleteAny: boolean,
   rolePerms: any,
-  currentUserChurch: string | null
+  currentUserChurch: string | null,
+  isSyncing: boolean
 }) => {
   const userChurch = currentUserChurch?.toLowerCase().trim();
   const regChurch = reg.church?.toLowerCase().trim();
@@ -70,12 +72,13 @@ const RegistrantRow = memo(({
       <td className="px-2 lg:px-6 py-4 text-center">
         {canVerify ? (
           <button
-            onClick={() => handleToggleVerify(reg)}
-            className={`inline-flex items-center justify-center p-1 rounded-lg transition-colors ${reg.verifiedByTreasurer ? 'bg-green-100 text-green-700 hover:bg-green-200' : 'bg-orange-100 text-orange-600 hover:bg-orange-200'
+            onClick={() => !isSyncing && handleToggleVerify(reg)}
+            disabled={isSyncing}
+            className={`inline-flex items-center justify-center p-1 rounded-lg transition-all ${isSyncing ? 'opacity-50 cursor-wait animate-pulse' : ''} ${reg.verifiedByTreasurer ? 'bg-green-100 text-green-700 hover:bg-green-200' : 'bg-orange-100 text-orange-600 hover:bg-orange-200'
               }`}
-            title={reg.verifiedByTreasurer ? 'Verified' : 'Pending Verification'}
+            title={isSyncing ? 'Syncing...' : (reg.verifiedByTreasurer ? 'Verified' : 'Pending Verification')}
           >
-            {reg.verifiedByTreasurer ? <CheckCircle size={14} className="lg:w-5 lg:h-5" /> : <Clock size={14} className="lg:w-5 lg:h-5" />}
+            {isSyncing ? <Loader2 size={14} className="animate-spin lg:w-5 lg:h-5 text-brand-brown" /> : (reg.verifiedByTreasurer ? <CheckCircle size={14} className="lg:w-5 lg:h-5" /> : <Clock size={14} className="lg:w-5 lg:h-5" />)}
           </button>
         ) : (
           <div className={`inline-flex items-center justify-center p-1 rounded-lg ${reg.verifiedByTreasurer ? 'text-green-500' : 'text-orange-400'}`} title={reg.verifiedByTreasurer ? 'Verified' : 'Pending Verification'}>
@@ -114,7 +117,8 @@ const RegistrantCard = memo(({
   canEditAny,
   canDeleteAny,
   rolePerms,
-  currentUserChurch
+  currentUserChurch,
+  isSyncing
 }: { 
   reg: Registrant, 
   canVerify: boolean, 
@@ -125,7 +129,8 @@ const RegistrantCard = memo(({
   canEditAny: boolean,
   canDeleteAny: boolean,
   rolePerms: any,
-  currentUserChurch: string | null
+  currentUserChurch: string | null,
+  isSyncing: boolean
 }) => {
   const userChurch = currentUserChurch?.toLowerCase().trim();
   const regChurch = reg.church?.toLowerCase().trim();
@@ -140,10 +145,10 @@ const RegistrantCard = memo(({
           <p className="font-black text-brand-brown text-[13px] leading-tight truncate">{reg.fullName}</p>
           <p className="text-[8px] text-gray-400 font-bold uppercase tracking-wider mt-0.5 truncate">{reg.church}</p>
         </div>
-        <div className={`shrink-0 p-1 rounded-lg transition-all shadow-sm ${reg.verifiedByTreasurer ? 'bg-green-100 text-green-700 border border-green-200' : 'bg-orange-50 text-orange-500 border border-orange-100'}`}>
+        <div className={`shrink-0 p-1 rounded-lg transition-all shadow-sm ${isSyncing ? 'opacity-50 animate-pulse bg-gray-100' : (reg.verifiedByTreasurer ? 'bg-green-100 text-green-700 border border-green-200' : 'bg-orange-50 text-orange-500 border border-orange-100')}`}>
           {canVerify ? (
-            <button onClick={() => handleToggleVerify(reg)} className="flex items-center justify-center">
-              {reg.verifiedByTreasurer ? <CheckCircle size={15} /> : <Clock size={15} />}
+            <button onClick={() => !isSyncing && handleToggleVerify(reg)} className="flex items-center justify-center" disabled={isSyncing}>
+              {isSyncing ? <Loader2 size={15} className="animate-spin" /> : (reg.verifiedByTreasurer ? <CheckCircle size={15} /> : <Clock size={15} />)}
             </button>
           ) : (
             <div className="flex items-center justify-center">
@@ -225,6 +230,7 @@ export default function Registrants() {
   });
   const [filterStatus, setFilterStatus] = useState<string>('All');
   const [filterMinistry, setFilterMinistry] = useState<string>('All');
+  const [filterVerify, setFilterVerify] = useState<string>('All');
 
   // Debounce search input
   useEffect(() => {
@@ -239,6 +245,7 @@ export default function Registrants() {
   const [pageRegistrants, setPageRegistrants] = useState<Registrant[]>([]);
   const [total, setTotal] = useState(0);
   const [isFetching, setIsFetching] = useState(false);
+  const [syncingIds, setSyncingIds] = useState<Set<string>>(new Set());
 
   type ChurchSummary = {
     total: number;
@@ -334,7 +341,8 @@ export default function Registrants() {
           search: searchTerm,
           church: filterChurch,
           status: filterStatus,
-          ministry: filterMinistry
+          ministry: filterMinistry,
+          verification: filterVerify
         }
       });
       setPageRegistrants(res.data.registrants);
@@ -357,7 +365,7 @@ export default function Registrants() {
 
   useEffect(() => {
     fetchData();
-  }, [currentPage, searchTerm, filterChurch, filterStatus, filterMinistry]);
+  }, [currentPage, searchTerm, filterChurch, filterStatus, filterMinistry, filterVerify]);
 
   useEffect(() => {
     fetchSummary();
@@ -369,7 +377,7 @@ export default function Registrants() {
   // Reset page when filters change
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchTerm, filterChurch, filterStatus, filterMinistry]);
+  }, [searchTerm, filterChurch, filterStatus, filterMinistry, filterVerify]);
 
   const totalPages = Math.ceil(total / itemsPerPage);
   const paginatedRegistrants = baseRegistrants;
@@ -554,23 +562,52 @@ export default function Registrants() {
     const reg = verifyConfirm.reg;
     const regId = (reg as any)._id || reg.id;
     const nowVerified = !reg.verifiedByTreasurer;
-    // Close immediately and optimistically update
+    
+    // Close immediately to allow the user to move to the next participant
     setVerifyConfirm({ isOpen: false, reg: null });
+    
+    // Add to local syncing queue
+    setSyncingIds(prev => new Set([...prev, regId]));
+
+    // Optimistic Update
     updateRegistrant(regId, {
       verifiedByTreasurer: nowVerified,
       verifiedAt: nowVerified ? new Date().toISOString() : null
     });
-    api.put(`/api/registrants/${regId}`, {
-      verifiedByTreasurer: nowVerified,
-      verifiedAt: nowVerified ? new Date().toISOString() : null
-    }).catch(err => {
-      console.error(err);
-      // Revert ONLY the failed row back to its original state
-      updateRegistrant(regId, {
-        verifiedByTreasurer: reg.verifiedByTreasurer,
-        verifiedAt: reg.verifiedAt
-      });
-    });
+
+    const attemptSync = async (retries = 3) => {
+      try {
+        await api.put(`/api/registrants/${regId}`, {
+          verifiedByTreasurer: nowVerified,
+          verifiedAt: nowVerified ? new Date().toISOString() : null
+        });
+        // Success: Remove from syncing queue
+        setSyncingIds(prev => {
+          const next = new Set(prev);
+          next.delete(regId);
+          return next;
+        });
+      } catch (err) {
+        console.error(`Verification sync failed for ${regId}, retries left: ${retries}`, err);
+        if (retries > 0) {
+          setTimeout(() => attemptSync(retries - 1), 2000); // Retry after 2s
+        } else {
+          // Final failure: Revert and inform
+          setSyncingIds(prev => {
+            const next = new Set(prev);
+            next.delete(regId);
+            return next;
+          });
+          updateRegistrant(regId, {
+            verifiedByTreasurer: reg.verifiedByTreasurer,
+            verifiedAt: reg.verifiedAt
+          });
+          alert(`Failed to verify ${reg.fullName}. Please check your connection.`);
+        }
+      }
+    };
+
+    attemptSync();
   };
 
   const toggleMinistry = (m: string) => {
@@ -739,6 +776,16 @@ export default function Registrants() {
               <option value="Partial">Partial</option>
               <option value="Unpaid">Unpaid</option>
             </select>
+
+            <select
+              value={filterVerify}
+              onChange={(e) => setFilterVerify(e.target.value)}
+              className="py-2 pl-3 pr-8 rounded-lg border border-gray-200 focus:outline-none focus:border-brand-brown focus:ring-1 transition-all w-full md:w-32 lg:w-40 bg-white text-xs font-bold"
+            >
+              <option value="All">Verification</option>
+              <option value="Verified">Verified Only</option>
+              <option value="Unverified">Unverified Only</option>
+            </select>
           </div>
         </div>
 
@@ -778,6 +825,7 @@ export default function Registrants() {
                   canDeleteAny={canDeleteAny}
                   rolePerms={rolePerms}
                   currentUserChurch={currentUser?.church || null}
+                  isSyncing={syncingIds.has((reg as any)._id || reg.id)}
                 />
               )) : (
                 <tr>
@@ -805,6 +853,7 @@ export default function Registrants() {
               canDeleteAny={canDeleteAny}
               rolePerms={rolePerms}
               currentUserChurch={currentUser?.church || null}
+              isSyncing={syncingIds.has((reg as any)._id || (reg as any).id)}
             />
           )) : (
             <div className="mobile-card py-12 text-center text-gray-400">

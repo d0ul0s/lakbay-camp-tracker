@@ -54,12 +54,9 @@ export default function ConfirmModal({
               {cancelLabel}
             </button>
             <button
+              autoFocus
               onClick={() => {
                 onConfirm();
-                // We do NOT call onCancel() automatically if it's an async action. 
-                // The parent component manages isOpen via verifyConfirm / confirmModal state.
-                // It will be closed manually by the parent when the API promise resolves, 
-                // allowing the spinner to remain visible inside the button/overlay while loading.
               }}
               disabled={isLoading}
               className={`flex-1 px-4 py-3 rounded-lg font-bold text-white transition-colors flex items-center justify-center gap-2 disabled:opacity-75 disabled:cursor-not-allowed ${

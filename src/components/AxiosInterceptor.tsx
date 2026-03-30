@@ -21,13 +21,15 @@ export default function AxiosInterceptor({ children }: { children: React.ReactNo
         const message = error.response?.data?.message || '';
         const isTimeout = error.code === 'ECONNABORTED' || error.message?.toLowerCase().includes('timeout');
 
-        // Handle cold start related errors (including health check timeouts) silently
-        if (status === 502 || status === 503 || error.code === 'ERR_NETWORK' || isTimeout) {
+        const isColdStartError = status === 502 || status === 503;
+        const isNetworkGlitch = error.code === 'ERR_NETWORK' || isTimeout;
+
+        // ONLY trigger the full-screen 'Waking up' loader for actual server sleep (502/503)
+        // or if it's the very first request (nothing awake yet).
+        // This prevents minor mobile network hiccups from blocking the whole UI during active use.
+        if (isColdStartError || (!isServerAwake && isNetworkGlitch)) {
           setServerAwake(false);
-          if (error.config?.url?.includes('/api/health')) {
-            return Promise.reject(error); // Silently reject health checks without global error
-          }
-          return Promise.reject(error); // The ColdStartLoader will handle the UI
+          return Promise.reject(error);
         }
 
         if (status === 401) {

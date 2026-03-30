@@ -85,20 +85,17 @@ const getChurchVibrantColor = (church: string) => {
   return colors[Math.abs(hash) % colors.length];
 };
 
-// Helper: Modern Facebook Circular SVG Icon
+// Helper: Modern Facebook Solid Circular SVG Icon (2024 Version)
 const FacebookIcon = ({ size = 16, className = "" }: { size?: number, className?: string }) => (
   <svg 
     width={size} 
     height={size} 
     viewBox="0 0 24 24" 
-    fill="none" 
     xmlns="http://www.w3.org/2000/svg"
     className={className}
+    fill="currentColor"
   >
-    <path 
-      d="M24 12.073C24 5.405 18.627 0 12 0S0 5.405 0 12.073C0 18.1 4.388 23.094 10.125 24v-8.437H7.078v-3.49h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.49h-2.796V24C19.612 23.094 24 18.1 24 12.073z" 
-      fill="currentColor"
-    />
+    <path d="M12 0C5.373 0 0 5.373 0 12c0 5.99 4.388 10.954 10.125 11.854V15.47H7.078v-3.47h3.047V9.356c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.384C19.612 22.954 24 17.99 24 12c0-6.627-5.373-12-12-12z" />
   </svg>
 );
 
@@ -311,6 +308,22 @@ export default function Organization() {
   // Roles processing
   const staff = leaders;
   const youthLeaders = leaders.filter(l => getCategories(l).includes('Youth Leader'));
+
+  // Logic: Tribe Integrity Audit (Ungrouped & Duplicates)
+  const memberAssignments: Record<string, string[]> = {};
+  groups.forEach((g: CampGroup) => {
+    (g.members || []).forEach((m: string) => {
+      if (!memberAssignments[m]) memberAssignments[m] = [];
+      memberAssignments[m].push(g.name);
+    });
+  });
+
+  const ungrouped = registrants
+    .filter((r) => r.church !== 'JAM')
+    .filter((r) => !memberAssignments[r.fullName]);
+  const duplicates = Object.entries(memberAssignments)
+    .filter(([_, groupNames]) => groupNames.length > 1)
+    .map(([name, groupNames]) => ({ name, groups: groupNames }));
   
   // Dynamic fallback for church list if settings haven't loaded yet
   const effectiveChurches = (appSettings?.churches && appSettings.churches.length > 0)
@@ -508,7 +521,94 @@ export default function Organization() {
           {/* 3. OFFICIAL GROUPINGS */}
           {activeTab === 'groups' && (
             <section className="animate-in fade-in slide-in-from-bottom-2 duration-500 mb-12">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+                {/* Tribe Integrity Audit Summary (Admin Only) */}
+                {isAdmin && (
+                  <div className="mb-8 grid grid-cols-1 lg:grid-cols-3 gap-6 animate-in fade-in zoom-in-95 duration-300">
+                    {/* 1. Ungrouped Participants */}
+                    <div className="lg:col-span-2 bg-white rounded-3xl p-5 border border-amber-100 shadow-sm shadow-amber-900/5 transition-all hover:shadow-md">
+                      <div className="flex items-center justify-between gap-4 mb-4">
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 rounded-2xl bg-amber-50 flex items-center justify-center text-amber-500 shadow-inner">
+                            <Users size={20} />
+                          </div>
+                          <div>
+                            <h4 className="text-sm font-black uppercase text-gray-800 tracking-widest leading-none mb-1">Ungrouped Members</h4>
+                            <p className="text-[10px] text-gray-400 font-bold uppercase leading-none">{ungrouped.length} remaining for assignment</p>
+                          </div>
+                        </div>
+                        <div className="relative group/ungsearch flex-1 max-w-[200px]">
+                          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-300 group-focus-within/ungsearch:text-amber-400 transition-colors" size={14} />
+                          <input 
+                            type="text" 
+                            placeholder="Find ungrouped..." 
+                            className="w-full pl-8 pr-3 py-2 bg-gray-50 border border-gray-100 rounded-xl text-xs outline-none focus:border-amber-200 focus:bg-white transition-all font-medium"
+                            value={registrySearch}
+                            onChange={e => setRegistrySearch(e.target.value)}
+                          />
+                        </div>
+                      </div>
+                      <div className="flex flex-wrap gap-2 max-h-[150px] overflow-y-auto p-2 bg-amber-50/20 rounded-2xl border border-amber-50/50 custom-scrollbar">
+                        {ungrouped.length === 0 ? (
+                          <div className="w-full py-6 flex flex-col items-center justify-center gap-2 opacity-40">
+                             <Check className="text-emerald-500" size={24} />
+                             <p className="text-[11px] font-black uppercase tracking-widest text-emerald-600">All participants grouped!</p>
+                          </div>
+                        ) : (
+                          ungrouped
+                            .filter((r) => (r.fullName || '').toLowerCase().includes(registrySearch.toLowerCase()) || (r.church || '').toLowerCase().includes(registrySearch.toLowerCase()))
+                            .map((r) => (
+                              <div key={r._id || r.id} className="flex items-center gap-2 px-3 py-1.5 bg-white border border-amber-100 rounded-xl shadow-[0_1px_2px_rgba(0,0,0,0.02)] transition-transform hover:scale-105 cursor-default group">
+                                <div className={`w-1.5 h-1.5 rounded-full ${getChurchVibrantColor(r.church || '')}`}></div>
+                                <span className="text-[11px] font-bold text-gray-700 truncate max-w-[120px]">{r.fullName}</span>
+                                <span className="text-[8px] font-black uppercase text-gray-300 tracking-tighter ml-auto opacity-0 group-hover:opacity-100 transition-opacity">{r.church}</span>
+                              </div>
+                            ))
+                        )}
+                        {ungrouped.filter((r) => (r.fullName || '').toLowerCase().includes(registrySearch.toLowerCase())).length === 0 && ungrouped.length > 0 && (
+                          <p className="w-full text-center py-4 text-[10px] text-gray-400 italic">No matches found.</p>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* 2. Logic Critical Errors (Duplicates) */}
+                    <div className="bg-white rounded-3xl p-5 border border-red-50 shadow-sm shadow-red-900/5 relative overflow-hidden group">
+                      {duplicates.length > 0 && (
+                        <div className="absolute top-0 right-0 p-3 animate-pulse">
+                          <Flag size={20} className="text-red-500" fill="currentColor" opacity={0.1} />
+                        </div>
+                      )}
+                      <div className="flex items-center gap-3 mb-4">
+                        <div className={`w-10 h-10 rounded-2xl flex items-center justify-center shadow-inner transition-colors ${duplicates.length > 0 ? 'bg-red-50 text-red-500' : 'bg-emerald-50 text-emerald-500'}`}>
+                          {duplicates.length > 0 ? <Flag size={20} /> : <Check size={20} />}
+                        </div>
+                        <div>
+                          <h4 className="text-sm font-black uppercase text-gray-800 tracking-widest leading-none mb-1">Double Bookings</h4>
+                          <p className={`text-[10px] font-bold uppercase leading-none ${duplicates.length > 0 ? 'text-red-400' : 'text-emerald-500'}`}>
+                            {duplicates.length > 0 ? `${duplicates.length} participants in multiple tribes` : 'Perfect assignments'}
+                          </p>
+                        </div>
+                      </div>
+                      <div className={`flex flex-col gap-2 max-h-[150px] overflow-y-auto p-2 rounded-2xl border transition-all ${duplicates.length > 0 ? 'bg-red-50/20 border-red-100' : 'bg-emerald-50/20 border-emerald-50 opacity-50'}`}>
+                        {duplicates.length === 0 ? (
+                          <p className="text-[10px] text-gray-400 italic py-6 text-center">No duplicate tribe assignments detected.</p>
+                        ) : (
+                          duplicates.map((d, idx: number) => (
+                            <div key={idx} className="bg-white p-2.5 rounded-xl border border-red-100/50 shadow-sm">
+                              <p className="text-[11px] font-black text-red-600 truncate mb-1">{d.name}</p>
+                              <div className="flex flex-wrap gap-1">
+                                {d.groups.map((gn: string) => (
+                                  <span key={gn} className="text-[8px] bg-red-50 text-red-400 px-1.5 py-0.5 rounded font-black uppercase tracking-tighter border border-red-100">{gn}</span>
+                                ))}
+                              </div>
+                            </div>
+                          ))
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
                 <div className="flex items-center gap-2 text-brand-brown/40">
                   <Tent size={18} />
                   <h3 className="text-sm font-black uppercase tracking-widest">Tribal Unit Groups</h3>
@@ -753,7 +853,7 @@ export default function Organization() {
                   icon={<Star size={12} className="inline mr-1 text-orange-500" />}
                   value={groupForm.leader || ''}
                   onChange={val => setGroupForm({ ...groupForm, leader: val })}
-                  options={registrants}
+                  options={registrants.filter(r => r.church !== 'JAM')}
                   placeholder="Search participant..."
                 />
                 <SearchableRoleInput
@@ -761,7 +861,7 @@ export default function Organization() {
                   icon={<Shield size={12} className="inline mr-1 text-amber-500" />}
                   value={groupForm.assistantLeader || ''}
                   onChange={val => setGroupForm({ ...groupForm, assistantLeader: val })}
-                  options={registrants}
+                  options={registrants.filter(r => r.church !== 'JAM')}
                   placeholder="Search participant..."
                 />
                 <SearchableRoleInput
@@ -769,7 +869,7 @@ export default function Organization() {
                   icon={<Target size={12} className="inline mr-1 text-blue-500" />}
                   value={groupForm.pointKeeper || ''}
                   onChange={val => setGroupForm({ ...groupForm, pointKeeper: val })}
-                  options={registrants}
+                  options={registrants.filter(r => r.church !== 'JAM')}
                   placeholder="Search participant..."
                 />
                 <SearchableRoleInput
@@ -777,7 +877,7 @@ export default function Organization() {
                   icon={<Flag size={12} className="inline mr-1 text-red-500" />}
                   value={groupForm.flagBearer || ''}
                   onChange={val => setGroupForm({ ...groupForm, flagBearer: val })}
-                  options={registrants}
+                  options={registrants.filter(r => r.church !== 'JAM')}
                   placeholder="Search participant..."
                 />
                 <SearchableRoleInput
@@ -789,7 +889,7 @@ export default function Organization() {
                     next[0] = val;
                     setGroupForm({ ...groupForm, grabMasters: next });
                   }}
-                  options={registrants}
+                  options={registrants.filter(r => r.church !== 'JAM')}
                   placeholder="Search participant..."
                 />
                 <SearchableRoleInput
@@ -801,7 +901,7 @@ export default function Organization() {
                     next[1] = val;
                     setGroupForm({ ...groupForm, grabMasters: next });
                   }}
-                  options={registrants}
+                  options={registrants.filter(r => r.church !== 'JAM')}
                   placeholder="Search participant..."
                 />
               </div>
@@ -822,7 +922,7 @@ export default function Organization() {
                 </div>
                 <div className="flex flex-wrap gap-1.5 p-3 bg-indigo-50/30 rounded-xl border border-indigo-100/50 max-h-32 overflow-y-auto">
                   {leaders
-                    .filter(l => !getCategories(l).includes('Youth Leader'))
+                    .filter(l => getCategories(l).includes('Facilitator/Counselor') && l.churchRef !== 'JAM')
                     .filter(l => l.name.toLowerCase().includes(facilSearch.toLowerCase()))
                     .map(l => (
                       <button
@@ -875,6 +975,7 @@ export default function Organization() {
                   />
                   <div className="flex flex-wrap gap-1.5 max-h-48 overflow-y-auto pt-2 custom-scrollbar">
                     {registrants
+                      .filter(r => r.church !== 'JAM')
                       .filter(reg => (reg.fullName || '').toLowerCase().includes(registrySearch.toLowerCase()) || (reg.church || '').toLowerCase().includes(registrySearch.toLowerCase()))
                       .map(reg => (
                         <button
@@ -886,12 +987,15 @@ export default function Organization() {
                             setGroupForm({ ...groupForm, members: next });
                             setMembersRaw(next.join(', '));
                           }}
-                          className={`text-[9px] px-2 py-0.5 rounded-md font-bold transition-all border ${ (groupForm.members || []).includes(reg.fullName) 
-                            ? 'bg-brand-brown border-brand-brown text-white shadow-sm' 
-                            : 'bg-white border-gray-200 text-gray-500 hover:border-brand-sand' }`}
+                          className={`text-[9px] px-2.5 py-1.5 rounded-lg font-black transition-all border shadow-sm ${ (groupForm.members || []).includes(reg.fullName) 
+                            ? 'bg-brand-brown border-brand-brown text-white ring-2 ring-brand-sand/50' 
+                            : 'bg-white border-gray-100 text-gray-400 hover:border-brand-brown hover:text-brand-brown' }`}
                         >
-                          {reg.fullName}
-                        </button>
+                        <div className="flex flex-col items-center gap-0.5">
+                          <span>{reg.fullName}</span>
+                          <span className={`text-[7px] opacity-70 ${ (groupForm.members || []).includes(reg.fullName) ? 'text-brand-cream' : 'text-gray-300' }`}>{reg.church ? reg.church : ''}</span>
+                        </div>
+                      </button>
                       ))}
                     {registrants.filter(reg => (reg.fullName || '').toLowerCase().includes(registrySearch.toLowerCase())).length === 0 && (
                       <p className="w-full text-center py-4 text-[10px] text-gray-400 italic">No matching participants found.</p>
