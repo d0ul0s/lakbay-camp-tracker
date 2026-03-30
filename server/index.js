@@ -22,11 +22,15 @@ const originCheck = (origin, callback) => {
   if (!origin || allowedOrigins.includes(origin)) {
     return callback(null, true);
   }
-  // Allow any local network IP (e.g., http://192.168.x.x:5173)
+  // Allow any Vercel or Render preview domains
+  if (origin.endsWith('.vercel.app') || origin.endsWith('.onrender.com')) {
+    return callback(null, true);
+  }
+  // Allow any local network IP
   if (origin.startsWith('http://192.168.') || origin.startsWith('http://10.') || origin.startsWith('http://172.')) {
     return callback(null, true);
   }
-  callback(new Error('Not allowed by CORS'));
+  callback(new Error(`Not allowed by CORS: ${origin}`));
 };
 
 const io = require('socket.io')(server, {
