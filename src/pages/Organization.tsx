@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAppStore } from '../store';
 import { Link } from 'react-router-dom';
-import { Users, Shield, X, Edit2, Map, Tent, Star, Flag, Target, Hand, Loader2, Search, Check, ChevronDown, ExternalLink, ArrowLeft } from 'lucide-react';
+import { Users, Shield, X, Edit2, Map, Tent, Star, Flag, Target, Hand, Loader2, Search, Check, ChevronDown, ArrowLeft } from 'lucide-react';
 import api from '../api/axios';
 
 interface CampLeader {
@@ -84,6 +84,23 @@ const getChurchVibrantColor = (church: string) => {
   }
   return colors[Math.abs(hash) % colors.length];
 };
+
+// Helper: Modern Facebook Circular SVG Icon
+const FacebookIcon = ({ size = 16, className = "" }: { size?: number, className?: string }) => (
+  <svg 
+    width={size} 
+    height={size} 
+    viewBox="0 0 24 24" 
+    fill="none" 
+    xmlns="http://www.w3.org/2000/svg"
+    className={className}
+  >
+    <path 
+      d="M24 12.073C24 5.405 18.627 0 12 0S0 5.405 0 12.073C0 18.1 4.388 23.094 10.125 24v-8.437H7.078v-3.49h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.49h-2.796V24C19.612 23.094 24 18.1 24 12.073z" 
+      fill="currentColor"
+    />
+  </svg>
+);
 
 // Searchable Input Component for Group Roles
 const SearchableRoleInput = ({ label, icon, value, onChange, options, placeholder }: { label: string, icon: React.ReactNode, value: string, onChange: (val: string) => void, options: any[], placeholder: string }) => {
@@ -183,11 +200,17 @@ export default function Organization() {
   // Local raw input states for comma-separated fields
   const [membersRaw, setMembersRaw] = useState('');
 
+  // Local search filter states for modal
+  const [facilSearch, setFacilSearch] = useState('');
+  const [registrySearch, setRegistrySearch] = useState('');
+
   useEffect(() => {
     if (groupModal.isOpen && groupModal.group) {
       setMembersRaw(groupModal.group.members?.join(', ') || '');
     } else if (groupModal.isOpen) {
       setMembersRaw('');
+      setFacilSearch('');
+      setRegistrySearch('');
     }
   }, [groupModal.isOpen, groupModal.group]);
 
@@ -377,14 +400,12 @@ export default function Organization() {
                                   {s.image ? <img src={s.image} alt={s.name} className="w-full h-full object-cover" /> : <span className="font-display text-brand-brown text-xs">{s.name.charAt(0)}</span>}
                                 </div>
                                 <div className="min-w-0">
-                                  <p className="font-bold text-sm leading-none flex items-center gap-1.5 truncate">
-                                    {s.socialLink ? (
-                                      <a href={s.socialLink} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:text-brand-brown hover:underline truncate flex items-center gap-1" title="View Social Profile">
-                                        {s.name}
-                                        <ExternalLink size={10} className="opacity-70" />
+                                  <p className="font-bold text-sm leading-none flex items-center gap-2 truncate text-gray-800">
+                                    {s.name}
+                                    {s.socialLink && (
+                                      <a href={s.socialLink} target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:text-blue-700 transition-all p-1 rounded-lg hover:bg-blue-50/50 group" title="View Facebook Profile">
+                                        <FacebookIcon size={14} className="fill-blue-500/10 group-hover:fill-blue-500/20" />
                                       </a>
-                                    ) : (
-                                      <span className="text-gray-800">{s.name}</span>
                                     )}
                                   </p>
                                   {s.roleTitle && <p className="text-[9px] uppercase font-black text-gray-400 tracking-tighter mt-1 truncate">{s.roleTitle}</p>}
@@ -441,14 +462,12 @@ export default function Organization() {
                                   {cl.image ? <img src={cl.image} alt={cl.name} className="w-full h-full object-cover" /> : <span className="font-display text-brand-brown text-xs">{cl.name.charAt(0)}</span>}
                                  </div>
                                  <div className="min-w-0">
-                                   <p className="text-sm font-bold leading-none flex items-center gap-1.5 truncate">
-                                     {cl.socialLink ? (
-                                       <a href={cl.socialLink} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:text-brand-brown hover:underline truncate flex items-center gap-1" title="View Social Profile">
-                                         {cl.name}
-                                         <ExternalLink size={10} className="opacity-70" />
+                                   <p className="text-sm font-bold leading-none flex items-center gap-2 truncate text-gray-800">
+                                     {cl.name}
+                                     {cl.socialLink && (
+                                       <a href={cl.socialLink} target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:text-blue-700 transition-all p-1 rounded-lg hover:bg-blue-50/50 group" title="View Facebook Profile">
+                                         <FacebookIcon size={14} className="fill-blue-500/10 group-hover:fill-blue-500/20" />
                                        </a>
-                                     ) : (
-                                       <span className="text-gray-800">{cl.name}</span>
                                      )}
                                    </p>
                                    {cl.roleTitle && <p className="text-[8px] uppercase font-black text-gray-400 tracking-tighter mt-1 truncate">{cl.roleTitle}</p>}
@@ -787,33 +806,61 @@ export default function Organization() {
                 />
               </div>
 
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
+              <div className="space-y-3">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                   <label className="block text-[11px] text-gray-500 font-bold uppercase tracking-widest flex items-center gap-1"><Shield size={14} className="text-indigo-400" /> Facilitators</label>
+                  <div className="relative group/search flex-1 sm:max-w-xs">
+                    <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within/search:text-indigo-500 transition-colors" size={12} />
+                    <input 
+                      type="text" 
+                      placeholder="Search facilitators..." 
+                      className="w-full pl-8 pr-3 py-1.5 bg-gray-50 border border-gray-100 rounded-lg text-xs outline-none focus:border-indigo-200 focus:bg-white transition-all font-medium"
+                      value={facilSearch}
+                      onChange={e => setFacilSearch(e.target.value)}
+                    />
+                  </div>
                 </div>
-                <div className="flex flex-wrap gap-1.5 p-3 bg-indigo-50/30 rounded-xl border border-indigo-100/50">
-                  {leaders.filter(l => getCategories(l).includes('Facilitator/Counselor')).map(l => (
-                    <button
-                      key={l._id || l.id}
-                      type="button"
-                      onClick={() => {
-                        const current = groupForm.facilitators || [];
-                        const next = current.includes(l.name) ? current.filter(n => n !== l.name) : [...current, l.name];
-                        setGroupForm({ ...groupForm, facilitators: next });
-                      }}
-                      className={`text-[10px] px-2.5 py-1 rounded-lg font-bold border transition-all ${(groupForm.facilitators || []).includes(l.name)
-                        ? 'bg-indigo-600 border-indigo-600 text-white'
-                        : 'bg-white border-indigo-200 text-indigo-600 hover:border-indigo-400'
-                        }`}
-                    >
-                      {l.name}
-                    </button>
-                  ))}
+                <div className="flex flex-wrap gap-1.5 p-3 bg-indigo-50/30 rounded-xl border border-indigo-100/50 max-h-32 overflow-y-auto">
+                  {leaders
+                    .filter(l => getCategories(l).includes('Facilitator/Counselor'))
+                    .filter(l => l.name.toLowerCase().includes(facilSearch.toLowerCase()))
+                    .map(l => (
+                      <button
+                        key={l._id || l.id}
+                        type="button"
+                        onClick={() => {
+                          const current = groupForm.facilitators || [];
+                          const next = current.includes(l.name) ? current.filter(n => n !== l.name) : [...current, l.name];
+                          setGroupForm({ ...groupForm, facilitators: next });
+                        }}
+                        className={`text-[10px] px-2.5 py-1 rounded-lg font-bold border transition-all ${(groupForm.facilitators || []).includes(l.name)
+                          ? 'bg-indigo-600 border-indigo-600 text-white shadow-sm'
+                          : 'bg-white border-indigo-200 text-indigo-600 hover:border-indigo-400'
+                          }`}
+                      >
+                        {l.name}
+                      </button>
+                    ))}
+                  {leaders.filter(l => getCategories(l).includes('Facilitator/Counselor') && l.name.toLowerCase().includes(facilSearch.toLowerCase())).length === 0 && (
+                    <p className="text-[10px] text-gray-400 italic py-1 px-2">No facilitators found.</p>
+                  )}
                 </div>
               </div>
 
-              <div>
-                <label className="block text-xs text-gray-500 font-bold uppercase tracking-widest mb-1.5 px-1">Participants/Members Listing</label>
+              <div className="space-y-3">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 px-1">
+                  <label className="block text-xs text-gray-500 font-bold uppercase tracking-widest">Participants/Members Listing</label>
+                  <div className="relative group/regshow flex-1 sm:max-w-xs">
+                    <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within/regshow:text-brand-brown transition-colors" size={12} />
+                    <input 
+                      type="text" 
+                      placeholder="Filter registry..." 
+                      className="w-full pl-8 pr-3 py-1.5 bg-gray-50 border border-gray-100 rounded-lg text-xs outline-none focus:border-brand-brown/30 focus:bg-white transition-all font-medium"
+                      value={registrySearch}
+                      onChange={e => setRegistrySearch(e.target.value)}
+                    />
+                  </div>
+                </div>
                 <div className="p-4 bg-gray-50 rounded-2xl border border-gray-100">
                   <textarea
                     value={membersRaw}
@@ -822,29 +869,33 @@ export default function Organization() {
                       const list = e.target.value.split(',').map(s => s.trim()).filter(s => s !== '');
                       setGroupForm({ ...groupForm, members: list });
                     }}
-                    rows={4}
+                    rows={3}
                     placeholder="Separate names with commas (e.g. John Doe, Jane Smith)"
-                    className="w-full bg-transparent border-none outline-none text-sm font-medium resize-none placeholder:text-gray-300"
+                    className="w-full bg-transparent border-none outline-none text-sm font-medium resize-none placeholder:text-gray-300 mb-2 border-b border-gray-200 pb-2"
                   />
-                  <div className="mt-2 flex flex-wrap gap-1.5 pt-2 border-t border-gray-200">
-                    <span className="text-[9px] font-black text-gray-400 uppercase tracking-tighter mr-1 self-center">Participants Registry:</span>
-                    {registrants.map(reg => (
-                      <button
-                        key={reg._id || reg.id}
-                        type="button"
-                        onClick={() => {
-                          const current = groupForm.members || [];
-                          const next = current.includes(reg.fullName) ? current.filter(n => n !== reg.fullName) : [...current, reg.fullName];
-                          setGroupForm({ ...groupForm, members: next });
-                          setMembersRaw(next.join(', '));
-                        }}
-                        className={`text-[9px] px-2 py-0.5 rounded-md font-bold transition-all border ${ (groupForm.members || []).includes(reg.fullName) 
-                          ? 'bg-brand-brown border-brand-brown text-white shadow-sm' 
-                          : 'bg-white border-gray-200 text-gray-500 hover:border-brand-sand' }`}
-                      >
-                        {reg.fullName}
-                      </button>
-                    ))}
+                  <div className="flex flex-wrap gap-1.5 max-h-48 overflow-y-auto pt-2 custom-scrollbar">
+                    {registrants
+                      .filter(reg => (reg.fullName || '').toLowerCase().includes(registrySearch.toLowerCase()) || (reg.church || '').toLowerCase().includes(registrySearch.toLowerCase()))
+                      .map(reg => (
+                        <button
+                          key={reg._id || reg.id}
+                          type="button"
+                          onClick={() => {
+                            const current = groupForm.members || [];
+                            const next = current.includes(reg.fullName) ? current.filter(n => n !== reg.fullName) : [...current, reg.fullName];
+                            setGroupForm({ ...groupForm, members: next });
+                            setMembersRaw(next.join(', '));
+                          }}
+                          className={`text-[9px] px-2 py-0.5 rounded-md font-bold transition-all border ${ (groupForm.members || []).includes(reg.fullName) 
+                            ? 'bg-brand-brown border-brand-brown text-white shadow-sm' 
+                            : 'bg-white border-gray-200 text-gray-500 hover:border-brand-sand' }`}
+                        >
+                          {reg.fullName}
+                        </button>
+                      ))}
+                    {registrants.filter(reg => (reg.fullName || '').toLowerCase().includes(registrySearch.toLowerCase())).length === 0 && (
+                      <p className="w-full text-center py-4 text-[10px] text-gray-400 italic">No matching participants found.</p>
+                    )}
                   </div>
                 </div>
               </div>
