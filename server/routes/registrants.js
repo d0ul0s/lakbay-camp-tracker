@@ -26,8 +26,8 @@ router.get('/', requirePermission('registrants', 'view'), async (req, res) => {
     if (verification !== 'All') {
       query.verifiedByTreasurer = verification === 'Verified';
     }
-    console.log('DEBUG: Registrants Query:', { verification, query });
-    
+
+
     // Role-based visibility: Non-admins might only see their own church depending on permissions
     // But the current controller design seems to return all by default for 'view' permission.
     // We maintain that but allow church filter.
