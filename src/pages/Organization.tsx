@@ -167,7 +167,7 @@ export default function Organization() {
                  <h4 className="font-black uppercase text-[10px] lg:text-xs tracking-widest text-brand-brown/60 mb-3 border-b border-gray-100 pb-2 flex items-center gap-2">
                    <div className="w-1.5 h-1.5 rounded-full bg-brand-brown"></div> {category}
                  </h4>
-                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                 <div className="flex flex-col gap-1.5">
                    {staff.filter(s => s.category === category).map(s => (
                      <div key={s._id || s.id} className="flex items-center justify-between group p-2 hover:bg-gray-50 rounded-xl transition-colors border border-transparent hover:border-brand-beige">
                         <div className="flex items-center gap-3">

@@ -141,7 +141,6 @@ export default function PublicOrganization() {
                 return (
                   <div key={church} className="bg-gradient-to-br from-white to-gray-50 border border-brand-beige rounded-2xl p-5 shadow-sm hover:shadow-md transition-shadow">
                      <h4 className="text-[11px] font-black uppercase text-gray-400 tracking-widest mb-3 border-b border-gray-100 pb-2">{church}</h4>
-                     <div className="p-5 pt-0">
                      <div className="grid grid-cols-1 gap-3">
                        {churchLeaders.map(cl => (
                          <div key={cl._id || cl.id} className="flex items-center justify-between group bg-white border border-gray-50 p-2.5 rounded-lg shadow-sm">
@@ -162,7 +161,6 @@ export default function PublicOrganization() {
                            </div>
                          </div>
                        ))}
-                     </div>
                      </div>
                   </div>
                 );
