@@ -51,6 +51,21 @@ export default function Organization() {
   const [leaderForm, setLeaderForm] = useState<Partial<CampLeader>>({ categories: ['Registration'], name: '', roleTitle: '', churchRef: '', image: '', socialLink: '' });
   const [groupForm, setGroupForm] = useState<Partial<CampGroup>>({ name: '', leader: '', assistantLeader: '', pointKeeper: '', flagBearer: '', facilitators: [], grabMasters: [], members: [] });
 
+  // Local raw input states for comma-separated fields to fix space-typing bug
+  const [facilRaw, setFacilRaw] = useState('');
+  const [grabRaw, setGrabRaw] = useState('');
+  const [membersRaw, setMembersRaw] = useState('');
+
+  useEffect(() => {
+    if (groupModal.isOpen && groupModal.group) {
+      setFacilRaw(groupModal.group.facilitators?.join(', ') || '');
+      setGrabRaw(groupModal.group.grabMasters?.join(', ') || '');
+      setMembersRaw(groupModal.group.members?.join(', ') || '');
+    } else if (groupModal.isOpen) {
+      setFacilRaw(''); setGrabRaw(''); setMembersRaw('');
+    }
+  }, [groupModal.isOpen, groupModal.group]);
+
   const ALL_CATEGORIES = [
     'Camp Head', 'Registration', 'Food', 'Arts & Decorations',
     'Media', 'Music', 'Marshall', 'Runners', 'Game Masters',
@@ -565,6 +580,7 @@ export default function Organization() {
                                  const current = groupForm.facilitators || [];
                                  const next = current.includes(l.name) ? current.filter(n => n !== l.name) : [...current, l.name];
                                  setGroupForm({...groupForm, facilitators: next});
+                                 setFacilRaw(next.join(', '));
                               }}
                               className={`text-[10px] px-2.5 py-1 rounded-lg font-bold border transition-all ${
                                  (groupForm.facilitators || []).includes(l.name)
@@ -588,6 +604,7 @@ export default function Organization() {
                                    const current = groupForm.facilitators || [];
                                    const next = current.includes(l.name) ? current.filter(n => n !== l.name) : [...current, l.name];
                                    setGroupForm({...groupForm, facilitators: next});
+                                   setFacilRaw(next.join(', '));
                                 }}
                                 className={`text-[10px] px-2.5 py-1 rounded-lg font-bold border transition-all ${
                                    (groupForm.facilitators || []).includes(l.name)
@@ -603,52 +620,45 @@ export default function Organization() {
 
                      <input 
                         type="text" 
-                        value={groupForm.facilitators?.join(', ')} 
-                        onChange={e => setGroupForm({...groupForm, facilitators: e.target.value.split(',').map(s=>s.trim()).filter(Boolean)})} 
+                        value={facilRaw} 
+                        onChange={e => {
+                          const val = e.target.value;
+                          setFacilRaw(val);
+                          setGroupForm({...groupForm, facilitators: val.split(',').map(s=>s.trim()).filter(Boolean)});
+                        }} 
                         className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:border-indigo-300 outline-none font-medium bg-white" 
                         placeholder="Or type manual names separated by comma..." 
                      />
                   </div>
 
                   <div className="space-y-4">
-                     <div className="flex items-center justify-between">
-                        <label className="block text-[11px] text-gray-500 font-bold uppercase tracking-widest flex items-center gap-1"><Hand size={14} className="text-gray-400" /> Grab Masters</label>
-                        <span className="text-[10px] text-gray-400 font-bold uppercase text-right">Quick add:</span>
-                     </div>
-                     
-                     <div className="flex flex-wrap gap-1.5 p-3 bg-gray-50 rounded-xl border border-gray-200/50">
-                        {leaders.filter(l => !getCategories(l).includes('Youth Leader')).map(l => (
-                           <button 
-                              key={l._id || l.id}
-                              type="button"
-                              onClick={() => {
-                                 const current = groupForm.grabMasters || [];
-                                 const next = current.includes(l.name) ? current.filter(n => n !== l.name) : [...current, l.name];
-                                 setGroupForm({...groupForm, grabMasters: next});
-                              }}
-                              className={`text-[10px] px-2.5 py-1 rounded-lg font-bold border transition-all ${
-                                 (groupForm.grabMasters || []).includes(l.name)
-                                    ? 'bg-brand-brown border-brand-brown text-white shadow-sm'
-                                    : 'bg-white border-gray-200 text-gray-600 hover:border-gray-400'
-                              }`}
-                           >
-                              {l.name}
-                           </button>
-                        ))}
-                     </div>
-
+                     <label className="block text-[11px] text-gray-500 font-bold uppercase tracking-widest flex items-center gap-1"><Hand size={14} className="text-gray-400" /> Grab Masters (Youths)</label>
                      <input 
                         type="text" 
-                        value={groupForm.grabMasters?.join(', ')} 
-                        onChange={e => setGroupForm({...groupForm, grabMasters: e.target.value.split(',').map(s=>s.trim()).filter(Boolean)})} 
+                        value={grabRaw} 
+                        onChange={e => {
+                           const val = e.target.value;
+                           setGrabRaw(val);
+                           setGroupForm({...groupForm, grabMasters: val.split(',').map(s=>s.trim()).filter(Boolean)});
+                        }} 
                         className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:border-brand-brown outline-none font-medium bg-white" 
-                        placeholder="Or type manual names separated by comma..." 
+                        placeholder="Type youth names separated by comma..." 
                      />
                   </div>
 
                   <div>
                      <label className="block text-[11px] text-gray-500 font-bold mb-1 uppercase tracking-widest">Normal Members (Comma separated)</label>
-                     <textarea value={groupForm.members?.join(', ')} onChange={e => setGroupForm({...groupForm, members: e.target.value.split(',').map(s=>s.trim()).filter(Boolean)})} rows={4} className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:border-brand-brown outline-none font-medium leading-relaxed custom-scrollbar" placeholder="Paste all member names here separated by commas..." />
+                     <textarea 
+                        value={membersRaw} 
+                        onChange={e => {
+                           const val = e.target.value;
+                           setMembersRaw(val);
+                           setGroupForm({...groupForm, members: val.split(',').map(s=>s.trim()).filter(Boolean)});
+                        }} 
+                        rows={4} 
+                        className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:border-brand-brown outline-none font-medium leading-relaxed custom-scrollbar" 
+                        placeholder="Paste all member names here separated by commas..." 
+                     />
                   </div>
 
                   <div className="pt-4 border-t border-gray-100 flex justify-end">
