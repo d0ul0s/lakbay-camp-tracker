@@ -28,6 +28,13 @@ interface CampGroup {
   members: string[];
 }
 
+// Helper: get effective categories for a leader
+const getCategories = (l: CampLeader) => {
+  if (l.categories && l.categories.length > 0) return l.categories;
+  if (l.category) return [l.category];
+  return [];
+};
+
 export default function Organization() {
   const { currentUser, appSettings, isServerAwake } = useAppStore();
   const isAdmin = currentUser?.role === 'admin';
@@ -133,13 +140,6 @@ export default function Organization() {
   // For the staff section, we allow all leaders but we only render their non-"Youth Leader" roles
   const staff = leaders;
   const youthLeaders = leaders.filter(l => getCategories(l).includes('Youth Leader'));
-
-  // Helper: get effective categories for a leader
-  const getCategories = (l: CampLeader) => {
-    if (l.categories && l.categories.length > 0) return l.categories;
-    if (l.category) return [l.category];
-    return [];
-  };
 
   return (
     <>
