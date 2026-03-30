@@ -215,6 +215,8 @@ export default function Organization() {
   // Local search filter states for modal
   const [facilSearch, setFacilSearch] = useState('');
   const [registrySearch, setRegistrySearch] = useState('');
+  // Separate search state for the ungrouped audit panel (independent from modal)
+  const [ungroupedSearch, setUngroupedSearch] = useState('');
 
   useEffect(() => {
     if (groupModal.isOpen && groupModal.group) {
@@ -223,6 +225,10 @@ export default function Organization() {
       setMembersRaw('');
       setFacilSearch('');
       setRegistrySearch('');
+    } else {
+      // Modal just closed — clear modal-local searches to prevent leaking into main page
+      setRegistrySearch('');
+      setFacilSearch('');
     }
   }, [groupModal.isOpen, groupModal.group]);
 
@@ -605,8 +611,8 @@ export default function Organization() {
                             type="text" 
                             placeholder="Find ungrouped..." 
                             className="w-full pl-8 pr-3 py-2 bg-gray-50 border border-gray-100 rounded-xl text-xs outline-none focus:border-amber-200 focus:bg-white transition-all font-medium"
-                            value={registrySearch}
-                            onChange={e => setRegistrySearch(e.target.value)}
+                            value={ungroupedSearch}
+                            onChange={e => setUngroupedSearch(e.target.value)}
                           />
                         </div>
                       </div>
@@ -618,7 +624,7 @@ export default function Organization() {
                           </div>
                         ) : (
                           ungrouped
-                            .filter((r) => (r.fullName || '').toLowerCase().includes(registrySearch.toLowerCase()) || (r.church || '').toLowerCase().includes(registrySearch.toLowerCase()))
+                            .filter((r) => (r.fullName || '').toLowerCase().includes(ungroupedSearch.toLowerCase()) || (r.church || '').toLowerCase().includes(ungroupedSearch.toLowerCase()))
                             .map((r) => (
                               <div key={r._id || r.id} className="flex items-center gap-2 px-3 py-1.5 bg-white border border-amber-100 rounded-xl shadow-[0_1px_2px_rgba(0,0,0,0.02)] transition-transform hover:scale-105 cursor-default group">
                                 <div className={`w-1.5 h-1.5 rounded-full ${getChurchVibrantColor(r.church || '')}`}></div>
@@ -627,7 +633,7 @@ export default function Organization() {
                               </div>
                             ))
                         )}
-                        {ungrouped.filter((r) => (r.fullName || '').toLowerCase().includes(registrySearch.toLowerCase())).length === 0 && ungrouped.length > 0 && (
+                        {ungrouped.filter((r) => (r.fullName || '').toLowerCase().includes(ungroupedSearch.toLowerCase())).length === 0 && ungrouped.length > 0 && (
                           <p className="w-full text-center py-4 text-[10px] text-gray-400 italic">No matches found.</p>
                         )}
                       </div>
