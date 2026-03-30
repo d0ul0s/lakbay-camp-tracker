@@ -359,6 +359,7 @@ export default function Organization() {
   const youthLeaders = leaders.filter(l => getCategories(l).includes('Youth Leader'));
 
   // Logic: Tribe Integrity Audit (Ungrouped & Duplicates)
+  // Keys are lowercased+trimmed for case-insensitive matching
   const memberAssignments: Record<string, string[]> = {};
   groups.forEach((g: CampGroup) => {
     const allGroupedNames = [
@@ -372,17 +373,17 @@ export default function Organization() {
     ].filter(Boolean);
 
     allGroupedNames.forEach((name: string) => {
-      const normalized = name.trim();
-      if (!memberAssignments[normalized]) memberAssignments[normalized] = [];
-      if (!memberAssignments[normalized].includes(g.name)) {
-        memberAssignments[normalized].push(g.name);
+      const key = name.toLowerCase().trim();
+      if (!memberAssignments[key]) memberAssignments[key] = [];
+      if (!memberAssignments[key].includes(g.name)) {
+        memberAssignments[key].push(g.name);
       }
     });
   });
 
   const ungrouped = registrants
     .filter((r) => r.church !== 'JAM')
-    .filter((r) => !memberAssignments[r.fullName]);
+    .filter((r) => !memberAssignments[(r.fullName || '').toLowerCase().trim()]);
   const duplicates = Object.entries(memberAssignments)
     .filter(([_, groupNames]) => groupNames.length > 1)
     .map(([name, groupNames]) => ({ name, groups: groupNames }));
