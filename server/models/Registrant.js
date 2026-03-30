@@ -2,7 +2,7 @@ const mongoose = require('mongoose');
 
 const registrantSchema = new mongoose.Schema({
   fullName: { type: String, required: true },
-  age: { type: Number, required: true },
+  age: { type: Number, required: false, default: null },
   church: { type: String, required: true, index: true },
   sex: { type: String, enum: ['Male', 'Female'], required: true, default: 'Male' },
   ministry: { type: [String], default: [] },

@@ -235,6 +235,7 @@ export default function Settings() {
           {renderArrayEditor('Expense Categories', 'expenseCategories', 'Categories for the expense tracker.')}
           {renderArrayEditor('Payment Methods', 'paymentMethods', 'Accepted methods of payment for expenses.')}
           {renderArrayEditor('Solicitation Types', 'solicitationTypes', 'Dynamic list of valid donation/solicitation sources.')}
+          {renderArrayEditor('Age Requirement Waiver', 'waivedAgeChurches', 'Churches in this list can register participants without providing an age (for fast tracking).')}
         </div>
       )}
 

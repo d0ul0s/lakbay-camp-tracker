@@ -5,7 +5,7 @@ export type PaymentMethod = 'Cash (In-person)' | 'Online (GCash)';
 export interface Registrant {
   id: string;
   fullName: string;
-  age: number;
+  age: number | null;
   sex: 'Male' | 'Female';
   ministry: string[];
   shirtSize: ShirtSize;

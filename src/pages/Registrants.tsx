@@ -202,7 +202,7 @@ export default function Registrants() {
   
   // Use global settings with an internal fallback for the structure
   const settings = appSettings || {
-    churches: [], merchCosts: {}, ministries: [], expenseCategories: [], paymentMethods: [], shirtSizePhoto: null
+    churches: [], merchCosts: {}, ministries: [], expenseCategories: [], paymentMethods: [], shirtSizePhoto: null, waivedAgeChurches: []
   } as any;
 
   useEffect(() => {
@@ -298,7 +298,7 @@ export default function Registrants() {
   // Form state
   const initialForm: Omit<Registrant, 'id' | 'dateRegistered'> = {
     fullName: '',
-    age: 0,
+    age: null,
     sex: 'Male',
     ministry: [],
     shirtSize: 'M',
@@ -314,6 +314,7 @@ export default function Registrants() {
     verifiedAt: null
   };
   const [formData, setFormData] = useState(initialForm);
+  const isAgeWaived = settings.waivedAgeChurches?.includes(formData.church);
 
   // Auto-set default church when settings load if forming new
   useEffect(() => {
@@ -893,13 +894,23 @@ export default function Registrants() {
 
                       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                         <div>
-                          <label className="block text-sm text-gray-600 mb-1">Age</label>
+                          <label className={`block text-sm mb-1 ${isAgeWaived ? 'text-brand-brown font-bold' : 'text-gray-600'}`}>
+                            Age {!isAgeWaived && <span className="text-red-500">*</span>}
+                          </label>
                           <input
-                            type="number" required min="1" max="100"
+                            type="number" 
+                            required={!isAgeWaived} 
+                            min="1" max="100"
                             value={formData.age || ''}
-                            onChange={(e) => setFormData({ ...formData, age: parseInt(e.target.value) || 0 })}
-                            className="w-full px-3 py-2 rounded-lg border border-gray-200 focus:outline-none focus:border-brand-brown text-center"
+                            onChange={(e) => setFormData({ ...formData, age: parseInt(e.target.value) || null })}
+                            className={`w-full px-3 py-2 rounded-lg border focus:outline-none text-center transition-all ${
+                              isAgeWaived ? 'border-brand-sand bg-brand-cream/10 focus:border-brand-brown' : 'border-gray-200 focus:border-brand-brown'
+                            }`}
+                            placeholder={isAgeWaived ? 'Later' : ''}
                           />
+                          {isAgeWaived && !formData.age && (
+                            <p className="text-[9px] text-brand-brown font-black mt-1 uppercase tracking-tighter leading-tight animate-pulse">⚠️ Age Temporarily optional</p>
+                          )}
                         </div>
                         <div>
                           <label className="block text-sm text-gray-600 mb-1">Sex</label>
