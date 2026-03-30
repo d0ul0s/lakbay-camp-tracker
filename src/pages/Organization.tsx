@@ -8,7 +8,8 @@ interface CampLeader {
   id?: string;
   name: string;
   churchRef: string | null;
-  category: string;
+  categories: string[];   // multi-role support
+  category?: string;      // legacy compat
   roleTitle: string;
   image?: string;
   socialLink?: string;
@@ -40,8 +41,14 @@ export default function Organization() {
   const [groupModal, setGroupModal] = useState<{ isOpen: boolean, group: CampGroup | null }>({ isOpen: false, group: null });
 
   // Form States
-  const [leaderForm, setLeaderForm] = useState<Partial<CampLeader>>({ category: 'Registration', name: '', roleTitle: '', churchRef: '', image: '', socialLink: '' });
+  const [leaderForm, setLeaderForm] = useState<Partial<CampLeader>>({ categories: ['Registration'], name: '', roleTitle: '', churchRef: '', image: '', socialLink: '' });
   const [groupForm, setGroupForm] = useState<Partial<CampGroup>>({ name: '', leader: '', assistantLeader: '', pointKeeper: '', flagBearer: '', facilitators: [], grabMasters: [], members: [] });
+
+  const ALL_CATEGORIES = [
+    'Camp Head', 'Registration', 'Food', 'Arts & Decorations',
+    'Media', 'Music', 'Marshall', 'Runners', 'Game Masters',
+    'Point Masters', 'Medic', 'Awards', 'Finance', 'Youth Leader'
+  ];
 
   const fetchData = async () => {
     setIsLoading(true);
@@ -123,8 +130,15 @@ export default function Organization() {
     }
   };
 
-  const staff = leaders.filter(l => l.category !== 'Youth Leader');
-  const youthLeaders = leaders.filter(l => l.category === 'Youth Leader');
+  const staff = leaders.filter(l => !l.categories?.includes('Youth Leader') && !(l.category === 'Youth Leader'));
+  const youthLeaders = leaders.filter(l => l.categories?.includes('Youth Leader') || l.category === 'Youth Leader');
+
+  // Helper: get effective categories for a leader
+  const getCategories = (l: CampLeader) => {
+    if (l.categories && l.categories.length > 0) return l.categories;
+    if (l.category) return [l.category];
+    return [];
+  };
 
   return (
     <>
@@ -144,7 +158,7 @@ export default function Organization() {
           {isAdmin && (
             <div className="flex gap-2">
               <button 
-                onClick={() => { setLeaderForm({ category: 'Registration', name: '', roleTitle: '', churchRef: '', image: '', socialLink: '' }); setLeaderModal({ isOpen: true, leader: null }); }}
+                onClick={() => { setLeaderForm({ categories: ['Registration'], name: '', roleTitle: '', churchRef: '', image: '', socialLink: '' }); setLeaderModal({ isOpen: true, leader: null }); }}
                 className="bg-brand-sand text-brand-brown px-4 py-2 rounded-xl font-bold hover:bg-opacity-80 transition-colors shadow-sm flex items-center gap-2 text-sm"
               >
                 <Shield size={16} /> Add Role
@@ -167,13 +181,13 @@ export default function Organization() {
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 lg:gap-6">
             {staff.length === 0 && <p className="text-gray-400 text-sm italic col-span-full">No staff assigned yet.</p>}
-            {Array.from(new Set(staff.map(s => s.category))).sort().map(category => (
+            {Array.from(new Set(staff.flatMap(s => getCategories(s)))).sort().map(category => (
               <div key={category} className="bg-white rounded-2xl p-4 lg:p-5 shadow-sm border border-brand-sand/50 h-max">
                  <h4 className="font-black uppercase text-[10px] lg:text-xs tracking-widest text-brand-brown/60 mb-3 border-b border-gray-100 pb-2 flex items-center gap-2">
                    <div className="w-1.5 h-1.5 rounded-full bg-brand-brown"></div> {category}
                  </h4>
                  <div className="flex flex-col gap-1.5">
-                   {staff.filter(s => s.category === category).map(s => (
+                   {staff.filter(s => getCategories(s).includes(category)).map(s => (
                      <div key={s._id || s.id} className="flex items-center justify-between group p-2 hover:bg-gray-50 rounded-xl transition-colors border border-transparent hover:border-brand-beige">
                         <div className="flex items-center gap-3">
                           <div className="w-8 h-8 rounded-full bg-brand-cream flex items-center justify-center shrink-0 overflow-hidden border border-brand-sand/30 shadow-inner">
@@ -193,7 +207,10 @@ export default function Organization() {
                         {isAdmin && (
                           <div className="opacity-0 group-hover:opacity-100 flex gap-1 bg-white shadow-sm border border-gray-100 p-0.5 rounded-lg shrink-0">
                             <button 
-                                onClick={() => { setLeaderForm(s); setLeaderModal({ isOpen: true, leader: s }); }}
+                                onClick={() => {
+                                  const norm = { ...s, categories: s.categories?.length > 0 ? s.categories : (s.category ? [s.category] : []) };
+                                  setLeaderForm(norm); setLeaderModal({ isOpen: true, leader: s });
+                                }}
                                 className="p-2 text-blue-600 hover:bg-blue-50 bg-white rounded-lg transition-colors opacity-0 group-hover:opacity-100 shadow-sm border border-brand-beige"
                               >
                                 <Edit2 size={14} />
@@ -251,7 +268,10 @@ export default function Organization() {
                              {isAdmin && (
                                <div className="opacity-0 group-hover:opacity-100 flex gap-1">
                                   <button 
-                                    onClick={() => { setLeaderForm(cl); setLeaderModal({ isOpen: true, leader: cl }); }}
+                                    onClick={() => {
+                                      const norm = { ...cl, categories: cl.categories?.length > 0 ? cl.categories : (cl.category ? [cl.category] : ['Youth Leader']) };
+                                      setLeaderForm(norm); setLeaderModal({ isOpen: true, leader: cl });
+                                    }}
                                     className="p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors opacity-0 group-hover:opacity-100"
                                   >
                                     <Edit2 size={12} />
@@ -407,25 +427,47 @@ export default function Organization() {
               <h3 className="text-2xl font-display text-brand-brown mb-6">{leaderModal.leader ? 'Edit Role' : 'Add New Role'}</h3>
               <form onSubmit={handleSaveLeader} className="space-y-4">
                  <div>
-                    <label className="block text-xs text-gray-500 mb-1">Category</label>
-                    <select required value={leaderForm.category} onChange={e => setLeaderForm({...leaderForm, category: e.target.value as any})} className="w-full border border-gray-200 rounded-xl px-4 py-2.5 focus:border-brand-brown outline-none">
-                       <option value="Camp Head">Camp Head</option>
-                       <option value="Registration">Registration Team</option>
-                       <option value="Food">Food Team</option>
-                       <option value="Arts & Decorations">Arts & Decorations</option>
-                       <option value="Media">Media Team</option>
-                       <option value="Music">Music Team</option>
-                       <option value="Marshall">Marshall</option>
-                       <option value="Runners">Runners</option>
-                       <option value="Game Masters">Game Masters</option>
-                       <option value="Point Masters">Point Masters</option>
-                       <option value="Medic">Medic</option>
-                       <option value="Awards">Awards</option>
-                       <option value="Finance">Finance (Treasurer & Auditor)</option>
-                       <option value="Youth Leader">Church Youth Leader</option>
-                    </select>
+                    <label className="block text-xs font-semibold text-gray-500 mb-2">Department(s) — select all that apply</label>
+                    <div className="grid grid-cols-2 gap-1.5 max-h-48 overflow-y-auto border border-gray-200 rounded-xl p-3">
+                      {ALL_CATEGORIES.filter(c => c !== 'Youth Leader').map(cat => (
+                        <label key={cat} className="flex items-center gap-2 cursor-pointer group">
+                          <input
+                            type="checkbox"
+                            className="w-4 h-4 accent-brand-brown rounded"
+                            checked={(leaderForm.categories || []).includes(cat)}
+                            onChange={e => {
+                              const current = leaderForm.categories || [];
+                              setLeaderForm({
+                                ...leaderForm,
+                                categories: e.target.checked
+                                  ? [...current, cat]
+                                  : current.filter(c => c !== cat)
+                              });
+                            }}
+                          />
+                          <span className="text-sm text-gray-700 group-hover:text-brand-brown font-medium leading-tight">{cat}</span>
+                        </label>
+                      ))}
+                    </div>
+                    <label className="flex items-center gap-2 mt-2 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        className="w-4 h-4 accent-indigo-600 rounded"
+                        checked={(leaderForm.categories || []).includes('Youth Leader')}
+                        onChange={e => {
+                          const current = leaderForm.categories || [];
+                          setLeaderForm({
+                            ...leaderForm,
+                            categories: e.target.checked
+                              ? [...current, 'Youth Leader']
+                              : current.filter(c => c !== 'Youth Leader')
+                          });
+                        }}
+                      />
+                      <span className="text-sm font-medium text-indigo-700">Church Youth Leader</span>
+                    </label>
                  </div>
-                 {leaderForm.category === 'Youth Leader' && (
+                 {(leaderForm.categories || []).includes('Youth Leader') && (
                    <div>
                       <label className="block text-xs text-gray-500 mb-1">Church</label>
                       <select required value={leaderForm.churchRef || ''} onChange={e => setLeaderForm({...leaderForm, churchRef: e.target.value})} className="w-full border border-gray-200 rounded-xl px-4 py-2.5 focus:border-brand-brown outline-none">
@@ -438,10 +480,7 @@ export default function Organization() {
                     <label className="block text-xs text-gray-500 mb-1">Full Name</label>
                     <input type="text" required value={leaderForm.name} onChange={e => setLeaderForm({...leaderForm, name: e.target.value})} className="w-full border border-gray-200 rounded-xl px-4 py-2.5 focus:border-brand-brown outline-none" placeholder="e.g. John Doe" />
                  </div>
-                 <div>
-                    <label className="block text-xs text-gray-500 mb-1">Specific Title (Optional)</label>
-                    <input type="text" value={leaderForm.roleTitle} onChange={e => setLeaderForm({...leaderForm, roleTitle: e.target.value})} className="w-full border border-gray-200 rounded-xl px-4 py-2.5 focus:border-brand-brown outline-none" placeholder="e.g. Head Coordinator, Medical Team" />
-                 </div>
+
                  <div>
                     <label className="block text-xs text-gray-500 mb-1">Photo URL (Optional)</label>
                     <input type="url" value={leaderForm.image} onChange={e => setLeaderForm({...leaderForm, image: e.target.value})} className="w-full border border-gray-200 rounded-xl px-4 py-2.5 focus:border-brand-brown outline-none" placeholder="e.g. https://imgur.com/photo.jpg" />

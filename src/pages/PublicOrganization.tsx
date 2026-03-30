@@ -9,7 +9,8 @@ interface CampLeader {
   id?: string;
   name: string;
   churchRef: string | null;
-  category: string;
+  categories: string[];   // multi-role support
+  category?: string;      // legacy compat
   roleTitle: string;
   image?: string;
   socialLink?: string;
@@ -59,8 +60,14 @@ export default function PublicOrganization() {
     if (isServerAwake) fetchData();
   }, [isServerAwake]);
 
-  const staff = leaders.filter(l => l.category !== 'Youth Leader');
-  const youthLeaders = leaders.filter(l => l.category === 'Youth Leader');
+  const getCategories = (l: CampLeader) => {
+    if (l.categories && l.categories.length > 0) return l.categories;
+    if (l.category) return [l.category];
+    return [];
+  };
+
+  const staff = leaders.filter(l => !getCategories(l).includes('Youth Leader'));
+  const youthLeaders = leaders.filter(l => getCategories(l).includes('Youth Leader'));
   
   // Dynamically extract churches with youth leaders assigned to them
   const activeChurches = Array.from(new Set(youthLeaders.filter(yl => yl.churchRef).map(yl => yl.churchRef as string))).sort();
@@ -102,13 +109,13 @@ export default function PublicOrganization() {
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4 lg:gap-6">
             {staff.length === 0 && <p className="text-gray-400 text-sm italic col-span-full bg-white p-6 rounded-2xl border border-dashed border-gray-300">Staff structures are currently being finalized.</p>}
-            {Array.from(new Set(staff.map(s => s.category))).sort().map(category => (
+            {Array.from(new Set(staff.flatMap(s => getCategories(s)))).sort().map(category => (
               <div key={category} className="bg-white rounded-2xl p-5 md:p-6 shadow-md shadow-brand-brown/5 border border-brand-sand/50 transform hover:-translate-y-1 transition-all duration-300">
                  <h4 className="font-black uppercase text-[11px] md:text-xs tracking-widest text-brand-brown mb-4 border-b border-gray-100 pb-3 flex items-center gap-2">
                    <div className="w-2 h-2 rounded-full bg-brand-light-brown shadow-sm shadow-brand-brown/30"></div> {category}
                  </h4>
                  <div className="flex flex-col gap-2">
-                   {staff.filter(s => s.category === category).map(s => (
+                    {staff.filter(s => getCategories(s).includes(category)).map(s => (
                      <div key={s._id || s.id} className="flex items-center justify-between group p-2 hover:bg-brand-cream/50 rounded-xl transition-colors">
                         <div className="flex items-center gap-3">
                           <div className="w-10 h-10 rounded-full bg-gradient-to-br from-brand-sand/30 to-brand-cream flex items-center justify-center shrink-0 overflow-hidden border border-brand-sand/50 shadow-inner">

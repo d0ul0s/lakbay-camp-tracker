@@ -20,8 +20,16 @@ const requireAdmin = (req, res, next) => {
 // GET all leaders & staff (Public access)
 router.get('/leaders', async (req, res) => {
   try {
-    const leaders = await CampLeader.find({}).sort({ category: 1, name: 1 });
-    res.json(leaders);
+    const leaders = await CampLeader.find({}).sort({ name: 1 });
+    // Normalize legacy docs: populate `categories` from old single `category` field
+    const normalized = leaders.map(l => {
+      const obj = l.toJSON();
+      if (!obj.categories || obj.categories.length === 0) {
+        obj.categories = obj.category ? [obj.category] : [];
+      }
+      return obj;
+    });
+    res.json(normalized);
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
@@ -30,14 +38,21 @@ router.get('/leaders', async (req, res) => {
 // POST new leader
 router.post('/leaders', auth, requireAdmin, async (req, res) => {
   try {
-    const newLeader = new CampLeader(req.body);
+    const body = { ...req.body };
+    // Normalize: if only old `category` string sent, promote to `categories` array
+    if (body.categories && body.categories.length > 0) {
+      body.category = body.categories[0]; // keep legacy field in sync
+    } else if (body.category) {
+      body.categories = [body.category];
+    }
+    const newLeader = new CampLeader(body);
     await newLeader.save();
     
     await logActivity(
       req.user.id,
       req.user.role,
       'Added Organization Role',
-      `Added ${req.body.name} primarily as ${req.body.category}`,
+      `Added ${body.name} to: ${(body.categories || [body.category]).join(', ')}`,
       req.ip
     );
     
@@ -50,7 +65,14 @@ router.post('/leaders', auth, requireAdmin, async (req, res) => {
 // PUT update leader
 router.put('/leaders/:id', auth, requireAdmin, async (req, res) => {
   try {
-    const leader = await CampLeader.findByIdAndUpdate(req.params.id, req.body, { new: true });
+    const body = { ...req.body };
+    // Normalize categories array ↔ legacy category field
+    if (body.categories && body.categories.length > 0) {
+      body.category = body.categories[0];
+    } else if (body.category) {
+      body.categories = [body.category];
+    }
+    const leader = await CampLeader.findByIdAndUpdate(req.params.id, body, { new: true });
     
     await logActivity(
       req.user.id,
