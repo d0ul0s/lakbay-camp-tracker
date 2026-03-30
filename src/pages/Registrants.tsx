@@ -1096,7 +1096,7 @@ export default function Registrants() {
                 </div>
               </div>
 
-              <div className="mt-8 pt-6 border-t border-brand-beige flex justify-end gap-3 bg-white pb-2">
+              <div className="mt-auto px-6 py-4 border-t border-brand-beige flex justify-end gap-3 bg-white sticky bottom-0 z-30 pb-[max(1rem,env(safe-area-inset-bottom))] shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)]">
                 <button
                   type="button"
                   onClick={closeModal}
@@ -1351,7 +1351,7 @@ export default function Registrants() {
                 <PlusCircle size={20} /> Add Another Row
               </button>
 
-              <div className="mt-8 pt-6 border-t border-brand-beige flex justify-end gap-3 bg-gray-50/30 pb-2">
+              <div className="mt-auto px-4 sm:px-6 py-4 border-t border-brand-beige flex justify-end gap-3 bg-gray-50 sticky bottom-0 z-30 pb-[max(1rem,env(safe-area-inset-bottom))] shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)]">
                 <button
                   type="button"
                   onClick={() => setIsBatchModalOpen(false)}
