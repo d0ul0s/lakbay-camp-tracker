@@ -10,6 +10,7 @@ export default function Dashboard() {
   const expenses = useAppStore(s => s.expenses);
   const solicitations = useAppStore(s => s.solicitations);
   const hasBooted = useAppStore(s => s.hasBooted);
+  const hasSyncedLive = useAppStore(s => s.hasSyncedLive);
 
   const isAdmin = currentUser?.role?.toLowerCase().trim() === 'admin';
   const roleKey = currentUser?.role?.toLowerCase().trim();
@@ -111,7 +112,9 @@ export default function Dashboard() {
   const EXPENSE_COLORS = ['#8b5c40', '#d4a373', '#e9edc9', '#ccd5ae', '#faedcd', '#fefae0', '#e3d5ca', '#ddbea9'];
   const INCOME_COLORS = ['#4ade80', '#34d399'];
 
-  if (!hasBooted) {
+  const hasCachedData = registrants.length > 0 || expenses.length > 0;
+
+  if (!hasBooted && !hasCachedData) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[60vh] text-brand-brown animate-in fade-in duration-500">
         <Loader2 className="w-12 h-12 animate-spin mb-6 opacity-80" />
@@ -124,8 +127,13 @@ export default function Dashboard() {
   return (
     <div className="space-y-6">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
-        <h2 className="text-2xl md:text-3xl font-display text-brand-brown tracking-wide mb-1 md:mb-0">
+        <h2 className="text-2xl md:text-3xl font-display text-brand-brown tracking-wide mb-1 md:mb-0 flex items-center gap-3">
           Dashboard Overview
+          {!hasSyncedLive && (
+            <span className="flex items-center gap-1.5 text-xs font-sans font-semibold text-gray-400 bg-gray-100 px-2.5 py-1 rounded-full animate-pulse">
+              <Loader2 size={11} className="animate-spin" /> Syncing...
+            </span>
+          )}
         </h2>
 
         {/* Actions - Desktop Only */}
