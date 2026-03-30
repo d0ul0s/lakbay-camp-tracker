@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Users, Shield, Map, Tent, Star, Flag, Target, Hand, Loader2, ArrowLeft, ExternalLink } from 'lucide-react';
 import api from '../api/axios';
+import { useAppStore } from '../store';
 
 interface CampLeader {
   _id?: string;
@@ -28,6 +29,7 @@ interface CampGroup {
 }
 
 export default function PublicOrganization() {
+  const { isServerAwake } = useAppStore();
   const [leaders, setLeaders] = useState<CampLeader[]>([]);
   const [groups, setGroups] = useState<CampGroup[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -51,6 +53,11 @@ export default function PublicOrganization() {
   useEffect(() => {
     fetchData();
   }, []);
+
+  // Auto-refetch when the server wakes up after a cold start
+  useEffect(() => {
+    if (isServerAwake) fetchData();
+  }, [isServerAwake]);
 
   const staff = leaders.filter(l => l.category !== 'Youth Leader');
   const youthLeaders = leaders.filter(l => l.category === 'Youth Leader');

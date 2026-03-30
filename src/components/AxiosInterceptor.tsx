@@ -3,11 +3,18 @@ import api from '../api/axios';
 import { useAppStore } from '../store';
 
 export default function AxiosInterceptor({ children }: { children: React.ReactNode }) {
-  const { setGlobalError, setLoading, logout, setServerAwake } = useAppStore();
+  const { setGlobalError, setLoading, logout, setServerAwake, isServerAwake } = useAppStore();
 
   useEffect(() => {
     const resInterceptor = api.interceptors.response.use(
-      (response) => response,
+      (response) => {
+        // If the server was previously marked as asleep, mark it as awake now
+        // so all subscribed pages (Organization, Public org, etc.) auto-refetch.
+        if (!isServerAwake) {
+          setServerAwake(true);
+        }
+        return response;
+      },
       (error) => {
         setLoading(false);
         const status = error.response?.status;
@@ -43,7 +50,7 @@ export default function AxiosInterceptor({ children }: { children: React.ReactNo
     return () => {
       api.interceptors.response.eject(resInterceptor);
     };
-  }, [setGlobalError, setLoading, logout]);
+  }, [setGlobalError, setLoading, logout, isServerAwake]);
 
   return <>{children}</>;
 }

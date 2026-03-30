@@ -28,7 +28,7 @@ interface CampGroup {
 }
 
 export default function Organization() {
-  const { currentUser, appSettings } = useAppStore();
+  const { currentUser, appSettings, isServerAwake } = useAppStore();
   const isAdmin = currentUser?.role === 'admin';
 
   const [leaders, setLeaders] = useState<CampLeader[]>([]);
@@ -62,6 +62,11 @@ export default function Organization() {
   useEffect(() => {
     fetchData();
   }, []);
+
+  // Auto-refetch when the server comes back from a cold start while user is on this page
+  useEffect(() => {
+    if (isServerAwake) fetchData();
+  }, [isServerAwake]);
 
   const handleSaveLeader = async (e: React.FormEvent) => {
     e.preventDefault();
