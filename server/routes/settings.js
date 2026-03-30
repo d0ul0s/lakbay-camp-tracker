@@ -43,7 +43,7 @@ router.put('/', async (req, res) => {
   try {
     const update = {};
     const fields = [
-      'churchList', 'merchCosts', 'ministries', 
+      'churchList', 'waivedAgeChurches', 'merchCosts', 'ministries', 
       'expenseCategories', 'paymentMethods', 
       'solicitationTypes', 'shirtSizePhoto', 'permissionMatrix'
     ];
