@@ -822,7 +822,7 @@ export default function Organization() {
                 </div>
                 <div className="flex flex-wrap gap-1.5 p-3 bg-indigo-50/30 rounded-xl border border-indigo-100/50 max-h-32 overflow-y-auto">
                   {leaders
-                    .filter(l => getCategories(l).includes('Facilitator/Counselor'))
+                    .filter(l => !getCategories(l).includes('Youth Leader'))
                     .filter(l => l.name.toLowerCase().includes(facilSearch.toLowerCase()))
                     .map(l => (
                       <button
@@ -841,8 +841,8 @@ export default function Organization() {
                         {l.name}
                       </button>
                     ))}
-                  {leaders.filter(l => getCategories(l).includes('Facilitator/Counselor') && l.name.toLowerCase().includes(facilSearch.toLowerCase())).length === 0 && (
-                    <p className="text-[10px] text-gray-400 italic py-1 px-2">No facilitators found.</p>
+                  {leaders.filter(l => !getCategories(l).includes('Youth Leader') && l.name.toLowerCase().includes(facilSearch.toLowerCase())).length === 0 && (
+                    <p className="text-[10px] text-gray-400 italic py-1 px-2">No personnel found.</p>
                   )}
                 </div>
               </div>
