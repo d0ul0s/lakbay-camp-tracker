@@ -266,6 +266,13 @@ export default function Registrants() {
   const [formError, setFormError] = useState<string | null>(null);
   const [batchError, setBatchError] = useState<string | null>(null);
 
+  // Auto-save batch draft to prevent data loss on unintended reload
+  useEffect(() => {
+    if (batchData.length > 0) {
+      localStorage.setItem('lakbay_batch_registrants', JSON.stringify(batchData));
+    }
+  }, [batchData]);
+
   const isAdmin = currentUser?.role?.toLowerCase().trim() === 'admin';
   const roleKey = currentUser?.role?.toLowerCase().trim();
   const rolePerms = roleKey ? currentUser?.permissionMatrix?.[roleKey]?.registrants : undefined;
@@ -437,6 +444,21 @@ export default function Registrants() {
   };
 
   const openBatchModal = () => {
+    const savedDraft = localStorage.getItem('lakbay_batch_registrants');
+    if (savedDraft) {
+      try {
+        const parsed = JSON.parse(savedDraft);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          setBatchData(parsed);
+          setBatchError(null);
+          setIsBatchModalOpen(true);
+          return;
+        }
+      } catch (e) {
+        console.error('Failed to parse batch draft', e);
+      }
+    }
+
     setBatchData([{ 
       ...initialForm, 
       church: (roleKey === 'coordinator') && user?.church ? user.church : (settings.churches[0] || '') 
@@ -451,6 +473,7 @@ export default function Registrants() {
     if (validData.length === 0) return;
 
     setBatchError(null);
+    localStorage.removeItem('lakbay_batch_registrants'); // Clear draft on valid submission
     // Optimistic batch add with temp entries
     const tempDocs = validData.map(d => ({
       ...d,
@@ -1092,13 +1115,24 @@ export default function Registrants() {
               <h3 className="text-2xl font-display text-brand-brown tracking-wide flex items-center gap-2">
                 <Users className="text-brand-brown" /> Batch Registration
               </h3>
-              <button
-                type="button"
-                onClick={() => setIsBatchModalOpen(false)}
-                className="text-gray-400 hover:text-brand-brown transition-colors p-1 rounded-lg hover:bg-white"
-              >
-                <X size={24} />
-              </button>
+              <div className="flex items-center gap-3">
+                {batchData.length > 0 && (
+                  <button 
+                    type="button" 
+                    onClick={() => { setBatchData([]); localStorage.removeItem('lakbay_batch_registrants'); }} 
+                    className="text-[10px] font-black uppercase text-red-500 hover:text-white hover:bg-red-500 border border-red-200 px-3 py-1.5 rounded-lg transition-colors tracking-widest"
+                  >
+                    Clear Draft
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={() => setIsBatchModalOpen(false)}
+                  className="text-gray-400 hover:text-brand-brown transition-colors p-1 rounded-lg hover:bg-white"
+                >
+                  <X size={24} />
+                </button>
+              </div>
             </div>
 
             <form onSubmit={handleBatchSubmit} className="flex-1 overflow-y-auto p-4 sm:p-6 bg-gray-50/30">

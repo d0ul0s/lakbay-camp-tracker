@@ -124,6 +124,13 @@ export default function Expenses() {
   const [isBatchModalOpen, setIsBatchModalOpen] = useState(false);
   const [batchData, setBatchData] = useState<Omit<Expense, 'id'>[]>([]);
 
+  // Auto-save batch draft to prevent data loss
+  useEffect(() => {
+    if (batchData.length > 0) {
+      localStorage.setItem('lakbay_batch_expenses', JSON.stringify(batchData));
+    }
+  }, [batchData]);
+
   const handleToggleVerify = (exp: Expense) => {
     setVerifyConfirm({ isOpen: true, expense: exp });
   };
@@ -277,6 +284,20 @@ export default function Expenses() {
   };
 
   const openBatchModal = () => {
+    const savedDraft = localStorage.getItem('lakbay_batch_expenses');
+    if (savedDraft) {
+      try {
+        const parsed = JSON.parse(savedDraft);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          setBatchData(parsed);
+          setIsBatchModalOpen(true);
+          return;
+        }
+      } catch (e) {
+        console.error('Failed to parse batch expenses draft', e);
+      }
+    }
+
     setBatchData([{ 
       ...initialForm, 
       category: settings.expenseCategories[0] || '' as any,
@@ -289,6 +310,8 @@ export default function Expenses() {
     e.preventDefault();
     const validData = batchData.filter(d => d.paidBy && d.description && d.amount > 0);
     if (validData.length === 0) return;
+
+    localStorage.removeItem('lakbay_batch_expenses'); // Clear draft on valid submission
 
     const payload = validData.map(d => ({ ...d, date: new Date(d.date).toISOString() }));
     
@@ -722,13 +745,24 @@ export default function Expenses() {
               <h3 className="text-2xl font-display text-brand-brown tracking-wide flex items-center gap-2">
                 <Users className="text-brand-brown" /> Batch Expense Logging
               </h3>
-              <button
-                type="button"
-                onClick={() => setIsBatchModalOpen(false)}
-                className="text-gray-400 hover:text-brand-brown transition-colors p-1 rounded-lg hover:bg-white"
-              >
-                <X size={24} />
-              </button>
+              <div className="flex items-center gap-3">
+                {batchData.length > 0 && (
+                  <button 
+                    type="button" 
+                    onClick={() => { setBatchData([]); localStorage.removeItem('lakbay_batch_expenses'); }} 
+                    className="text-[10px] font-black uppercase text-red-500 hover:text-white hover:bg-red-500 border border-red-200 px-3 py-1.5 rounded-lg transition-colors tracking-widest"
+                  >
+                    Clear Draft
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={() => setIsBatchModalOpen(false)}
+                  className="text-gray-400 hover:text-brand-brown transition-colors p-1 rounded-lg hover:bg-white"
+                >
+                  <X size={24} />
+                </button>
+              </div>
             </div>
 
             <form onSubmit={handleBatchSubmit} className="flex-1 overflow-y-auto p-4 sm:p-6 bg-gray-50/30 pb-24 md:pb-6">
