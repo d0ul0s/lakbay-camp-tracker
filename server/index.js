@@ -106,7 +106,7 @@ app.use('/api/settings', auth, require('./routes/settings'));
 app.use('/api/boot', auth, require('./routes/boot'));
 app.use('/api/backup', auth, require('./routes/backup'));
 app.use('/api/activity-logs', auth, require('./routes/activityLogs'));
-app.use('/api/org', auth, require('./routes/org'));
+app.use('/api/org', require('./routes/org'));
 app.use('/api/auth', require('./routes/auth'));
 
 const connectDB = () => {
