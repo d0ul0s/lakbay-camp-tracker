@@ -276,9 +276,15 @@ export default function Organization() {
       }
       setLeaderModal({ isOpen: false, leader: null });
       fetchData();
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
-      alert('Failed to save leader');
+      setConfirmState({
+        isOpen: true,
+        title: 'Save Failed',
+        message: err.response?.data?.message || 'Failed to save personnel role. Please check all fields and try again.',
+        onConfirm: () => setConfirmState(prev => ({ ...prev, isOpen: false })),
+        isDestructive: false
+      });
     }
   };
 
@@ -318,9 +324,15 @@ export default function Organization() {
       }
       setGroupModal({ isOpen: false, group: null });
       fetchData();
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
-      alert('Failed to save group');
+      setConfirmState({
+        isOpen: true,
+        title: 'Save Failed',
+        message: err.response?.data?.message || 'Failed to save tribe data. Please check all fields and try again.',
+        onConfirm: () => setConfirmState(prev => ({ ...prev, isOpen: false })),
+        isDestructive: false
+      });
     }
   };
 
@@ -973,7 +985,7 @@ export default function Organization() {
                 </div>
                 <div className="flex flex-wrap gap-1.5 p-3 bg-indigo-50/30 rounded-xl border border-indigo-100/50 max-h-32 overflow-y-auto">
                   {leaders
-                    .filter(l => getCategories(l).includes('Facilitator/Counselor') && l.churchRef !== 'JAM')
+                    .filter(l => !getCategories(l).includes('Youth Leader') && l.churchRef !== 'JAM')
                     .filter(l => l.name.toLowerCase().includes(facilSearch.toLowerCase()))
                     .map(l => (
                       <button
@@ -989,11 +1001,16 @@ export default function Organization() {
                           : 'bg-white border-indigo-200 text-indigo-600 hover:border-indigo-400'
                           }`}
                       >
-                        {l.name}
+                        <div className="flex flex-col items-center gap-0.5">
+                          <span>{l.name}</span>
+                          {l.categories && l.categories.length > 0 && (
+                            <span className="text-[7px] opacity-60 font-medium">{getCategories(l).filter(c => c !== 'Youth Leader').join(', ')}</span>
+                          )}
+                        </div>
                       </button>
                     ))}
                   {leaders.filter(l => !getCategories(l).includes('Youth Leader') && l.name.toLowerCase().includes(facilSearch.toLowerCase())).length === 0 && (
-                    <p className="text-[10px] text-gray-400 italic py-1 px-2">No personnel found.</p>
+                    <p className="text-[10px] text-gray-400 italic py-1 px-2">{leaders.length === 0 ? 'No personnel added yet. Add staff roles in the Departments tab first.' : 'No matching personnel found.'}</p>
                   )}
                 </div>
               </div>
