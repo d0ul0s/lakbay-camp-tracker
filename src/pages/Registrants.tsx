@@ -1096,7 +1096,7 @@ export default function Registrants() {
                 </div>
               </div>
 
-              <div className="mt-auto px-6 py-4 border-t border-brand-beige flex justify-end gap-3 bg-white sticky bottom-0 z-30 pb-[max(1rem,env(safe-area-inset-bottom))] shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)]">
+              <div className="mt-auto px-6 py-4 border-t border-brand-beige flex justify-end gap-3 bg-white sticky bottom-0 z-30 pb-[calc(1.5rem+env(safe-area-inset-bottom))] shadow-[0_-4px_12px_rgba(0,0,0,0.08)]">
                 <button
                   type="button"
                   onClick={closeModal}
@@ -1351,7 +1351,7 @@ export default function Registrants() {
                 <PlusCircle size={20} /> Add Another Row
               </button>
 
-              <div className="mt-auto px-4 sm:px-6 py-4 border-t border-brand-beige flex justify-end gap-3 bg-gray-50 sticky bottom-0 z-30 pb-[max(1rem,env(safe-area-inset-bottom))] shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)]">
+              <div className="mt-auto px-4 sm:px-6 py-4 border-t border-brand-beige flex justify-end gap-3 bg-white sticky bottom-0 z-30 pb-[calc(1.5rem+env(safe-area-inset-bottom))] shadow-[0_-4px_12px_rgba(0,0,0,0.08)]">
                 <button
                   type="button"
                   onClick={() => setIsBatchModalOpen(false)}
@@ -1423,7 +1423,7 @@ export default function Registrants() {
 
       {/* Mobile FAB */}
       {canAdd && (
-        <div className="md:hidden fixed bottom-24 right-6 z-[30] flex flex-col gap-3">
+        <div className="md:hidden fixed bottom-28 right-6 z-[30] flex flex-col gap-3">
           <button
             onClick={openBatchModal}
             className="w-12 h-12 bg-white text-brand-brown rounded-full shadow-lg border-2 border-brand-sand flex items-center justify-center active:scale-95 transition-transform"

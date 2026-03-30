@@ -18,8 +18,8 @@ const requireAdmin = (req, res, next) => {
 // REGISTRANTS (Participants)
 // ===============================
 
-// GET all registrant names for group sorting (Authenticated only)
-router.get('/registrants', auth, async (req, res) => {
+// GET all registrant names for group sorting (Public access for dashboard color-coding)
+router.get('/registrants', async (req, res) => {
   try {
     const registrants = await Registrant.find({}, 'fullName church').sort({ fullName: 1 });
     res.json(registrants);

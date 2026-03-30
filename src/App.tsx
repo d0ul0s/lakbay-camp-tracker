@@ -13,7 +13,6 @@ import Users from './pages/Users';
 import Solicitations from './pages/Solicitations';
 import ActivityLogs from './pages/ActivityLogs';
 import Organization from './pages/Organization';
-import PublicOrganization from './pages/PublicOrganization';
 import AxiosInterceptor from './components/AxiosInterceptor';
 import ColdStartLoader from './components/ColdStartLoader';
 import ErrorBoundary from './components/ErrorBoundary';
@@ -22,6 +21,11 @@ const router = createBrowserRouter([
   {
     path: "/login",
     element: <Login />,
+    errorElement: <ErrorBoundary />
+  },
+  {
+    path: "/public-org",
+    element: <Organization />,
     errorElement: <ErrorBoundary />
   },
   {
@@ -49,11 +53,6 @@ const router = createBrowserRouter([
         ]
       }
     ]
-  },
-  {
-    path: "/public-org",
-    element: <PublicOrganization />,
-    errorElement: <ErrorBoundary />
   },
   {
     path: "*",
