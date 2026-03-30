@@ -113,13 +113,17 @@ app.use('/api/activity-logs', auth, require('./routes/activityLogs'));
 app.use('/api/org', require('./routes/org'));
 app.use('/api/auth', require('./routes/auth'));
 
-const connectDB = () => {
+const connectDB = (attempt = 0) => {
   if (mongoose.connection.readyState === 1 || mongoose.connection.readyState === 2) return;
   
   const options = {
-    serverSelectionTimeoutMS: 15000,
-    heartbeatFrequencyMS: 10000,
+    serverSelectionTimeoutMS: 30000,  // Give Atlas more time to respond
     socketTimeoutMS: 45000,
+    heartbeatFrequencyMS: 30000,      // Reduced heartbeat frequency (easier on Atlas M0)
+    maxPoolSize: 5,                   // CRITICAL: Limit connections — M0 free allows max 500 across ALL clients
+    minPoolSize: 1,                   // Keep at least 1 warm connection
+    retryWrites: true,
+    retryReads: true,
   };
 
   mongoose.connect(process.env.MONGO_URI, options)
@@ -128,12 +132,20 @@ const connectDB = () => {
     })
     .catch(err => {
       console.error('MongoDB connection issue:', err.message);
+      // Exponential backoff: 5s, 10s, 20s, then cap at 30s
+      const delay = Math.min(5000 * Math.pow(2, attempt), 30000);
+      console.log(`Retrying MongoDB connection in ${delay / 1000}s (attempt ${attempt + 1})...`);
+      setTimeout(() => connectDB(attempt + 1), delay);
     });
 };
 
 mongoose.connection.on('disconnected', () => {
   console.error('MongoDB Atlas disconnected! Self-healing triggered. Reconnecting in 5s...');
-  setTimeout(connectDB, 5000);
+  setTimeout(() => connectDB(0), 5000);
+});
+
+mongoose.connection.on('error', (err) => {
+  console.error('MongoDB connection error:', err.message);
 });
 
 // Start listening immediately
