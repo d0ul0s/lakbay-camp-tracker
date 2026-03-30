@@ -62,7 +62,14 @@ export default function MerchClaims() {
   const [pageRegistrants, setPageRegistrants] = useState<Registrant[]>([]);
   const [total, setTotal] = useState(0);
   const [isFetching, setIsFetching] = useState(false);
-  const [stats, setStats] = useState({
+  const [stats, setStats] = useState<{
+    sizes: Record<string, number>;
+    tshirts: { claimed: number; total: number };
+    bags: { claimed: number; total: number };
+    notebooks: { claimed: number; total: number };
+    pens: { claimed: number; total: number };
+  }>({
+    sizes: {},
     tshirts: { claimed: 0, total: 0 },
     bags: { claimed: 0, total: 0 },
     notebooks: { claimed: 0, total: 0 },
@@ -95,6 +102,7 @@ export default function MerchClaims() {
       const res = await api.get('/api/registrants/summary');
       const m = res.data.merchStats;
       setStats({
+        sizes: res.data.sizeStats || {},
         tshirts: { claimed: m.tshirt, total: m.total },
         bags: { claimed: m.bag, total: m.total },
         notebooks: { claimed: m.notebook, total: m.total },
@@ -218,6 +226,21 @@ export default function MerchClaims() {
           </div>
         ))}
       </div>
+
+      {/* Size Breakdown */}
+      {Object.keys(stats.sizes || {}).length > 0 && (
+        <div className="flex flex-wrap gap-2 pt-2">
+          {Object.entries(stats.sizes || {}).sort(([a], [b]) => {
+            const order = ['XS', 'S', 'M', 'L', 'XL', 'XXL', '3XL', '4XL', '5XL'];
+            return (order.indexOf(a) !== -1 ? order.indexOf(a) : 99) - (order.indexOf(b) !== -1 ? order.indexOf(b) : 99);
+          }).map(([size, count]) => (
+            <div key={size} className="bg-white border border-brand-sand/50 rounded-lg px-3 py-1.5 flex items-center justify-between gap-3 shadow-sm min-w-[70px]">
+              <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest leading-none">{size}</span>
+              <span className="text-sm font-black text-brand-brown leading-none">{count}</span>
+            </div>
+          ))}
+        </div>
+      )}
 
       <div className="bg-white rounded-2xl shadow-sm border border-brand-beige overflow-hidden">
         {/* Toolbar */}

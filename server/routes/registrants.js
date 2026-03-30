@@ -93,7 +93,7 @@ router.get('/', requirePermission('registrants', 'view'), async (req, res) => {
 // GET registrants summary (separate from list to avoid aggregate overhead on list calls)
 router.get('/summary', requirePermission('registrants', 'view'), async (req, res) => {
   try {
-    const all = await Registrant.find({}, 'church amountPaid verifiedByTreasurer feeType merchClaims');
+    const all = await Registrant.find({}, 'church amountPaid verifiedByTreasurer feeType merchClaims shirtSize');
     
     const sum = {};
     let totalExpected = 0;
@@ -106,6 +106,8 @@ router.get('/summary', requirePermission('registrants', 'view'), async (req, res
       pen: 0,
       total: 0
     };
+
+    const sizeStats = {};
 
     all.forEach(r => {
       if (!sum[r.church]) sum[r.church] = { total: 0, collected: 0, expected: 0, pending: 0 };
@@ -126,13 +128,18 @@ router.get('/summary', requirePermission('registrants', 'view'), async (req, res
       if (r.merchClaims?.bag) merchStats.bag++;
       if (r.merchClaims?.notebook) merchStats.notebook++;
       if (r.merchClaims?.pen) merchStats.pen++;
+
+      // Size stats
+      const size = r.shirtSize || 'Unknown';
+      sizeStats[size] = (sizeStats[size] || 0) + 1;
     });
 
     res.json({
       churchSummaries: sum,
       totalExpected,
       totalCollected,
-      merchStats
+      merchStats,
+      sizeStats
     });
   } catch (err) {
     res.status(500).json({ message: err.message });

@@ -913,22 +913,23 @@ export default function Registrants() {
                           </select>
                         </div>
                         <div>
-                          <label className="block text-sm text-gray-600 mb-1">Shirt Size
+                          <div className="flex items-center justify-between mb-1">
+                            <label className="block text-sm text-gray-600">Shirt Size</label>
                             <button
                               type="button"
                               onClick={() => setShirtModalOpen(true)}
-                              className="ml-1 text-gray-400 hover:text-brand-brown transition-colors"
+                              className="text-[10px] font-bold text-brand-brown uppercase tracking-wider hover:underline flex items-center gap-1 bg-brand-sand/30 px-2 py-0.5 rounded transition-colors hover:bg-brand-sand"
                               title="View Size Chart"
                             >
-                              <Info size={14} className="inline" />
+                              <Info size={12} /> Size Guide
                             </button>
-                          </label>
+                          </div>
                           <select
                             value={formData.shirtSize}
                             onChange={(e) => setFormData({ ...formData, shirtSize: e.target.value as ShirtSize })}
                             className="w-full px-3 py-2 rounded-lg border-2 border-brand-sand focus:outline-none focus:border-brand-brown font-bold text-center"
                           >
-                            {['XS', 'S', 'M', 'L', 'XL', 'XXL'].map(s => <option key={s} value={s}>{s}</option>)}
+                            {['XS', 'S', 'M', 'L', 'XL', 'XXL', '3XL', '4XL', '5XL'].map(s => <option key={s} value={s}>{s}</option>)}
                           </select>
                         </div>
                       </div>
@@ -1113,6 +1114,13 @@ export default function Registrants() {
                 <Users className="text-brand-brown" /> Batch Registration
               </h3>
               <div className="flex items-center gap-3">
+                <button
+                  type="button"
+                  onClick={() => setShirtModalOpen(true)}
+                  className="flex items-center gap-1 text-[10px] font-bold uppercase text-brand-brown hover:text-white hover:bg-brand-brown border border-brand-brown px-3 py-1.5 rounded-lg transition-colors tracking-widest bg-brand-sand/30"
+                >
+                  <Info size={14} /> Size Guide
+                </button>
                 {batchData.length > 0 && (
                   <button 
                     type="button" 
@@ -1204,7 +1212,7 @@ export default function Registrants() {
                                     <div>
                                       <label className="block text-xs text-gray-500 mb-1 text-center font-bold">Size</label>
                                       <select value={row.shirtSize} onChange={(e) => setBatchData(batchData.map((d, i) => i === idx ? { ...d, shirtSize: e.target.value as any } : d))} className="w-full px-2 py-2 text-sm rounded-lg border border-gray-200 focus:outline-none focus:border-brand-brown text-center font-black">
-                                        {['XS', 'S', 'M', 'L', 'XL', 'XXL'].map(s => <option key={s} value={s}>{s}</option>)}
+                                        {['XS', 'S', 'M', 'L', 'XL', 'XXL', '3XL', '4XL', '5XL'].map(s => <option key={s} value={s}>{s}</option>)}
                                       </select>
                                     </div>
                                   </div>

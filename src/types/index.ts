@@ -1,4 +1,4 @@
-export type ShirtSize = 'XS' | 'S' | 'M' | 'L' | 'XL' | 'XXL';
+export type ShirtSize = 'XS' | 'S' | 'M' | 'L' | 'XL' | 'XXL' | '3XL' | '4XL' | '5XL';
 export type PaymentStatus = 'Paid' | 'Partial' | 'Unpaid';
 export type PaymentMethod = 'Cash (In-person)' | 'Online (GCash)';
 

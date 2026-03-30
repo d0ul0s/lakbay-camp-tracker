@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Loader2 } from 'lucide-react';
+import { Loader2, Map } from 'lucide-react';
 import api from '../api/axios';
 import { useAppStore } from '../store';
 
@@ -74,8 +74,18 @@ export default function Login() {
           </button>
         </form>
 
-        <div className="mt-8 pt-6 border-t border-brand-beige text-center text-sm text-gray-500">
-          <p>For authorized camp personnel only. If you are not a camp staff, please ask for assistance from your Youth Church leader.</p>
+        <div className="mt-8 pt-6 border-t border-brand-beige flex flex-col gap-4">
+          <button 
+            type="button" 
+            onClick={() => navigate('/public-org')} 
+            className="w-full bg-brand-sand/50 border border-brand-sand text-brand-brown hover:bg-brand-brown hover:text-white hover:border-brand-brown font-bold py-3 px-4 rounded-lg transition-all duration-300 text-sm shadow-sm flex items-center justify-center gap-2 group"
+          >
+            <Map size={18} className="text-brand-brown group-hover:text-white transition-colors" /> View Camp Organization Board
+          </button>
+          
+          <p className="text-center text-xs text-brand-brown/60 px-2 font-medium leading-relaxed">
+            Portal is for authorized backend access only. For general camp inquiries, please contact your Church Youth leader.
+          </p>
         </div>
       </div>
     </div>

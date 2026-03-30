@@ -12,6 +12,8 @@ import Reports from './pages/Reports';
 import Users from './pages/Users';
 import Solicitations from './pages/Solicitations';
 import ActivityLogs from './pages/ActivityLogs';
+import Organization from './pages/Organization';
+import PublicOrganization from './pages/PublicOrganization';
 import AxiosInterceptor from './components/AxiosInterceptor';
 import ColdStartLoader from './components/ColdStartLoader';
 import ErrorBoundary from './components/ErrorBoundary';
@@ -34,6 +36,7 @@ const router = createBrowserRouter([
           { path: "/merch", element: <MerchClaims /> },
           { path: "/expenses", element: <Expenses /> },
           { path: "/solicitations", element: <Solicitations /> },
+          { path: "/org", element: <Organization /> },
           { path: "/activity-logs", element: <ActivityLogs /> },
           { path: "/reports", element: <Reports /> },
           {
@@ -46,6 +49,11 @@ const router = createBrowserRouter([
         ]
       }
     ]
+  },
+  {
+    path: "/public-org",
+    element: <PublicOrganization />,
+    errorElement: <ErrorBoundary />
   },
   {
     path: "*",
