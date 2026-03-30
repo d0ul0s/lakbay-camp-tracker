@@ -107,7 +107,7 @@ export default function PublicOrganization() {
                  <h4 className="font-black uppercase text-[11px] md:text-xs tracking-widest text-brand-brown mb-4 border-b border-gray-100 pb-3 flex items-center gap-2">
                    <div className="w-2 h-2 rounded-full bg-brand-light-brown shadow-sm shadow-brand-brown/30"></div> {category}
                  </h4>
-                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                 <div className="flex flex-col gap-2">
                    {staff.filter(s => s.category === category).map(s => (
                      <div key={s._id || s.id} className="flex items-center justify-between group p-2 hover:bg-brand-cream/50 rounded-xl transition-colors">
                         <div className="flex items-center gap-3">
