@@ -481,7 +481,19 @@ export default function Registrants() {
 
   const handleBatchSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const validData = batchData.filter(d => d.fullName && NAME_REGEX.test(d.fullName));
+
+    // Validate: name must be non-empty and valid, age must be a positive number
+    const invalidRows = batchData
+      .map((d, idx) => ({ d, idx }))
+      .filter(({ d }) => !d.fullName || !NAME_REGEX.test(d.fullName) || !d.age || d.age < 1);
+
+    if (invalidRows.length > 0) {
+      const rowNums = invalidRows.map(({ idx }) => `#${idx + 1}`).join(', ');
+      setBatchError(`Please fill in a valid name AND age for rows: ${rowNums}. Age is required for all registrants.`);
+      return;
+    }
+
+    const validData = batchData;
     if (validData.length === 0) return;
 
     setBatchError(null);
