@@ -618,10 +618,9 @@ export default function Registrants() {
         </div>
       </div>
 
-      {/* Per-Church Summary (For Admins) */}
-      {(isAdmin) && (
-        <div className="bg-white p-5 rounded-2xl shadow-sm border border-brand-beige">
-          <div className="flex items-center justify-between mb-4 border-b border-gray-100 pb-2">
+      {/* Per-Church Summary (For All Roles) */}
+      <div className="bg-white p-5 rounded-2xl shadow-sm border border-brand-beige">
+        <div className="flex items-center justify-between mb-4 border-b border-gray-100 pb-2">
             <h3 className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Financial Performance Snapshot</h3>
             <span className="text-[10px] font-black text-brand-brown bg-brand-sand/30 px-2 py-0.5 rounded-full uppercase tracking-tighter">Per-Church Metrics</span>
           </div>
@@ -692,8 +691,6 @@ export default function Registrants() {
             <span className="text-[9px] font-black text-gray-300 uppercase ml-1 tracking-widest">Scroll for more</span>
           </div>
         </div>
-      )}
-
 
       {/* Filters and Table */}
       <div className="bg-white rounded-2xl shadow-sm border border-brand-beige overflow-hidden">
