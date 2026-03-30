@@ -212,10 +212,11 @@ export default function Registrants() {
     churches: [], merchCosts: {}, ministries: [], expenseCategories: [], paymentMethods: [], shirtSizePhoto: null, waivedAgeChurches: []
   } as any;
 
+  const hasSyncedLive = useAppStore(s => s.hasSyncedLive);
+
   useEffect(() => {
     // If boot sync is already complete (cache hit + live sync), skip redundant fetches.
     // Layout.tsx already handles the live boot cycle for all roles via fetchBootData().
-    const { hasSyncedLive } = useAppStore.getState();
     if (!hasSyncedLive) {
       fetchGlobalSettings();
       fetchRegistrants(registrants.length > 0);
