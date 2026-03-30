@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { Users, Shield, Map, Tent, Star, Flag, Target, Hand, Loader2, ArrowLeft } from 'lucide-react';
+import { Users, Shield, Map, Tent, Star, Flag, Target, Hand, Loader2, ArrowLeft, ExternalLink } from 'lucide-react';
 import api from '../api/axios';
 
 interface CampLeader {
@@ -10,6 +10,7 @@ interface CampLeader {
   category: string;
   roleTitle: string;
   image?: string;
+  socialLink?: string;
 }
 
 interface CampGroup {
@@ -105,7 +106,13 @@ export default function PublicOrganization() {
                             {s.image ? <img src={s.image} alt={s.name} className="w-full h-full object-cover" /> : <span className="font-display text-brand-brown text-base">{s.name.charAt(0)}</span>}
                           </div>
                           <div>
-                            <p className="font-bold text-gray-900 leading-tight">{s.name}</p>
+                            <p className="font-bold text-gray-900 leading-tight flex items-center gap-1.5">
+                              {s.socialLink ? (
+                                <a href={s.socialLink} target="_blank" rel="noopener noreferrer" className="hover:text-blue-600 hover:underline flex items-center gap-1" title="View Social Profile">{s.name} <ExternalLink size={10} className="text-gray-400" /></a>
+                              ) : (
+                                s.name
+                              )}
+                            </p>
                             {s.roleTitle && <p className="text-[10px] uppercase font-bold text-gray-400 tracking-wider mt-0.5">{s.roleTitle}</p>}
                           </div>
                         </div>
@@ -140,7 +147,13 @@ export default function PublicOrganization() {
                                {cl.image ? <img src={cl.image} alt={cl.name} className="w-full h-full object-cover" /> : <span className="font-display text-brand-brown text-[10px]">{cl.name.charAt(0)}</span>}
                              </div>
                              <div>
-                               <p className="text-sm font-bold text-brand-brown leading-none">{cl.name}</p>
+                               <p className="text-sm font-bold text-brand-brown leading-none flex items-center gap-1.5">
+                                 {cl.socialLink ? (
+                                   <a href={cl.socialLink} target="_blank" rel="noopener noreferrer" className="hover:text-blue-600 hover:underline flex items-center gap-1" title="View Social Profile">{cl.name} <ExternalLink size={10} className="text-gray-400" /></a>
+                                 ) : (
+                                   cl.name
+                                 )}
+                               </p>
                                {cl.roleTitle && <p className="text-[9px] uppercase font-bold text-gray-400 tracking-wider mt-1">{cl.roleTitle}</p>}
                              </div>
                            </div>

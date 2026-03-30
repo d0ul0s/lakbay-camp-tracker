@@ -14,6 +14,7 @@ const campLeaderSchema = new mongoose.Schema({
   },
   roleTitle: { type: String, default: '' }, // e.g. "Head Coordinator", "Logistics"
   image: { type: String, default: '' }, // Direct URL link to photo (Option B)
+  socialLink: { type: String, default: '' }, // Facebook, Instagram, Discord, etc.
   createdAt: { type: Date, default: Date.now }
 });
 

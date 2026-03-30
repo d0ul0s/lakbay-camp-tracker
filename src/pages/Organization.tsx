@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAppStore } from '../store';
-import { Users, Shield, X, Edit2, Map, Tent, Star, Flag, Target, Hand, Loader2 } from 'lucide-react';
+import { Users, Shield, X, Edit2, Map, Tent, Star, Flag, Target, Hand, Loader2, ExternalLink } from 'lucide-react';
 import api from '../api/axios';
 
 interface CampLeader {
@@ -10,6 +10,7 @@ interface CampLeader {
   category: string;
   roleTitle: string;
   image?: string;
+  socialLink?: string;
 }
 
 interface CampGroup {
@@ -37,7 +38,7 @@ export default function Organization() {
   const [groupModal, setGroupModal] = useState<{ isOpen: boolean, group: CampGroup | null }>({ isOpen: false, group: null });
 
   // Form States
-  const [leaderForm, setLeaderForm] = useState<Partial<CampLeader>>({ category: 'Registration', name: '', roleTitle: '', churchRef: '', image: '' });
+  const [leaderForm, setLeaderForm] = useState<Partial<CampLeader>>({ category: 'Registration', name: '', roleTitle: '', churchRef: '', image: '', socialLink: '' });
   const [groupForm, setGroupForm] = useState<Partial<CampGroup>>({ name: '', leader: '', assistantLeader: '', pointKeeper: '', flagBearer: '', facilitators: [], grabMasters: [], members: [] });
 
   const fetchData = async () => {
@@ -134,7 +135,7 @@ export default function Organization() {
           {isAdmin && (
             <div className="flex gap-2">
               <button 
-                onClick={() => { setLeaderForm({ category: 'Registration', name: '', roleTitle: '', churchRef: '', image: '' }); setLeaderModal({ isOpen: true, leader: null }); }}
+                onClick={() => { setLeaderForm({ category: 'Registration', name: '', roleTitle: '', churchRef: '', image: '', socialLink: '' }); setLeaderModal({ isOpen: true, leader: null }); }}
                 className="bg-brand-sand text-brand-brown px-4 py-2 rounded-xl font-bold hover:bg-opacity-80 transition-colors shadow-sm flex items-center gap-2 text-sm"
               >
                 <Shield size={16} /> Add Role
@@ -170,7 +171,13 @@ export default function Organization() {
                             {s.image ? <img src={s.image} alt={s.name} className="w-full h-full object-cover" /> : <span className="font-display text-brand-brown text-sm">{s.name.charAt(0)}</span>}
                           </div>
                           <div>
-                            <p className="font-bold text-gray-900 leading-tight">{s.name}</p>
+                            <p className="font-bold text-gray-900 leading-tight flex items-center gap-1.5">
+                              {s.socialLink ? (
+                                <a href={s.socialLink} target="_blank" rel="noopener noreferrer" className="hover:text-blue-600 hover:underline flex items-center gap-1" title="View Social Profile">{s.name} <ExternalLink size={10} className="text-gray-400" /></a>
+                              ) : (
+                                s.name
+                              )}
+                            </p>
                             {s.roleTitle && <p className="text-[9px] lg:text-[10px] uppercase font-bold text-gray-400 tracking-wider mt-0.5">{s.roleTitle}</p>}
                           </div>
                         </div>
@@ -211,7 +218,13 @@ export default function Organization() {
                               {cl.image ? <img src={cl.image} alt={cl.name} className="w-full h-full object-cover" /> : <span className="font-display text-brand-brown text-[10px]">{cl.name.charAt(0)}</span>}
                              </div>
                              <div>
-                               <p className="text-sm font-bold text-brand-brown leading-none">{cl.name}</p>
+                               <p className="text-sm font-bold text-brand-brown leading-none flex items-center gap-1.5">
+                                 {cl.socialLink ? (
+                                   <a href={cl.socialLink} target="_blank" rel="noopener noreferrer" className="hover:text-blue-600 hover:underline flex items-center gap-1" title="View Social Profile">{cl.name} <ExternalLink size={10} className="text-gray-400" /></a>
+                                 ) : (
+                                   cl.name
+                                 )}
+                               </p>
                                {cl.roleTitle && <p className="text-[9px] uppercase font-bold text-gray-400 tracking-wider mt-1">{cl.roleTitle}</p>}
                              </div>
                            </div>
@@ -391,6 +404,10 @@ export default function Organization() {
                  <div>
                     <label className="block text-xs text-gray-500 mb-1">Photo URL (Optional)</label>
                     <input type="url" value={leaderForm.image} onChange={e => setLeaderForm({...leaderForm, image: e.target.value})} className="w-full border border-gray-200 rounded-xl px-4 py-2.5 focus:border-brand-brown outline-none" placeholder="e.g. https://imgur.com/photo.jpg" />
+                 </div>
+                 <div>
+                    <label className="block text-xs text-gray-500 mb-1">Social Media Link (Optional)</label>
+                    <input type="url" value={leaderForm.socialLink} onChange={e => setLeaderForm({...leaderForm, socialLink: e.target.value})} className="w-full border border-gray-200 rounded-xl px-4 py-2.5 focus:border-blue-400 outline-none" placeholder="e.g. https://facebook.com/username" />
                  </div>
                  <button type="submit" className="w-full py-3 rounded-xl bg-brand-brown text-white font-bold hover:bg-brand-light-brown transition-colors mt-2">{leaderModal.leader ? 'Save Changes' : 'Add Role'}</button>
               </form>
