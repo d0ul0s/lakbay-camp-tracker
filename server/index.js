@@ -110,6 +110,7 @@ app.use('/api/settings', auth, require('./routes/settings'));
 app.use('/api/boot', auth, require('./routes/boot'));
 app.use('/api/backup', auth, require('./routes/backup'));
 app.use('/api/activity-logs', auth, require('./routes/activityLogs'));
+app.use('/api/points', auth, require('./routes/points'));
 app.use('/api/org', require('./routes/org'));
 app.use('/api/announcements', require('./routes/announcements'));
 app.use('/api/tribe-proposals', auth, require('./routes/tribeProposals'));

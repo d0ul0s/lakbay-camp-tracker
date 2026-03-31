@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { useAppStore } from '../store';
 import { Link } from 'react-router-dom';
-import { Users, Shield, X, Edit2, Map, Tent, Star, Flag, Target, Hand, Loader2, Search, Check, ChevronDown, ArrowLeft } from 'lucide-react';
+import { Users, Shield, X, Edit2, Map, Tent, Star, Flag, Target, Hand, Loader2, Search, Check, ChevronDown, ArrowLeft, Printer } from 'lucide-react';
 import ConfirmModal from '../components/ConfirmModal';
 import api from '../api/axios';
 import { getChurchColor, getChurchVibrantColor } from '../utils/churchColorUtils';
@@ -134,13 +134,30 @@ const SearchableRoleInput = ({ label, icon, value, onChange, options, placeholde
 export default function Organization() {
   const { currentUser, appSettings, isServerAwake, fetchGlobalSettings } = useAppStore();
   const isAdmin = currentUser?.role === 'admin';
+  const rolePerms = currentUser?.permissionMatrix?.[currentUser.role!];
   const isVisitor = !currentUser;
+
+  // Granular check: Admin always has access, others check matrix
+  const canViewOrg = isAdmin || (rolePerms?.org?.view === true);
 
   const [leaders, setLeaders] = useState<CampLeader[]>([]);
   const [groups, setGroups] = useState<CampGroup[]>([]);
   const [registrants, setRegistrants] = useState<{ id?: string, _id?: string, fullName: string, church: string }[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'departments' | 'leaders' | 'groups'>('departments');
+
+  // If not visitor, and not admin, and NO permission, show restricted
+  if (!isVisitor && !canViewOrg) {
+    return (
+      <div className="flex flex-col items-center justify-center h-full min-h-[50vh] text-center px-4">
+        <div className="bg-white p-8 rounded-2xl shadow-sm border border-brand-beige max-w-md w-full">
+          <ShieldAlert size={48} className="mx-auto text-red-400 mb-4" />
+          <h2 className="text-2xl font-display text-brand-brown mb-2">Restricted Access</h2>
+          <p className="text-gray-500">Only authorized coordinators or administrators can view the internal organization roster.</p>
+        </div>
+      </div>
+    );
+  }
 
   // Modals
   const [leaderModal, setLeaderModal] = useState<{ isOpen: boolean, leader: CampLeader | null }>({ isOpen: false, leader: null });
@@ -389,6 +406,13 @@ export default function Organization() {
             </h2>
             <p className="text-gray-500 font-medium text-sm md:text-base mt-2 border-l-4 border-brand-sand/50 pl-4">Official camp groupings, staff roster, and church youth leaders.</p>
           </div>
+          <button 
+            onClick={() => window.print()}
+            className="flex items-center justify-center gap-2 px-5 py-3 bg-white border-2 border-brand-sand text-brand-brown rounded-2xl font-bold hover:bg-brand-sand hover:text-white transition-all shadow-sm active:scale-95 shrink-0"
+          >
+            <Printer size={18} /> 
+            <span>Print {activeTab === 'groups' ? 'Tribes' : activeTab === 'leaders' ? 'Personnel' : 'Report'}</span>
+          </button>
         </div>
 
         <CampCountdown />
@@ -1213,6 +1237,121 @@ export default function Organization() {
         onCancel={() => setConfirmState(prev => ({ ...prev, isOpen: false }))}
         isDestructive={confirmState.isDestructive}
       />
+
+      {/* Hidden Print Styling and Content */}
+      <style>{`
+        @media print {
+          body * { visibility: hidden; }
+          #print-root, #print-root * { visibility: visible; }
+          #print-root { position: absolute; left: 0; top: 0; width: 100%; color: black !important; background: white !important; }
+          .no-print { display: none !important; }
+          @page { margin: 1cm; }
+        }
+      `}</style>
+      
+      <div id="print-root" className="hidden print:block p-8 bg-white">
+        <div className="border-b-4 border-gray-900 pb-4 mb-8">
+           <h1 className="text-4xl font-display font-black tracking-widest text-black">LAKBAY CAMP 2026</h1>
+           <p className="text-sm font-bold uppercase tracking-widest text-gray-600">
+             Official {activeTab === 'groups' ? 'Tribe Rosters' : activeTab === 'leaders' ? 'Personnel Directory' : 'Departmental Structure'} Report
+           </p>
+           <p className="text-[10px] text-gray-400 mt-1">Generated: {new Date().toLocaleDateString()} at {new Date().toLocaleTimeString()}</p>
+        </div>
+
+        {/* 1. PRINT DEPARTMENTS */}
+        {activeTab === 'departments' && (
+          <div className="space-y-10">
+            {Array.from(new Set(staff.flatMap(s => getCategories(s))))
+              .filter(cat => cat !== 'Youth Leader')
+              .sort((a, b) => a === 'Camp Head' ? -1 : b === 'Camp Head' ? 1 : a.localeCompare(b))
+              .map(category => (
+                <div key={category} className="break-inside-avoid">
+                  <h2 className="text-xl font-bold border-b-2 border-gray-800 mb-4 pb-1 uppercase">{category}</h2>
+                  <div className="grid grid-cols-2 gap-x-8 gap-y-2">
+                    {staff.filter(s => getCategories(s).includes(category)).map(s => (
+                      <div key={s._id || s.id} className="flex justify-between border-b border-gray-100 py-1">
+                        <span className="font-bold">{s.name}</span>
+                        <span className="text-xs text-gray-500 italic">{s.roleTitle}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))}
+          </div>
+        )}
+
+        {/* 2. PRINT LEADERS */}
+        {activeTab === 'leaders' && (
+          <div className="space-y-6">
+            <table className="w-full border-collapse">
+               <thead>
+                  <tr className="bg-gray-100">
+                    <th className="border border-gray-300 p-2 text-left uppercase text-xs">Church / Local</th>
+                    <th className="border border-gray-300 p-2 text-left uppercase text-xs">Youth Leader</th>
+                    <th className="border border-gray-300 p-2 text-left uppercase text-xs">Designation</th>
+                  </tr>
+               </thead>
+               <tbody>
+                  {effectiveChurches.map(churchName => {
+                    const ldr = youthLeaders.find(yl => yl.churchRef === churchName);
+                    return (
+                      <tr key={churchName}>
+                        <td className="border border-gray-300 p-2 font-black">{churchName}</td>
+                        <td className="border border-gray-300 p-2 font-medium">{ldr?.name || '---'}</td>
+                        <td className="border border-gray-300 p-2 text-sm italic text-gray-600">{ldr?.roleTitle || 'Head Youth Leader'}</td>
+                      </tr>
+                    );
+                  })}
+               </tbody>
+            </table>
+          </div>
+        )}
+
+        {/* 3. PRINT TRIBES */}
+        {activeTab === 'groups' && (
+          <div className="grid grid-cols-2 gap-x-8 gap-y-12">
+             {groups.sort((a, b) => a.name.localeCompare(b.name)).map(tribe => {
+               const tribeOfficialArr = tribe.members?.filter(m => registrants.some(r => r.fullName.toLowerCase().trim() === m.toLowerCase().trim())) || [];
+               const tribeManualArr = tribe.members?.filter(m => !registrants.some(r => r.fullName.toLowerCase().trim() === m.toLowerCase().trim())) || [];
+               
+               return (
+                  <div key={tribe.id || tribe._id} className="break-inside-avoid border-t-2 border-gray-900 pt-3">
+                     <h2 className="text-2xl font-black mb-1 text-black uppercase">{tribe.name}</h2>
+                     
+                     <div className="mb-4 space-y-0.5">
+                        <div className="flex justify-between text-[10px] font-bold"><span className="uppercase">Leader:</span> <span>{tribe.leader || '---'}</span></div>
+                        <div className="flex justify-between text-[10px] font-bold"><span className="uppercase">Asst:</span> <span>{tribe.assistantLeader || '---'}</span></div>
+                        <div className="flex justify-between text-[10px] font-bold"><span className="uppercase">Point Keeper:</span> <span>{tribe.pointKeeper || '---'}</span></div>
+                        <div className="flex justify-between text-[10px] font-bold"><span className="uppercase">Flag Bearer:</span> <span>{tribe.flagBearer || '---'}</span></div>
+                     </div>
+
+                     <div className="mb-4">
+                        <p className="text-[10px] font-black uppercase text-gray-500 mb-1 border-b border-gray-200">Facilitators / Grab Masters</p>
+                        <div className="columns-2 text-[9px] font-medium leading-relaxed">
+                           {[...(tribe.facilitators || []), ...(tribe.grabMasters || [])].map((f, i) => (
+                             <div key={i}>• {f}</div>
+                           ))}
+                        </div>
+                     </div>
+
+                     <div>
+                        <p className="text-[10px] font-black uppercase text-gray-500 mb-1 border-b border-gray-200">Members ({tribeOfficialArr.length + tribeManualArr.length})</p>
+                        <div className="columns-2 text-[9px] font-medium gap-x-4 leading-tight">
+                           {tribeOfficialArr.sort().map((m, i) => {
+                             const reg = registrants.find(r => r.fullName.toLowerCase().trim() === m.toLowerCase().trim());
+                             return <div key={i} className="flex justify-between border-b border-gray-50 mb-0.5"><span>{m}</span> <span className="text-[7px] text-gray-400 font-bold italic">{reg?.church}</span></div>;
+                           })}
+                           {tribeManualArr.sort().map((m, i) => (
+                             <div key={i} className="flex justify-between border-b border-gray-50 mb-0.5 text-gray-500 italic"><span>{m}</span> <span className="text-[7px] text-gray-400 font-black">GUEST</span></div>
+                           ))}
+                        </div>
+                     </div>
+                  </div>
+               );
+             })}
+          </div>
+        )}
+      </div>
     </>
   );
 }

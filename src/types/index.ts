@@ -101,6 +101,9 @@ export interface PermissionMatrixRole {
   expenses: { view: boolean; viewAll: boolean; add: boolean; editOwn: boolean; editAny: boolean; deleteOwn: boolean; deleteAny: boolean };
   solicitations: { view: boolean; add: boolean; edit: boolean; delete: boolean; verify: boolean };
   reports: { view: boolean; exportCsv: boolean };
+  announcements: { view: boolean };
+  org: { view: boolean };
+  points: { view: boolean; add: boolean; verify: boolean; delete: boolean };
   activitylogs: { view: boolean };
 }
 
@@ -126,4 +129,18 @@ export interface Announcement {
   createdAt?: string;
   updatedAt?: string;
   createdBy?: string;
+}
+
+export interface PointLog {
+  id: string;
+  _id?: string;
+  groupId: { id: string; _id: string; name: string };
+  type: 'merit' | 'demerit';
+  points: number;
+  reason: string;
+  createdBy: { id: string; _id: string; church: string; role: string };
+  verified: boolean;
+  verifiedBy?: { id: string; _id: string; role: string };
+  verifiedAt?: string;
+  createdAt: string;
 }

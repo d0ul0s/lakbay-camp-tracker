@@ -8,6 +8,7 @@ import Settings from './pages/Settings';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import Layout from './components/Layout';
 import Organization from './pages/Organization';
+import PublicOrganization from './pages/PublicOrganization';
 import TribeSorter from './pages/TribeSorter';
 import AxiosInterceptor from './components/AxiosInterceptor';
 import ColdStartLoader from './components/ColdStartLoader';
@@ -19,6 +20,8 @@ import ActivityLogs from './pages/ActivityLogs';
 import Reports from './pages/Reports';
 import Users from './pages/Users';
 
+import PointsManagement from './pages/PointsManagement';
+
 const router = createBrowserRouter([
   {
     path: "/login",
@@ -27,7 +30,7 @@ const router = createBrowserRouter([
   },
   {
     path: "/public-org",
-    element: <Organization />,
+    element: <PublicOrganization />,
     errorElement: <ErrorBoundary />
   },
   {
@@ -44,6 +47,7 @@ const router = createBrowserRouter([
         children: [
           { path: "/", element: <Dashboard /> },
           { path: "/registrants", element: <Registrants /> },
+          { path: "/points", element: <PointsManagement /> },
           { path: "/expenses", element: <Expenses /> },
           { path: "/solicitations", element: <Solicitations /> },
           { path: "/settings", element: <Settings /> },

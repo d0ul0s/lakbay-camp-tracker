@@ -8,6 +8,9 @@ const DEFAULT_MATRIX = {
     expenses: { view: true, viewAll: true, add: true, editOwn: true, editAny: false, deleteOwn: true, deleteAny: false },
     solicitations: { view: true, add: true, edit: true, delete: true, verify: true },
     reports: { view: true, exportCsv: true },
+    announcements: { view: false },
+    org: { view: true },
+    points: { view: true, add: false, verify: false, delete: false },
     activitylogs: { view: true }
   },
   coordinator: {
@@ -17,6 +20,9 @@ const DEFAULT_MATRIX = {
     expenses: { view: true, viewAll: true, add: true, editOwn: true, editAny: false, deleteOwn: true, deleteAny: false },
     solicitations: { view: false, add: false, edit: false, delete: false, verify: false },
     reports: { view: true, exportCsv: true },
+    announcements: { view: false },
+    org: { view: false },
+    points: { view: true, add: true, verify: false, delete: false },
     activitylogs: { view: false }
   }
 };

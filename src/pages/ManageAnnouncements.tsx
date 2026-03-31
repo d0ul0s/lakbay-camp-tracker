@@ -25,6 +25,8 @@ export default function ManageAnnouncements() {
   const [isSaving, setIsSaving] = useState(false);
   
   const isAdmin = currentUser?.role?.toLowerCase().trim() === 'admin';
+  const rolePerms = currentUser?.permissionMatrix?.[currentUser.role!];
+  const canManageAnnounce = isAdmin || (rolePerms?.announcements?.view === true);
 
   const initialForm: Omit<Announcement, '_id' | 'id' | 'createdAt' | 'updatedAt'> = {
     title: '',
@@ -36,14 +38,14 @@ export default function ManageAnnouncements() {
 
   const [formData, setFormData] = useState(initialForm);
 
-  // If not admin, show restricted
-  if (!isAdmin) {
+  // If not admin and no permission, show restricted
+  if (!canManageAnnounce) {
     return (
       <div className="flex flex-col items-center justify-center h-full min-h-[50vh] text-center px-4">
         <div className="bg-white p-8 rounded-2xl shadow-sm border border-brand-beige max-w-md w-full">
           <ShieldAlert size={48} className="mx-auto text-red-400 mb-4" />
           <h2 className="text-2xl font-display text-brand-brown mb-2">Restricted Access</h2>
-          <p className="text-gray-500">Only administrators can manage announcements.</p>
+          <p className="text-gray-500">Only authorized coordinators or administrators can manage announcements.</p>
         </div>
       </div>
     );

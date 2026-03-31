@@ -89,7 +89,7 @@ export default function PublicOrganization() {
   return (
     <div className="min-h-screen bg-brand-cream font-sans">
       {/* Public Header */}
-      <header className="bg-brand-brown text-white py-3 px-6 md:px-10 shadow-lg sticky top-0 z-50 flex items-center justify-between">
+      <header className="bg-brand-brown/95 text-white py-3 px-6 md:px-10 shadow-xl sticky top-0 z-[100] flex items-center justify-between backdrop-blur-md border-b border-white/10">
         <div className="flex items-center gap-3 md:gap-4 font-display tracking-widest leading-none">
           <img src="/logo.svg" alt="LAKBAY" className="h-8 w-8 md:h-10 md:w-10 filter drop-shadow-md" />
           <h1 className="text-lg md:text-xl hidden sm:block uppercase font-bold">LAKBAY CAMP</h1>
@@ -343,23 +343,57 @@ export default function PublicOrganization() {
                         )}
 
                         {g.members?.length > 0 && (
-                          <div className="mt-4 pt-3 border-t border-gray-100">
-                            <h5 className="text-[8px] font-black uppercase text-gray-400 tracking-widest mb-2 px-1">Members ({g.members.length})</h5>
-                            <div className="flex flex-wrap gap-1 px-0.5">
-                              {g.members.map((m: string, i: number) => {
-                                const reg = registrants.find(r => (r.fullName || '').toLowerCase().trim() === m.toLowerCase().trim());
-                                const colorClass = getChurchColor(reg?.church || '', appSettings?.churchColors);
-                                return (
-                                  <div
-                                    key={i}
-                                    className={`text-[9px] sm:text-[10px] px-2 py-0.5 rounded-md font-bold border ${colorClass} transition-transform hover:scale-105 cursor-default shadow-sm`}
-                                    title={reg?.church || 'Unknown Church'}
-                                  >
-                                    {m}
-                                  </div>
-                                );
-                              })}
-                            </div>
+                          <div className="mt-4 pt-4 border-t border-gray-100">
+                            {/* Partition members by registration status */}
+                            {(() => {
+                              const registered = g.members.filter(m => registrants.some(r => (r.fullName || '').toLowerCase().trim() === m.toLowerCase().trim()));
+                              const pending = g.members.filter(m => !registrants.some(r => (r.fullName || '').toLowerCase().trim() === m.toLowerCase().trim()));
+                              
+                              return (
+                                <div className="space-y-4">
+                                  {registered.length > 0 && (
+                                    <div>
+                                      <h5 className="text-[8px] font-black uppercase text-gray-400 tracking-widest mb-3 px-1">Registered Members ({registered.length})</h5>
+                                      <div className="flex flex-wrap gap-1.5 px-0.5">
+                                        {registered.map((m: string, i: number) => {
+                                          const reg = registrants.find(r => (r.fullName || '').toLowerCase().trim() === m.toLowerCase().trim());
+                                          const colorClass = getChurchColor(reg?.church || '', appSettings?.churchColors);
+                                          return (
+                                            <div
+                                              key={i}
+                                              className={`text-[9px] sm:text-[10px] px-2.5 py-1 rounded-lg font-bold border ${colorClass} transition-transform hover:scale-105 cursor-default shadow-sm`}
+                                              title={reg?.church || 'Unknown Church'}
+                                            >
+                                              {m}
+                                            </div>
+                                          );
+                                        })}
+                                      </div>
+                                    </div>
+                                  )}
+                                  
+                                  {pending.length > 0 && (
+                                    <div className="bg-amber-50/20 p-2.5 rounded-2xl border border-amber-100/50">
+                                      <h5 className="text-[8px] font-black uppercase text-amber-600/60 tracking-widest mb-2.5 px-1 flex items-center gap-1.5">
+                                        <div className="w-1 h-1 rounded-full bg-amber-400 animate-pulse" />
+                                        Pending Registration ({pending.length})
+                                      </h5>
+                                      <div className="flex flex-wrap gap-1.5 px-0.5">
+                                        {pending.map((m: string, i: number) => (
+                                          <div
+                                            key={i}
+                                            className="text-[9px] sm:text-[10px] px-2.5 py-1 rounded-lg font-bold border bg-white border-amber-300/40 text-amber-800 border-dashed transition-transform hover:scale-105 cursor-default shadow-sm"
+                                            title="Not yet registered in system"
+                                          >
+                                            {m}
+                                          </div>
+                                        ))}
+                                      </div>
+                                    </div>
+                                  )}
+                                </div>
+                              );
+                            })()}
                           </div>
                         )}
                       </div>

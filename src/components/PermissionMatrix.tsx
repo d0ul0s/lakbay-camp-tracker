@@ -63,6 +63,26 @@ const PAGES = [
     ] 
   },
   { 
+    id: 'announcements', 
+    label: 'Announcements', 
+    actions: [{ key: 'view', label: 'Can manage announcements' }] 
+  },
+  { 
+    id: 'org', 
+    label: 'Organization', 
+    actions: [{ key: 'view', label: 'Can view admin roster' }] 
+  },
+  { 
+    id: 'points', 
+    label: 'Point Management', 
+    actions: [
+      { key: 'view', label: 'Can view scoreboard' },
+      { key: 'add', label: 'Can submit points' },
+      { key: 'verify', label: 'Can verify points' },
+      { key: 'delete', label: 'Can delete logs' },
+    ] 
+  },
+  { 
     id: 'activitylogs', 
     label: 'Activity Logs', 
     actions: [{ key: 'view', label: 'Can view logs' }] 

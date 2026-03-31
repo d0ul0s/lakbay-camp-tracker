@@ -98,6 +98,9 @@ export default function Layout() {
       'expenses': 'expenses',
       'solicitations': 'solicitations',
       'reports': 'reports',
+      'announcements': 'announcements',
+      'org': 'org',
+      'points': 'points',
       'activitylogs': 'activitylogs'
     };
 
@@ -113,12 +116,13 @@ export default function Layout() {
   const navigation = [];
   if (hasAccess('dashboard')) navigation.push({ name: 'Dashboard', href: '/', icon: LayoutDashboard });
   if (hasAccess('registrants')) navigation.push({ name: 'Registrants', href: '/registrants', icon: Users });
+  if (hasAccess('points')) navigation.push({ name: 'Point Management', href: '/points', icon: Trophy });
   if (hasAccess('merch')) navigation.push({ name: 'Merch Claims', href: '/merch', icon: ShoppingBag });
   if (hasAccess('expenses')) navigation.push({ name: 'Expenses', href: '/expenses', icon: Receipt });
   if (hasAccess('solicitations')) navigation.push({ name: 'Solicitations', href: '/solicitations', icon: HeartHandshake });
   if (hasAccess('activitylogs')) navigation.push({ name: 'Activity Logs', href: '/activity-logs', icon: Activity });
-  navigation.push({ name: 'Announcements', href: '/announcements/manage', icon: Megaphone });
-  navigation.push({ name: 'Organization', href: '/org', icon: Map });
+  if (hasAccess('announcements')) navigation.push({ name: 'Announcements', href: '/announcements/manage', icon: Megaphone });
+  if (hasAccess('org')) navigation.push({ name: 'Organization', href: '/org', icon: Map });
   if (hasAccess('reports')) navigation.push({ name: 'Reports', href: '/reports', icon: FileDown });
   
   if (isAdmin) {

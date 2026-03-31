@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { UserRole, PermissionMatrix, AppSettings, Registrant, Expense, Solicitation, Announcement } from '../types';
+import type { UserRole, PermissionMatrix, AppSettings, Registrant, Expense, Solicitation, Announcement, PointLog } from '../types';
 import api from '../api/axios';
 
 // Mirror of DEFAULT_MATRIX from Settings model — ensures any missing DB key always has a valid fallback
@@ -11,6 +11,9 @@ const DEFAULT_MATRIX: Record<string, any> = {
     expenses: { view: true, viewAll: true, add: true, editOwn: true, editAny: false, deleteOwn: true, deleteAny: false },
     solicitations: { view: true, add: true, edit: true, delete: true, verify: true },
     reports: { view: true, exportCsv: true },
+    announcements: { view: false },
+    org: { view: true },
+    points: { view: true, add: false, verify: false, delete: false },
     activitylogs: { view: true }
   },
   coordinator: {
@@ -20,6 +23,9 @@ const DEFAULT_MATRIX: Record<string, any> = {
     expenses: { view: true, viewAll: true, add: true, editOwn: true, editAny: false, deleteOwn: true, deleteAny: false },
     solicitations: { view: false, add: false, edit: false, delete: false, verify: false },
     reports: { view: true, exportCsv: true },
+    announcements: { view: false },
+    org: { view: false },
+    points: { view: true, add: true, verify: false, delete: false },
     activitylogs: { view: false }
   }
 };
@@ -52,6 +58,7 @@ function updateCache(state: any, updates: any) {
       expenses: merged.expenses,
       solicitations: merged.solicitations,
       announcements: merged.announcements,
+      pointLogs: merged.pointLogs,
       appSettings: merged.appSettings
     }));
   } catch(e) {}
@@ -87,6 +94,10 @@ interface AppState {
   announcements: Announcement[];
   fetchAnnouncements: (silent?: boolean) => Promise<void>;
   syncAnnouncement: (action: string, data: any) => void;
+
+  pointLogs: PointLog[];
+  fetchPointLogs: (silent?: boolean) => Promise<void>;
+  syncPointLog: (action: string, data: any) => void;
 
   // In-flight mutation lock — prevents WebSocket echoes from overriding optimistic UI
   pendingMutations: Set<string>;
@@ -133,6 +144,7 @@ export const useAppStore = create<AppState>()((set) => {
     expenses: initialCache?.expenses || [],
     solicitations: initialCache?.solicitations || [],
     announcements: initialCache?.announcements || [],
+    pointLogs: initialCache?.pointLogs || [],
     users: [],
     isLoading: false,
     globalError: null,
@@ -197,6 +209,7 @@ export const useAppStore = create<AppState>()((set) => {
         expenses: [],
         solicitations: [],
         announcements: [],
+        pointLogs: [],
         hasBooted: false,
         hasSyncedLive: false
       });
@@ -284,6 +297,38 @@ export const useAppStore = create<AppState>()((set) => {
 
       updateCache(state, { announcements: next });
       return { announcements: next };
+    }),
+
+    fetchPointLogs: async (silent = false) => {
+      if (!silent) set({ isLoading: true });
+      try {
+        const res = await api.get('/api/points');
+        if (Array.isArray(res.data)) {
+          set({ pointLogs: res.data });
+          updateCache(useAppStore.getState(), { pointLogs: res.data });
+        }
+      } catch (err) {
+        console.error("Failed to fetch point logs", err);
+      } finally {
+        if (!silent) set({ isLoading: false });
+      }
+    },
+
+    syncPointLog: (action, data) => set(state => {
+      if (state.pendingMutations.has(`points:${data.id || data._id}`)) return state;
+      
+      let next = [...state.pointLogs];
+      if (action === 'added') {
+        const exists = next.find(p => p.id === data.id || p.id === data._id);
+        if (!exists) next = [data, ...next];
+      } else if (action === 'updated') {
+        next = next.map(p => (p.id === data.id || p.id === data._id) ? data : p);
+      } else if (action === 'deleted') {
+        next = next.filter(p => p.id !== (data._id || data.id));
+      }
+
+      updateCache(state, { pointLogs: next });
+      return { pointLogs: next };
     }),
 
     fetchRegistrants: async (silent = false) => {
@@ -485,7 +530,7 @@ export const useAppStore = create<AppState>()((set) => {
 
       try {
         const res = await api.get('/api/boot');
-        const { registrants, expenses, solicitations, announcements, settings } = res.data;
+        const { registrants, expenses, solicitations, announcements, points: pointLogs, settings } = res.data;
         const newSettings = {
           ...settings,
           churches: settings.churchList || settings.churches || [],
@@ -501,6 +546,7 @@ export const useAppStore = create<AppState>()((set) => {
           expenses,
           solicitations,
           announcements,
+          pointLogs: pointLogs || [],
           appSettings: newSettings,
         };
         
