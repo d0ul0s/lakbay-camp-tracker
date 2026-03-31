@@ -1,7 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import api from '../api/axios';
 import { useAppStore } from '../store';
-import { Announcement, AnnouncementType } from '../types';
+import type { Announcement, AnnouncementType } from '../types';
 import { 
   PlusCircle, 
   Megaphone, 
@@ -12,7 +12,6 @@ import {
   Edit2, 
   X, 
   Loader2, 
-  CheckCircle,
   Calendar,
   ShieldAlert
 } from 'lucide-react';

@@ -3,7 +3,6 @@ import { useNavigate } from 'react-router-dom';
 import { Loader2, Map, Megaphone, AlertTriangle, ChevronRight } from 'lucide-react';
 import api from '../api/axios';
 import { useAppStore } from '../store';
-import type { Announcement } from '../types';
 import { useEffect } from 'react';
 
 export default function Login() {
