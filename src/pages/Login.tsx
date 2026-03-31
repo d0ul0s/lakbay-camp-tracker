@@ -14,12 +14,18 @@ import { useAppStore } from '../store';
 export default function Login() {
   const [pin, setPin] = useState('');
   const [error, setError] = useState(false);
+  const [isDataLoading, setIsDataLoading] = useState(true);
   
   const { login, setLoading, announcements, fetchAnnouncements } = useAppStore();
   const navigate = useNavigate();
 
   useEffect(() => {
-    fetchAnnouncements(true);
+    // Background Fetch: Don't block the initial render
+    const loadAnnouncements = async () => {
+       await fetchAnnouncements(true);
+       setIsDataLoading(false);
+    };
+    loadAnnouncements();
   }, []);
 
   const priorityAnnouncements = announcements.filter(a => a.priority);
@@ -48,15 +54,15 @@ export default function Login() {
   const isLoading = useAppStore(state => state.isLoading);
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center p-4 bg-brand-cream select-none relative overflow-x-hidden">
-      {/* Dynamic Background */}
-      <div className="absolute inset-0 pointer-events-none opacity-10">
-        <div className="absolute top-[-20%] left-[-10%] w-[60%] h-[60%] rounded-full bg-brand-sand blur-[150px]"></div>
-        <div className="absolute bottom-[-10%] right-[-10%] w-[50%] h-[50%] rounded-full bg-brand-brown blur-[150px]"></div>
-      </div>
+    <div className="min-h-screen flex flex-col items-center justify-center p-4 select-none relative overflow-x-hidden bg-brand-cream bg-[radial-gradient(circle_at_top_left,rgba(212,163,115,0.15),transparent_50%),radial-gradient(circle_at_bottom_right,rgba(111,78,55,0.1),transparent_50%)]">
+      {/* 
+          GPU-Optimized Background:
+          The previous version used blur-[150px] which is CPU/GPU intensive on mobile.
+          The radial-gradient in the parent div above is significantly more efficient.
+      */}
 
       {/* Alert Banner for Priority Announcements */}
-      {latestPriority && (
+      {!isDataLoading && latestPriority && (
         <div 
           onClick={() => navigate('/announcements')}
           className="fixed top-0 left-0 right-0 z-50 bg-red-600 text-white py-3 px-4 shadow-xl cursor-pointer hover:bg-red-700 transition-colors animate-in slide-in-from-top duration-700"
