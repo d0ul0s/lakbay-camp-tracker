@@ -8,7 +8,6 @@ import Settings from './pages/Settings';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import Layout from './components/Layout';
 import Organization from './pages/Organization';
-import PublicOrganization from './pages/PublicOrganization';
 import TribeSorter from './pages/TribeSorter';
 import AxiosInterceptor from './components/AxiosInterceptor';
 import ColdStartLoader from './components/ColdStartLoader';
@@ -28,7 +27,7 @@ const router = createBrowserRouter([
   },
   {
     path: "/public-org",
-    element: <PublicOrganization />,
+    element: <Organization />,
     errorElement: <ErrorBoundary />
   },
   {

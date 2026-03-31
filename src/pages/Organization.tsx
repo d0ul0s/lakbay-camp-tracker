@@ -355,18 +355,26 @@ export default function Organization() {
 
   return (
     <>
-      <div className={`space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500 relative ${isVisitor ? 'min-h-screen bg-brand-cream p-4 md:p-8 pt-0' : ''}`}>
+      <div className={`space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500 relative ${isVisitor ? 'min-h-screen bg-brand-cream p-4 md:p-8 pt-0 font-sans' : ''}`}>
         {isVisitor && (
-          <header className="-mx-4 md:-mx-8 bg-brand-brown text-white py-3 px-6 md:px-10 shadow-lg sticky top-0 z-50 flex items-center justify-between mb-8 overflow-hidden">
-            <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-10 pointer-events-none"></div>
-            <div className="flex items-center gap-3 md:gap-4 font-display tracking-widest leading-none relative z-10 transition-transform active:scale-95 cursor-default">
-              <img src="/logo.svg" alt="LAKBAY" className="h-8 w-8 md:h-10 md:w-10 filter drop-shadow-md" />
-              <h1 className="text-lg md:text-xl hidden sm:block uppercase">LAKBAY CAMP</h1>
+          <>
+            {/* Background Decor */}
+            <div className="fixed inset-0 pointer-events-none overflow-hidden opacity-20">
+              <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] rounded-full bg-brand-sand blur-[120px]"></div>
+              <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] rounded-full bg-brand-brown/10 blur-[120px]"></div>
             </div>
-            <Link to="/login" className="relative z-10 flex items-center gap-2 bg-white/10 hover:bg-white/20 active:bg-white/30 px-4 py-2 rounded-xl transition-all font-bold text-xs backdrop-blur-sm shadow-inner uppercase tracking-wider border border-white/10">
-              <ArrowLeft size={14} /> Back to Login
-            </Link>
-          </header>
+
+            <header className="-mx-4 md:-mx-8 bg-brand-brown text-white py-3 px-6 md:px-10 shadow-lg sticky top-0 z-50 flex items-center justify-between mb-8 overflow-hidden">
+              <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-10 pointer-events-none"></div>
+              <div className="flex items-center gap-3 md:gap-4 font-display tracking-widest leading-none relative z-10 transition-transform active:scale-95 cursor-default">
+                <img src="/logo.svg" alt="LAKBAY" className="h-8 w-8 md:h-10 md:w-10 filter drop-shadow-md" />
+                <h1 className="text-lg md:text-xl hidden sm:block uppercase font-bold tracking-widest">LAKBAY CAMP</h1>
+              </div>
+              <Link to="/login" className="relative z-10 flex items-center gap-2 bg-white/10 hover:bg-white/20 active:bg-white/30 px-4 py-2 rounded-xl transition-all font-bold text-xs backdrop-blur-sm shadow-inner uppercase tracking-wider border border-white/10">
+                <ArrowLeft size={14} /> Back to Login
+              </Link>
+            </header>
+          </>
         )}
 
         {isLoading && (
@@ -377,10 +385,10 @@ export default function Organization() {
 
         <div className={`flex flex-col md:flex-row md:items-center justify-between gap-3 ${isVisitor ? 'max-w-7xl mx-auto w-full' : ''}`}>
           <div>
-            <h2 className="text-2xl md:text-4xl font-display text-brand-brown tracking-wide mb-1 flex items-center gap-3">
-              <Map className="text-brand-brown" size={isVisitor ? 32 : 24} /> {isVisitor ? 'Camp Board' : 'Camp Organization'}
+            <h2 className="text-3xl md:text-5xl font-display text-brand-brown tracking-wide mb-2 flex items-center gap-3">
+              <Map className="text-brand-brown w-8 h-8 md:w-10 md:h-10" /> Camp Organization
             </h2>
-            <p className="text-sm text-gray-500 font-medium border-l-4 border-brand-sand/30 pl-3">Official camp groupings, staff roster, and church youth leaders.</p>
+            <p className="text-gray-500 font-medium text-sm md:text-base mt-2 border-l-4 border-brand-sand/50 pl-4">Official camp groupings, staff roster, and church youth leaders.</p>
           </div>
         </div>
 

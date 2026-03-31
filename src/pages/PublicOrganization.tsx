@@ -76,8 +76,15 @@ export default function PublicOrganization() {
     if (isServerAwake) fetchData();
   }, [isServerAwake]);
 
+  // Processing
   const staff = leaders;
   const youthLeaders = leaders.filter(l => getCategories(l).includes('Youth Leader'));
+
+  // Dynamic fallback for church list if settings haven't loaded yet
+  const effectiveChurches = (appSettings?.churches && appSettings.churches.length > 0)
+    ? appSettings.churches.filter((c: string) => c !== 'JAM')
+    : Array.from(new Set(youthLeaders.filter(yl => yl.churchRef && yl.churchRef !== 'JAM').map(yl => yl.churchRef as string))).sort();
+
 
   return (
     <div className="min-h-screen bg-brand-cream font-sans">
@@ -85,9 +92,9 @@ export default function PublicOrganization() {
       <header className="bg-brand-brown text-white py-3 px-6 md:px-10 shadow-lg sticky top-0 z-50 flex items-center justify-between">
         <div className="flex items-center gap-3 md:gap-4 font-display tracking-widest leading-none">
           <img src="/logo.svg" alt="LAKBAY" className="h-8 w-8 md:h-10 md:w-10 filter drop-shadow-md" />
-          <h1 className="text-lg md:text-xl hidden sm:block uppercase">LAKBAY CAMP</h1>
+          <h1 className="text-lg md:text-xl hidden sm:block uppercase font-bold">LAKBAY CAMP</h1>
         </div>
-        <Link to="/login" className="flex items-center gap-2 bg-white/10 hover:bg-white/20 px-4 py-2 rounded-xl transition-colors font-bold text-xs backdrop-blur-sm shadow-inner uppercase tracking-wider">
+        <Link to="/login" className="flex items-center gap-2 bg-white/10 hover:bg-white/20 active:bg-white/30 px-4 py-2 rounded-xl transition-all font-bold text-xs backdrop-blur-sm shadow-inner uppercase tracking-wider border border-white/10">
           <ArrowLeft size={14} /> Back to Login
         </Link>
       </header>
@@ -102,15 +109,15 @@ export default function PublicOrganization() {
 
         <div>
           <h2 className="text-3xl md:text-5xl font-display text-brand-brown tracking-wide mb-2 flex items-center gap-3">
-            <Map className="text-brand-brown w-8 h-8 md:w-10 md:h-10" /> Camp Board
+            <Map className="text-brand-brown w-8 h-8 md:w-10 md:h-10" /> Camp Organization
           </h2>
-          <p className="text-gray-500 font-medium text-sm md:text-base mt-2 border-l-4 border-brand-sand/50 pl-4">Digital organization board for staff, youth leaders, and official tribe groupings.</p>
+          <p className="text-gray-500 font-medium text-sm md:text-base mt-2 border-l-4 border-brand-sand/50 pl-4">Official camp groupings, staff roster, and church youth leaders.</p>
         </div>
 
         <CampCountdown />
 
         {/* Tab Navigation */}
-        <div className="flex items-center gap-1 p-1 bg-brand-sand/10 rounded-2xl w-full sm:w-fit mb-4 border border-brand-sand/5">
+        <div className="flex items-center gap-1 p-1 bg-brand-sand/10 rounded-2xl w-full sm:w-fit mb-4 border border-brand-sand/5 shadow-inner">
           {[
             { id: 'departments', label: 'Departments', icon: <Shield size={16} /> },
             { id: 'leaders', label: 'YL', icon: <Users size={16} /> },
@@ -138,7 +145,7 @@ export default function PublicOrganization() {
                 <Shield size={18} />
                 <h3 className="text-sm font-black uppercase tracking-widest">Administrative Departments</h3>
               </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 md:gap-4">
                 {staff.length === 0 && <p className="text-gray-400 text-sm italic col-span-full">Staff structures are currently being finalized.</p>}
                 {Array.from(new Set(staff.flatMap(s => getCategories(s))))
                   .filter(cat => cat !== 'Youth Leader')
@@ -191,8 +198,8 @@ export default function PublicOrganization() {
                 <Users size={18} />
                 <h3 className="text-sm font-black uppercase tracking-widest">Church Youth Leaders</h3>
               </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-2.5">
-                {appSettings?.churches?.filter((c: string) => c !== 'JAM').map((church: string) => {
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-2.5 md:gap-3">
+                {effectiveChurches.map((church: string) => {
                   const churchLeaders = youthLeaders.filter(yl => yl.churchRef === church);
                   return (
                     <div key={church} className="bg-white border border-gray-100 rounded-2xl p-2.5 hover:border-brand-sand transition-all shadow-sm shadow-brand-brown/5">
@@ -242,10 +249,10 @@ export default function PublicOrganization() {
                 </div>
                 
                 {/* Church Color Legend */}
-                {((appSettings?.churches || []).filter((c: string) => c !== 'JAM').length > 0) && (
+                {effectiveChurches.length > 0 && (
                   <div className="flex flex-wrap gap-2 p-3 bg-white/50 backdrop-blur-sm rounded-2xl border border-brand-sand/10 shadow-sm sm:max-w-md md:max-w-lg lg:max-w-xl self-start">
                      <span className="text-[9px] font-black text-gray-400 uppercase tracking-widest mr-1 self-center">Church Legend:</span>
-                     {appSettings?.churches?.filter((c: string) => c !== 'JAM').map((church: string) => (
+                     {effectiveChurches.map((church: string) => (
                        <div key={church} className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg bg-white border border-gray-50 shadow-[0_1px_2px_rgba(0,0,0,0.02)]">
                           <div className={`w-3 h-3 rounded-full border border-white shadow-sm ring-1 ring-black/5 ${getChurchVibrantColor(church, appSettings?.churchColors)}`}></div>
                           <span className="text-[10px] font-bold text-gray-600 uppercase tracking-tight">{church}</span>
@@ -340,12 +347,12 @@ export default function PublicOrganization() {
                             <h5 className="text-[8px] font-black uppercase text-gray-400 tracking-widest mb-2 px-1">Members ({g.members.length})</h5>
                             <div className="flex flex-wrap gap-1 px-0.5">
                               {g.members.map((m: string, i: number) => {
-                                const reg = registrants.find(r => r.fullName === m);
+                                const reg = registrants.find(r => (r.fullName || '').toLowerCase().trim() === m.toLowerCase().trim());
                                 const colorClass = getChurchColor(reg?.church || '', appSettings?.churchColors);
                                 return (
                                   <div
                                     key={i}
-                                    className={`text-[9px] px-2 py-0.5 rounded-md font-bold border ${colorClass} transition-transform hover:scale-105 cursor-default shadow-sm`}
+                                    className={`text-[9px] sm:text-[10px] px-2 py-0.5 rounded-md font-bold border ${colorClass} transition-transform hover:scale-105 cursor-default shadow-sm`}
                                     title={reg?.church || 'Unknown Church'}
                                   >
                                     {m}
