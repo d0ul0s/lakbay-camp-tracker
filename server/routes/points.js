@@ -5,11 +5,41 @@ const CampGroup = require('../models/CampGroup');
 const { requirePermission, attachPermissions } = require('../middleware/permissions');
 const auth = require('../middleware/auth');
 
-// Apply auth and attachPermissions to all routes
+// PUBLIC ROUTE (No Auth Required)
+router.get('/public', async (req, res) => {
+  try {
+    const logs = await PointLog.find({ verified: true })
+      .populate('groupId', 'name')
+      .populate('createdBy', 'church role')
+      .sort({ createdAt: -1 })
+      .limit(30);
+
+    const groups = await CampGroup.find({}, 'name');
+    const scores = {};
+    
+    // In-memory score calc to avoid complex aggregation for simple pulse
+    const allVerified = await PointLog.find({ verified: true });
+    allVerified.forEach(p => {
+      scores[p.groupId] = (scores[p.groupId] || 0) + p.points;
+    });
+
+    const scoreboard = groups.map(g => ({
+      id: g._id,
+      name: g.name,
+      score: scores[g._id.toString()] || 0
+    })).sort((a, b) => b.score - a.score);
+
+    res.json({ logs, scoreboard });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
+// Apply auth and attachPermissions to all OTHER routes
 router.use(auth);
 router.use(attachPermissions);
 
-// Get all point logs
+// Get all point logs (Authenticated)
 router.get('/', requirePermission('points', 'view'), async (req, res) => {
   try {
     const logs = await PointLog.find()
@@ -30,28 +60,9 @@ router.post('/', requirePermission('points', 'add'), async (req, res) => {
   const pointValue = Math.abs(points); // Ensure positive input, we'll assign the sign based on type
 
   try {
-    // 1. Quota Check for Coordinators (Merit only)
-    if (type === 'merit' && !isAdmin) {
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-
-      const todayMerit = await PointLog.find({
-        createdBy: req.user.id,
-        type: 'merit',
-        createdAt: { $gte: today }
-      });
-
-      const totalGivenToday = todayMerit.reduce((sum, log) => sum + log.points, 0);
-      const DAILY_QUOTA = 50; // Merit points per day
-
-      if (totalGivenToday + pointValue > DAILY_QUOTA) {
-        return res.status(403).json({ 
-          message: `Daily merit quota exceeded. You have ${DAILY_QUOTA - totalGivenToday} points left for today.` 
-        });
-      }
-    }
-
-    // 2. Create the log
+    // Logic updated: No more quota limits for coordinators as per user request.
+    
+    // Create the log
     const finalPoints = type === 'merit' ? pointValue : -pointValue;
     
     const newLog = new PointLog({
@@ -67,12 +78,42 @@ router.post('/', requirePermission('points', 'add'), async (req, res) => {
 
     const saved = await newLog.save();
     
-    // Populate for response
     const populated = await PointLog.findById(saved._id)
       .populate('groupId', 'name')
       .populate('createdBy', 'church role');
 
     res.status(201).json(populated);
+  } catch (err) {
+    res.status(400).json({ message: err.message });
+  }
+});
+
+// Update Point Log Reason (Creator or Admin)
+router.put('/:id', async (req, res) => {
+  const { reason } = req.body;
+  if (!reason) return res.status(400).json({ message: 'Reason is required' });
+
+  try {
+    const log = await PointLog.findById(req.params.id);
+    if (!log) return res.status(404).json({ message: 'Log entry not found' });
+
+    // Permission check: Must be the creator OR an admin
+    const isAdmin = req.user.role === 'admin';
+    const isCreator = log.createdBy.toString() === req.user.id;
+
+    if (!isAdmin && !isCreator) {
+      return res.status(403).json({ message: 'You do not have permission to edit this entry' });
+    }
+
+    log.reason = reason;
+    const saved = await log.save();
+    
+    const populated = await PointLog.findById(saved._id)
+      .populate('groupId', 'name')
+      .populate('createdBy', 'church role')
+      .populate('verifiedBy', 'role');
+
+    res.json(populated);
   } catch (err) {
     res.status(400).json({ message: err.message });
   }

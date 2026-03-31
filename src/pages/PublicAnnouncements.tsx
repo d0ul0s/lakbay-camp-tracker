@@ -10,9 +10,83 @@ import {
   Calendar,
   ArrowLeft,
   Loader2,
-  Info
+  Info,
+  ChevronDown,
+  ChevronUp
 } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
+import ReactMarkdown from 'react-markdown';
+
+function AnnouncementCard({ ann, getTypeIcon, getPriorityStyle }: { ann: Announcement, getTypeIcon: any, getPriorityStyle: any }) {
+  const [isExpanded, setIsExpanded] = useState(false);
+  const isLong = ann.content.length > 300;
+
+  return (
+    <div 
+      className={`group relative p-6 md:p-8 rounded-[2rem] border transition-all duration-500 hover:shadow-2xl ${getPriorityStyle(ann.priority)} overflow-hidden`}
+    >
+      {/* Visual Accent */}
+      {ann.priority && (
+        <div className="absolute top-0 right-0 p-3">
+          <span className="flex items-center gap-1.5 px-3 py-1 bg-red-500 text-white text-[9px] font-black uppercase rounded-full shadow-lg shadow-red-200 animate-pulse">
+            Urgent Update
+          </span>
+        </div>
+      )}
+      
+      <div className="flex flex-col md:flex-row gap-6">
+        <div className={`shrink-0 w-16 h-16 rounded-2xl flex items-center justify-center shadow-sm ${ann.priority ? 'bg-red-100' : 'bg-brand-cream'}`}>
+          {getTypeIcon(ann.type)}
+        </div>
+        
+        <div className="flex-1 space-y-3">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-2">
+              <h3 className="text-2xl md:text-3xl font-display text-brand-brown group-hover:text-black transition-colors">
+                  {ann.title}
+              </h3>
+              <div className="flex items-center gap-4 text-[10px] font-bold uppercase tracking-widest text-gray-400">
+                   <span className="flex items-center gap-1.5">
+                      <Info size={12} className="text-brand-sand" /> {ann.type}
+                   </span>
+                   {ann.targetDate && (
+                      <span className="flex items-center gap-1.5 text-blue-500 bg-blue-50 px-2 py-0.5 rounded-md">
+                          <Calendar size={12} /> {format(parseISO(ann.targetDate), 'MMM d')}
+                      </span>
+                   )}
+              </div>
+          </div>
+          
+          <div className={`relative ${!isExpanded && isLong ? 'max-h-[160px] overflow-hidden' : ''}`}>
+            <div className="prose prose-base md:prose-lg prose-brown max-w-none prose-p:leading-relaxed prose-li:my-1">
+              <ReactMarkdown>{ann.content}</ReactMarkdown>
+            </div>
+            
+            {!isExpanded && isLong && (
+              <div className="absolute bottom-0 left-0 right-0 h-20 bg-gradient-to-t from-white via-white/80 to-transparent pointer-events-none"></div>
+            )}
+          </div>
+          
+          {isLong && (
+            <button 
+              onClick={() => setIsExpanded(!isExpanded)}
+              className="flex items-center gap-2 text-brand-sand hover:text-brand-brown font-black uppercase tracking-[0.2em] text-[10px] transition-colors pt-2"
+            >
+              {isExpanded ? (
+                <>Collapse <ChevronUp size={14} /></>
+              ) : (
+                <>Read More <ChevronDown size={14} /></>
+              )}
+            </button>
+          )}
+          
+          <div className="pt-4 flex items-center gap-2 text-[9px] font-black text-gray-300 uppercase tracking-widest">
+             Posted {format(parseISO(ann.createdAt!), 'MMM d, yyyy')} • {format(parseISO(ann.createdAt!), 'h:mm a')}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 export default function PublicAnnouncements() {
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
@@ -44,7 +118,7 @@ export default function PublicAnnouncements() {
 
   const getPriorityStyle = (priority: boolean) => {
     if (priority) return 'border-red-100 bg-red-50/30 ring-1 ring-red-50';
-    return 'border-brand-beige bg-white';
+    return 'border-brand-beige bg-white shadow-sm';
   };
 
   return (
@@ -87,51 +161,12 @@ export default function PublicAnnouncements() {
         ) : announcements.length > 0 ? (
           <div className="space-y-6">
             {announcements.map((ann) => (
-              <div 
+              <AnnouncementCard 
                 key={ann._id || ann.id}
-                className={`group relative p-6 md:p-8 rounded-[2rem] border transition-all duration-500 hover:shadow-2xl hover:-translate-y-1 ${getPriorityStyle(ann.priority)} overflow-hidden`}
-              >
-                {/* Visual Accent */}
-                {ann.priority && (
-                  <div className="absolute top-0 right-0 p-3">
-                    <span className="flex items-center gap-1.5 px-3 py-1 bg-red-500 text-white text-[9px] font-black uppercase rounded-full shadow-lg shadow-red-200 animate-pulse">
-                      Urgent Update
-                    </span>
-                  </div>
-                )}
-                
-                <div className="flex flex-col md:flex-row gap-6">
-                  <div className={`shrink-0 w-16 h-16 rounded-2xl flex items-center justify-center shadow-sm ${ann.priority ? 'bg-red-100' : 'bg-brand-cream'}`}>
-                    {getTypeIcon(ann.type)}
-                  </div>
-                  
-                  <div className="flex-1 space-y-3">
-                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-2">
-                        <h3 className="text-2xl md:text-3xl font-display text-brand-brown group-hover:text-black transition-colors">
-                            {ann.title}
-                        </h3>
-                        <div className="flex items-center gap-4 text-[10px] font-bold uppercase tracking-widest text-gray-400">
-                             <span className="flex items-center gap-1.5">
-                                <Info size={12} className="text-brand-sand" /> {ann.type}
-                             </span>
-                             {ann.targetDate && (
-                                <span className="flex items-center gap-1.5 text-blue-500 bg-blue-50 px-2 py-0.5 rounded-md">
-                                    <Calendar size={12} /> {format(parseISO(ann.targetDate), 'MMM d')}
-                                </span>
-                             )}
-                        </div>
-                    </div>
-                    
-                    <p className="text-gray-600 text-base md:text-lg leading-relaxed whitespace-pre-wrap">
-                      {ann.content}
-                    </p>
-                    
-                    <div className="pt-4 flex items-center gap-2 text-[9px] font-black text-gray-300 uppercase tracking-widest">
-                       Posted {format(parseISO(ann.createdAt!), 'MMM d, yyyy')} • {format(parseISO(ann.createdAt!), 'h:mm a')}
-                    </div>
-                  </div>
-                </div>
-              </div>
+                ann={ann}
+                getTypeIcon={getTypeIcon}
+                getPriorityStyle={getPriorityStyle}
+              />
             ))}
           </div>
         ) : (

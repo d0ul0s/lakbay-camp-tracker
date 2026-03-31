@@ -14,6 +14,7 @@ import AxiosInterceptor from './components/AxiosInterceptor';
 import ColdStartLoader from './components/ColdStartLoader';
 import ErrorBoundary from './components/ErrorBoundary';
 import PublicAnnouncements from './pages/PublicAnnouncements';
+import PublicPulse from './pages/PublicPulse';
 import ManageAnnouncements from './pages/ManageAnnouncements';
 import MerchClaims from './pages/MerchClaims';
 import ActivityLogs from './pages/ActivityLogs';
@@ -36,6 +37,11 @@ const router = createBrowserRouter([
   {
     path: "/announcements",
     element: <PublicAnnouncements />,
+    errorElement: <ErrorBoundary />
+  },
+  {
+    path: "/public-pulse",
+    element: <PublicPulse />,
     errorElement: <ErrorBoundary />
   },
   {

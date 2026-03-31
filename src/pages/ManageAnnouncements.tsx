@@ -13,16 +13,20 @@ import {
   X, 
   Loader2, 
   Calendar,
-  ShieldAlert
+  ShieldAlert,
+  Eye,
+  PenTool
 } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import toast from 'react-hot-toast';
+import ReactMarkdown from 'react-markdown';
 
 export default function ManageAnnouncements() {
   const { announcements, currentUser, syncAnnouncement } = useAppStore();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+  const [isPreview, setIsPreview] = useState(false);
   
   const isAdmin = currentUser?.role?.toLowerCase().trim() === 'admin';
   const rolePerms = currentUser?.permissionMatrix?.[currentUser.role!];
@@ -54,6 +58,7 @@ export default function ManageAnnouncements() {
   const handleOpenNew = () => {
     setFormData(initialForm);
     setEditingId(null);
+    setIsPreview(false);
     setIsModalOpen(true);
   };
 
@@ -66,6 +71,7 @@ export default function ManageAnnouncements() {
       targetDate: ann.targetDate ? ann.targetDate.split('T')[0] : null
     });
     setEditingId(ann._id || ann.id || null);
+    setIsPreview(false);
     setIsModalOpen(true);
   };
 
@@ -171,7 +177,9 @@ export default function ManageAnnouncements() {
                     <span className="px-1.5 py-0.5 bg-red-100 text-red-600 text-[9px] font-black uppercase rounded-md animate-bounce">URGENT</span>
                   )}
                 </div>
-                <p className="text-gray-500 text-sm line-clamp-4 leading-relaxed">{ann.content}</p>
+                <div className="text-gray-500 text-sm line-clamp-4 leading-relaxed prose prose-sm prose-brown">
+                  <ReactMarkdown>{ann.content}</ReactMarkdown>
+                </div>
               </div>
 
               <div className="mt-6 pt-4 border-t border-gray-50 flex items-center justify-between text-[10px]">
@@ -200,13 +208,13 @@ export default function ManageAnnouncements() {
       {/* Modal */}
       {isModalOpen && (
         <div className="fixed inset-0 bg-brand-brown/60 backdrop-blur-md z-[100] flex items-center justify-center p-4 animate-in fade-in duration-300">
-          <div className="bg-white rounded-[2.5rem] shadow-2xl w-full max-w-xl overflow-hidden border border-brand-sand flex flex-col max-h-[90vh]">
+          <div className="bg-white rounded-[2.5rem] shadow-2xl w-full max-w-2xl overflow-hidden border border-brand-sand flex flex-col max-h-[90vh]">
             <div className="px-8 py-6 border-b border-gray-100 flex justify-between items-center bg-brand-cream/30">
               <div>
                 <h3 className="text-2xl font-display text-brand-brown tracking-tight">
                   {editingId ? 'Edit Announcement' : 'Post New Announcement'}
                 </h3>
-                <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest mt-1">Live synchronized for all users</p>
+                <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest mt-1">Markdown ready for rich text</p>
               </div>
               <button onClick={() => setIsModalOpen(false)} className="p-2 hover:bg-white rounded-full transition-colors text-gray-400 hover:text-brand-brown">
                 <X size={24} />
@@ -251,14 +259,40 @@ export default function ManageAnnouncements() {
               </div>
 
               <div className="space-y-1">
-                <label className="text-[11px] font-black text-gray-400 uppercase tracking-widest ml-1">Content</label>
-                <textarea 
-                  required rows={5}
-                  placeholder="Tell your campers what's up..."
-                  className="w-full px-5 py-4 rounded-2xl border-2 border-brand-beige focus:border-brand-brown focus:outline-none transition-all leading-relaxed text-gray-700"
-                  value={formData.content}
-                  onChange={e => setFormData({...formData, content: e.target.value})}
-                />
+                <div className="flex items-center justify-between mb-1 ml-1 pr-1">
+                  <label className="text-[11px] font-black text-gray-400 uppercase tracking-widest">Content</label>
+                  <div className="flex bg-gray-100 p-1 rounded-lg">
+                    <button 
+                      type="button"
+                      onClick={() => setIsPreview(false)}
+                      className={`flex items-center gap-1.5 px-3 py-1 rounded-md text-[10px] font-black uppercase transition-all ${!isPreview ? 'bg-white text-brand-brown shadow-sm' : 'text-gray-400'}`}
+                    >
+                      <PenTool size={10} /> Write
+                    </button>
+                    <button 
+                      type="button"
+                      onClick={() => setIsPreview(true)}
+                      className={`flex items-center gap-1.5 px-3 py-1 rounded-md text-[10px] font-black uppercase transition-all ${isPreview ? 'bg-white text-brand-brown shadow-sm' : 'text-gray-400'}`}
+                    >
+                      <Eye size={10} /> Preview
+                    </button>
+                  </div>
+                </div>
+                
+                {isPreview ? (
+                  <div className="w-full min-h-[200px] px-5 py-4 rounded-2xl border-2 border-brand-brown/10 bg-brand-cream/20 prose prose-sm prose-brown max-w-none overflow-y-auto">
+                    <ReactMarkdown>{formData.content || '_No content yet..._'}</ReactMarkdown>
+                  </div>
+                ) : (
+                  <textarea 
+                    required rows={6}
+                    placeholder="Tell your campers what's up... (Markdown supported)"
+                    className="w-full px-5 py-4 rounded-2xl border-2 border-brand-beige focus:border-brand-brown focus:outline-none transition-all leading-relaxed text-gray-700 font-medium"
+                    value={formData.content}
+                    onChange={e => setFormData({...formData, content: e.target.value})}
+                  />
+                )}
+                <p className="text-[9px] text-gray-400 font-bold ml-2 mt-1">Supports **bold**, *italic*, # headings, - lists, and [links](url)</p>
               </div>
 
               <div className="flex items-center justify-between p-4 bg-brand-cream/50 rounded-2xl border border-brand-sand/50">

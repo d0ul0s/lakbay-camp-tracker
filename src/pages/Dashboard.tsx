@@ -1,16 +1,31 @@
-import { useMemo } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import { useAppStore } from '../store';
-import { Users, DollarSign, ShoppingBag, PlusCircle, HeartHandshake, Loader2, Zap } from 'lucide-react';
+import { Users, DollarSign, ShoppingBag, PlusCircle, HeartHandshake, Loader2, Zap, Trophy, Plus, Activity, ChevronRight, TrendingUp, TrendingDown } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, Legend } from 'recharts';
+import api from '../api/axios';
 
 export default function Dashboard() {
   const currentUser = useAppStore(s => s.currentUser);
   const registrants = useAppStore(s => s.registrants);
   const expenses = useAppStore(s => s.expenses);
   const solicitations = useAppStore(s => s.solicitations);
+  const pointLogs = useAppStore(s => s.pointLogs);
   const hasBooted = useAppStore(s => s.hasBooted);
   const hasSyncedLive = useAppStore(s => s.hasSyncedLive);
+
+  const [tribeList, setTribeList] = useState<{ id: string; name: string }[]>([]);
+
+  useEffect(() => {
+    api.get('/api/org/groups').then(res => {
+      if (Array.isArray(res.data)) {
+        setTribeList(res.data.map((g: any) => ({
+          id: g.id || g._id,
+          name: g.name
+        })));
+      }
+    }).catch(err => console.error("Failed to fetch tribes for dashboard", err));
+  }, []);
 
   const isAdmin = currentUser?.role?.toLowerCase().trim() === 'admin';
   const roleKey = currentUser?.role?.toLowerCase().trim();
@@ -18,6 +33,21 @@ export default function Dashboard() {
   const canAddSolicitations = isAdmin || rolePerms?.solicitations?.add === true;
   const canLogExpenses = isAdmin || rolePerms?.expenses?.add === true;
   const canAddRegistrants = isAdmin || rolePerms?.registrants?.add === true;
+
+  // Tribe Scores Calculation
+  const tribes = useMemo(() => {
+    const map: Record<string, number> = {};
+    pointLogs.filter(p => p.verified).forEach(p => {
+      const gId = p.groupId?.id || p.groupId?._id;
+      if (!gId) return;
+      map[gId] = (map[gId] || 0) + p.points;
+    });
+
+    return tribeList.map(t => ({
+      ...t,
+      score: map[t.id] || 0
+    })).sort((a, b) => b.score - a.score);
+  }, [tribeList, pointLogs]);
 
 
   // Financial stats (Memoized)
@@ -275,6 +305,83 @@ export default function Dashboard() {
         </div>
       </div>
 
+      {/* Tribe Standings (Integrated Leaderboard) */}
+      {(isAdmin || rolePerms?.points?.view) && (
+        <Link to="/points" className="block group mb-6">
+          <div className="bg-white rounded-2xl border border-brand-sand shadow-sm overflow-hidden hover:shadow-md transition-all">
+            <div className="p-3 border-b border-gray-50 flex items-center justify-between bg-brand-cream/10">
+               <div className="flex items-center gap-2">
+                  <Trophy size={14} className="text-brand-sand group-hover:scale-110 transition-transform" />
+                  <span className="text-[10px] font-black text-brand-brown uppercase tracking-widest">Live Tribe Standings</span>
+               </div>
+               <span className="text-[9px] font-bold text-gray-400 uppercase tracking-widest flex items-center gap-1">
+                 View Ops Center <Plus size={10} />
+               </span>
+            </div>
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8 divide-x divide-y divide-gray-50">
+               {tribes.map((tribe, idx) => (
+                 <div key={idx} className="p-3 flex flex-col items-center justify-center text-center hover:bg-brand-cream/5 transition-colors">
+                    <span className={`text-[9px] font-black mb-0.5 ${
+                        idx === 0 ? 'text-amber-600' :
+                        idx === 1 ? 'text-gray-400' :
+                        idx === 2 ? 'text-orange-600' :
+                        'text-gray-300'
+                    }`}>#{idx + 1}</span>
+                    <span className="text-[10px] font-bold text-gray-700 truncate w-full mb-0.5">{tribe.name}</span>
+                    <span className={`text-xl font-display tracking-tight leading-none ${tribe.score >= 0 ? 'text-brand-brown font-bold' : 'text-red-500 font-bold'}`}>
+                      {tribe.score}
+                    </span>
+                 </div>
+               ))}
+               {tribes.length === 0 && <div className="col-span-full py-8 text-center text-[10px] text-gray-300 font-bold uppercase tracking-widest">Awaiting Scoring Data</div>}
+            </div>
+          </div>
+        </Link>
+      )}
+
+      {/* Recent Activity Feed (Capped 1-5) */}
+      {(isAdmin || rolePerms?.points?.view) && (
+        <div className="bg-white rounded-2xl border border-brand-sand shadow-sm overflow-hidden mb-6">
+          <div className="p-3 border-b border-gray-50 flex items-center justify-between bg-gray-50/50">
+             <div className="flex items-center gap-2">
+                <Activity size={14} className="text-brand-brown" />
+                <span className="text-[10px] font-black text-brand-brown uppercase tracking-widest">Recent Activity Journal</span>
+             </div>
+             <Link to="/points" className="text-[9px] font-bold text-gray-400 hover:text-brand-brown transition-colors uppercase tracking-widest flex items-center gap-1">
+               Full History <ChevronRight size={10} />
+             </Link>
+          </div>
+          <div className="divide-y divide-gray-50">
+             {pointLogs.slice(0, 5).map((log: any) => (
+               <div key={log.id || log._id} className="p-3 flex items-center justify-between gap-4 hover:bg-brand-cream/5 transition-colors group">
+                  <div className="flex items-center gap-3 flex-1 min-w-0">
+                     <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 border ${
+                       log.type === 'merit' ? 'bg-green-50 border-green-100 text-green-500' : 'bg-red-50 border-red-100 text-red-500'
+                     }`}>
+                        {log.type === 'merit' ? <TrendingUp size={14} /> : <TrendingDown size={14} />}
+                     </div>
+                     <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2">
+                           <span className="text-[11px] font-bold text-gray-700 truncate">{log.groupId?.name}</span>
+                           {!log.verified && <span className="bg-amber-100 text-amber-700 text-[8px] px-1 rounded font-black uppercase">Pending</span>}
+                        </div>
+                        <p className="text-[10px] text-gray-400 truncate leading-tight">{log.reason}</p>
+                     </div>
+                  </div>
+                  <div className="text-right shrink-0">
+                     <span className={`text-base font-display block leading-none ${log.points > 0 ? 'text-green-500' : 'text-red-500'}`}>
+                        {log.points > 0 ? `+${log.points}` : log.points}
+                     </span>
+                     <span className="text-[8px] text-gray-300 font-bold uppercase tracking-tighter">
+                        {log.createdBy?.church}
+                     </span>
+                  </div>
+               </div>
+             ))}
+             {pointLogs.length === 0 && <div className="py-10 text-center text-[10px] text-gray-300 uppercase font-black tracking-widest">Awaiting First Entry</div>}
+          </div>
+        </div>
+      )}
 
 
       {/* Financial Charts (All Roles) */}
