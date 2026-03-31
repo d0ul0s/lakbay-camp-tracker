@@ -3,6 +3,7 @@ const router = express.Router();
 const CampLeader = require('../models/CampLeader');
 const CampGroup = require('../models/CampGroup');
 const Registrant = require('../models/Registrant');
+const SorterDraft = require('../models/SorterDraft');
 const auth = require('../middleware/auth');
 const logActivity = require('../utils/logger');
 
@@ -289,6 +290,62 @@ router.post('/groups/apply-proposal', auth, requireAdmin, async (req, res) => {
     );
 
     res.json({ message: 'Proposal applied successfully' });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
+// ===============================
+// SHARED SORTER DRAFT (Persistence)
+// ===============================
+
+// GET current draft session
+router.get('/sorter/draft', auth, requireAdmin, async (req, res) => {
+  try {
+    let draft = await SorterDraft.findOne({ sessionKey: 'shared-sorter-draft' });
+    if (!draft) {
+      // Create empty draft if none exists
+      draft = new SorterDraft({ sessionKey: 'shared-sorter-draft' });
+      await draft.save();
+    }
+    res.json(draft);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
+// PUT update draft session
+router.put('/sorter/draft', auth, requireAdmin, async (req, res) => {
+  try {
+    const { activeTab, groupCount, tribeNames, currentProposal, localScores } = req.body;
+    
+    const draft = await SorterDraft.findOneAndUpdate(
+      { sessionKey: 'shared-sorter-draft' },
+      { 
+        $set: { 
+          activeTab, 
+          groupCount, 
+          tribeNames, 
+          currentProposal, 
+          localScores,
+          lastUpdatedBy: req.user.id,
+          updatedAt: new Date()
+        } 
+      },
+      { new: true, upsert: true }
+    );
+    
+    res.json(draft);
+  } catch (err) {
+    res.status(400).json({ message: err.message });
+  }
+});
+
+// DELETE (reset) draft session
+router.delete('/sorter/draft', auth, requireAdmin, async (req, res) => {
+  try {
+    await SorterDraft.findOneAndDelete({ sessionKey: 'shared-sorter-draft' });
+    res.json({ message: 'Draft cleared.' });
   } catch (err) {
     res.status(500).json({ message: err.message });
   }

@@ -4,6 +4,7 @@ import { Users, Shield, Map, Tent, Star, Flag, Target, Hand, Loader2, ArrowLeft,
 import api from '../api/axios';
 import { useAppStore } from '../store';
 import { getChurchColor, getChurchVibrantColor } from '../utils/churchColorUtils';
+import CampCountdown from '../components/CampCountdown';
 
 interface CampLeader {
   _id?: string;
@@ -105,6 +106,8 @@ export default function PublicOrganization() {
           </h2>
           <p className="text-gray-500 font-medium text-sm md:text-base mt-2 border-l-4 border-brand-sand/50 pl-4">Digital organization board for staff, youth leaders, and official tribe groupings.</p>
         </div>
+
+        <CampCountdown />
 
         {/* Tab Navigation */}
         <div className="flex items-center gap-1 p-1 bg-brand-sand/10 rounded-2xl w-full sm:w-fit mb-4 border border-brand-sand/5">

@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { useAppStore } from '../store';
 import api from '../api/axios';
 import { 
@@ -17,11 +17,13 @@ import {
   Zap,
   LayoutGrid,
   ClipboardList,
-  BarChart4,
+  BarChart,
   Loader2,
   Settings,
   X,
-  Minus
+  Minus,
+  Cloud,
+  RotateCcw
 } from 'lucide-react';
 import type { Registrant, TribeProposal } from '../types';
 import toast from 'react-hot-toast';
@@ -37,6 +39,8 @@ export default function TribeSorter() {
   const [proposals, setProposals] = useState<TribeProposal[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  const [isSyncing, setIsSyncing] = useState(false);
+  const [lastSyncedAt, setLastSyncedAt] = useState<Date | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [isSaveModalOpen, setIsSaveModalOpen] = useState(false);
   const [proposalName, setProposalName] = useState('');
@@ -47,34 +51,112 @@ export default function TribeSorter() {
   const [currentProposal, setCurrentProposal] = useState<Partial<TribeProposal> | null>(null);
   const [localScores, setLocalScores] = useState<Record<string, { spirituality: number, build: number, lockedTribe: string | null }>>({});
 
+  // Refs for tracking initial load vs updates
+  const isInitialLoad = useRef(true);
+  const syncTimeout = useRef<NodeJS.Timeout | null>(null);
+
   useEffect(() => {
     fetchData();
     if (!appSettings) fetchGlobalSettings();
   }, []);
 
+  // Auto-sync effect
+  useEffect(() => {
+    if (isInitialLoad.current) return;
+    
+    // Debounce sync to server
+    if (syncTimeout.current) clearTimeout(syncTimeout.current);
+    
+    syncTimeout.current = setTimeout(() => {
+      syncDraftToCloud();
+    }, 2000);
+
+    return () => {
+      if (syncTimeout.current) clearTimeout(syncTimeout.current);
+    };
+  }, [activeTab, groupCount, tribeNames, currentProposal, localScores]);
+
   const fetchData = async () => {
     setIsLoading(true);
     try {
-      const [regRes, propRes] = await Promise.all([
+      const [regRes, propRes, draftRes] = await Promise.all([
         api.get('/api/org/registrants'),
-        api.get('/api/tribe-proposals')
+        api.get('/api/tribe-proposals'),
+        api.get('/api/org/sorter/draft')
       ]);
+      
       setRegistrants(regRes.data);
       setProposals(propRes.data);
 
-      // Initialize local scores for editing
+      const draft = draftRes.data;
+      
+      // 1. Initialize scores from draft OR server
       const scores: Record<string, any> = {};
+      const draftScores = draft?.localScores || {};
+      
       regRes.data.forEach((r: Registrant) => {
+        const dScore = draftScores[r.id];
         scores[r.id] = {
-          spirituality: r.spirituality || 1,
-          build: r.build || 1,
-          lockedTribe: r.lockedTribe || null
+          spirituality: dScore?.spirituality ?? (r.spirituality || 1),
+          build: dScore?.build ?? (r.build || 1),
+          lockedTribe: dScore?.lockedTribe ?? (r.lockedTribe || null)
         };
       });
+      
       setLocalScores(scores);
+
+      // 2. Initialize other UI states from draft
+      if (draft) {
+        if (draft.activeTab) setActiveTab(draft.activeTab as Tab);
+        if (draft.groupCount) setGroupCount(draft.groupCount);
+        if (draft.tribeNames) setTribeNames(draft.tribeNames);
+        if (draft.currentProposal) setCurrentProposal(draft.currentProposal);
+        if (draft.updatedAt) setLastSyncedAt(new Date(draft.updatedAt));
+      }
+
+      // Mark initial load as complete AFTER state is set
+      setTimeout(() => {
+        isInitialLoad.current = false;
+      }, 500);
+
     } catch (err) {
       console.error('Failed to fetch sorter data', err);
-      toast.error('Failed to load participants or proposals.');
+      toast.error('Failed to load participants or cloud draft.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const syncDraftToCloud = async () => {
+    if (!isAdmin) return;
+    setIsSyncing(true);
+    try {
+      const res = await api.put('/api/org/sorter/draft', {
+        activeTab,
+        groupCount,
+        tribeNames,
+        currentProposal,
+        localScores
+      });
+      setLastSyncedAt(new Date(res.data.updatedAt));
+    } catch (err) {
+      console.error('Sync failed', err);
+    } finally {
+      setIsSyncing(false);
+    }
+  };
+
+  const resetDraft = async () => {
+    if (!window.confirm('Reset all sorter work and sync with LIVE data? This cannot be undone.')) return;
+    
+    setIsLoading(true);
+    try {
+      await api.delete('/api/org/sorter/draft');
+      isInitialLoad.current = true;
+      await fetchData();
+      toast.success('Sorter draft reset to server defaults.');
+    } catch (err) {
+      toast.error('Failed to reset draft.');
     } finally {
       setIsLoading(false);
     }
@@ -127,8 +209,6 @@ export default function TribeSorter() {
             target.members.push(p.fullName);
         } else {
             // If the locked tribe doesn't exist among the N groups, put it in Tribe 1 or something?
-            // User requested permanent locks, but if N is smaller than what was locked...
-            // Let's just create it if it doesn't exist? Or just stick to the N count.
             const first = tribes[0];
             if (first) first.members.push(p.fullName);
         }
@@ -151,10 +231,6 @@ export default function TribeSorter() {
     // Distribute
     sortedRemaining.forEach(p => {
         // Find best tribe for this person
-        // Criteria: 
-        // 1. Lowest member count
-        // 2. (Secondary) Lowest church overlap
-        // 3. (Tertiary) Lowest avg scores
         const bestTribe = [...tribes].sort((a, b) => {
             // Count members from same church
             const sameChurchA = pool.filter(member => a.members.includes(member.fullName) && member.church === p.church).length;
@@ -261,6 +337,8 @@ export default function TribeSorter() {
       if (updates.length > 0) {
         await api.put('/api/org/registrants/bulk-scores', { updates });
         toast.success(`Updated scores/locks for ${updates.length} participants.`);
+        
+        // After committing to database, we can reset the draft markers
         await fetchData();
       } else {
         toast.error('No changes to save.');
@@ -287,15 +365,37 @@ export default function TribeSorter() {
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
       <header className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h2 className="text-3xl md:text-4xl font-display text-brand-brown tracking-wide flex items-center gap-3">
-             <Trophy className="text-brand-brown" size={32} /> Tribe Sorter
-          </h2>
+          <div className="flex items-center gap-4 mb-1">
+            <h2 className="text-3xl md:text-4xl font-display text-brand-brown tracking-wide flex items-center gap-3">
+               <Trophy className="text-brand-brown" size={32} /> Tribe Sorter
+            </h2>
+            <div className="flex items-center gap-2 px-3 py-1 bg-white border border-gray-100 rounded-full shadow-sm text-[10px] font-black uppercase tracking-widest text-gray-400">
+               {isSyncing ? (
+                 <>
+                   <Loader2 size={12} className="animate-spin text-brand-sand" />
+                   Syncing...
+                 </>
+               ) : (
+                 <>
+                   <Cloud size={12} className="text-emerald-500" />
+                   {lastSyncedAt ? `Synced ${lastSyncedAt.toLocaleTimeString()}` : 'Cloud Ready'}
+                 </>
+               )}
+            </div>
+          </div>
           <p className="text-sm text-gray-500 font-medium border-l-4 border-brand-sand/30 pl-3">
-            Intelligent participant distribution based on spirituality, build, and church diversity.
+            Shared cloud draft enabled. Your work is synced across devices.
           </p>
         </div>
 
         <div className="flex items-center gap-2">
+           <button 
+             onClick={resetDraft}
+             className="p-2.5 rounded-xl bg-white border border-gray-100 text-gray-400 hover:text-red-500 transition-all shadow-sm"
+             title="Reset Draft to Live Defaults"
+           >
+             <RotateCcw size={20} />
+           </button>
            <button 
              onClick={fetchData}
              className="p-2.5 rounded-xl bg-white border border-gray-100 text-gray-400 hover:text-brand-brown transition-all shadow-sm"
@@ -310,7 +410,7 @@ export default function TribeSorter() {
                className="flex items-center gap-2 px-5 py-2.5 bg-brand-brown text-white rounded-xl font-bold shadow-lg shadow-brand-brown/10 hover:scale-105 active:scale-95 transition-all disabled:opacity-50"
              >
                {isSaving ? <Loader2 size={18} className="animate-spin" /> : <Save size={18} />}
-               Save Changes
+               Save to Live
              </button>
            )}
         </div>
@@ -321,7 +421,7 @@ export default function TribeSorter() {
         {[
           { id: 'grading', label: '1. Grade Participants', icon: <ClipboardList size={18} /> },
           { id: 'sorter', label: '2. Generate Tribes', icon: <Zap size={18} /> },
-          { id: 'comparison', label: '3. Compare Proposals', icon: <BarChart4 size={18} /> }
+          { id: 'comparison', label: '3. Compare Proposals', icon: <BarChart size={18} /> }
         ].map(tab => (
           <button
             key={tab.id}
@@ -342,7 +442,7 @@ export default function TribeSorter() {
           <div className="flex items-center justify-center p-24">
              <div className="flex flex-col items-center gap-4">
                 <Loader2 size={48} className="text-brand-brown/20 animate-spin" />
-                <p className="text-gray-400 font-bold uppercase tracking-widest text-xs animate-pulse">Syncing Participants...</p>
+                <p className="text-gray-400 font-bold uppercase tracking-widest text-xs animate-pulse">Syncing Cloud Session...</p>
              </div>
           </div>
         ) : (
@@ -362,7 +462,7 @@ export default function TribeSorter() {
                    </div>
                    <div className="flex items-center gap-2 text-gray-400 bg-gray-50/50 px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-wider">
                       <Info size={14} className="text-brand-brown" />
-                      1 = Beginner/Slender | 5 = Mature/Strong
+                      1 = Beginner | 5 = Mature
                    </div>
                 </div>
 
@@ -371,7 +471,7 @@ export default function TribeSorter() {
                     .filter(r => (r.fullName || '').toLowerCase().includes(searchTerm.toLowerCase()) || (r.church || '').toLowerCase().includes(searchTerm.toLowerCase()))
                     .map(r => {
                       const scores = localScores[r.id] || { spirituality: 1, build: 1 };
-                      const hasChanges = scores.spirituality !== (r.spirituality || 1) || scores.build !== (r.build || 1);
+                      const hasChanges = scores.spirituality !== (r.spirituality || 1) || scores.build !== (r.build || 1) || scores.lockedTribe !== (r.lockedTribe || null);
                       return (
                         <div key={r.id} className={`bg-white rounded-3xl p-5 border transition-all ${hasChanges ? 'border-amber-300 shadow-md ring-2 ring-amber-50' : 'border-gray-50 shadow-sm'}`}>
                           <div className="flex justify-between items-start mb-4">
@@ -379,7 +479,7 @@ export default function TribeSorter() {
                                <h4 className="font-bold text-gray-800 truncate leading-tight">{r.fullName}</h4>
                                <p className="text-[10px] font-black uppercase text-gray-400 tracking-tighter mt-0.5">{r.church} • {r.sex}</p>
                             </div>
-                            {hasChanges && <div className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" title="Unsaved changes" />}
+                            {hasChanges && <div className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" title="Synced in draft" />}
                           </div>
 
                           <div className="space-y-4">

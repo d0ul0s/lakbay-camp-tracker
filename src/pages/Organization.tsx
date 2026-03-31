@@ -6,6 +6,7 @@ import { Users, Shield, X, Edit2, Map, Tent, Star, Flag, Target, Hand, Loader2, 
 import ConfirmModal from '../components/ConfirmModal';
 import api from '../api/axios';
 import { getChurchColor, getChurchVibrantColor } from '../utils/churchColorUtils';
+import CampCountdown from '../components/CampCountdown';
 
 interface CampLeader {
   _id?: string;
@@ -382,6 +383,8 @@ export default function Organization() {
             <p className="text-sm text-gray-500 font-medium border-l-4 border-brand-sand/30 pl-3">Official camp groupings, staff roster, and church youth leaders.</p>
           </div>
         </div>
+
+        <CampCountdown />
 
         {/* Tab Navigation */}
         <div className={`flex items-center gap-1 p-1 bg-brand-sand/10 rounded-2xl w-full sm:w-fit mb-8 border border-brand-sand/5 ${isVisitor ? 'max-w-7xl mx-auto' : ''}`}>
