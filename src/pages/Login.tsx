@@ -72,16 +72,16 @@ export default function Login() {
         </div>
       )}
 
-      <div className="max-w-md w-full bg-white rounded-[2.5rem] shadow-2xl p-6 md:p-10 border border-brand-beige relative z-10 hover:shadow-brand-sand/30 transition-all duration-700">
-        <div className="text-center mb-8">
-          <img src="/logo.svg" alt="LAKBAY Logo" className="h-20 w-auto mx-auto mb-4 object-contain brightness-0" />
-          <h1 className="text-5xl font-display text-brand-brown">LAKBAY</h1>
-          <p className="text-brand-light-brown mt-2 font-medium">Summer Youth Camp 2026</p>
+      <div className="max-w-sm w-full bg-white rounded-[2rem] shadow-2xl p-6 md:p-8 border border-brand-beige relative z-10 hover:shadow-brand-sand/30 transition-all duration-700">
+        <div className="text-center mb-6">
+          <img src="/logo.svg" alt="LAKBAY Logo" className="h-16 w-auto mx-auto mb-3 object-contain brightness-0" />
+          <h1 className="text-4xl font-display text-brand-brown">LAKBAY</h1>
+          <p className="text-[10px] text-brand-light-brown font-black uppercase tracking-widest mt-1">Summer Youth Camp 2026</p>
         </div>
 
-        <form onSubmit={handleLogin} className="space-y-6">
-          <div>
-            <label className="block text-sm font-medium text-brand-brown mb-2 text-center">Enter Access PIN</label>
+        <form onSubmit={handleLogin} className="space-y-5">
+          <div className="bg-brand-cream/30 p-4 rounded-2xl border border-brand-sand/10">
+            <label className="block text-[10px] font-black uppercase tracking-widest text-brand-brown mb-3 text-center opacity-60">Enter Access PIN</label>
             <input
               type="password"
               value={pin}
@@ -90,49 +90,53 @@ export default function Login() {
                 setPin(e.target.value);
                 setError(false);
               }}
-              className="w-full px-4 py-3 rounded-lg border-2 border-brand-sand focus:ring-0 focus:border-brand-brown outline-none transition-all text-center text-3xl tracking-[0.5em] font-mono"
+              className="w-full bg-transparent border-b-2 border-brand-sand focus:border-brand-brown outline-none transition-all text-center text-3xl tracking-[0.5em] font-mono pb-2"
               placeholder="••••"
               maxLength={4}
               disabled={isLoading}
             />
             {error && (
-              <p className="text-red-500 text-sm mt-3 text-center font-medium">
-                Invalid PIN code. Please try again.
+              <p className="text-red-500 text-[10px] mt-3 text-center font-bold uppercase tracking-tight">
+                Invalid PIN code.
               </p>
             )}
           </div>
           <button
             type="submit"
             disabled={isLoading || !pin.trim()}
-            className="w-full bg-brand-brown hover:bg-brand-light-brown text-white font-bold py-3 px-4 rounded-lg transition-colors text-lg shadow-md disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+            className="w-full bg-brand-brown hover:bg-brand-light-brown text-white font-bold py-3 px-4 rounded-xl transition-all text-sm shadow-md disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 transform active:scale-95"
           >
-            {isLoading && <Loader2 className="animate-spin" size={20} />}
+            {isLoading && <Loader2 className="animate-spin" size={16} />}
             {isLoading ? 'Verifying...' : 'Enter Portal'}
           </button>
         </form>
 
-        <div className="mt-8 pt-6 border-t border-brand-beige flex flex-col gap-3">
-          <button 
-            type="button" 
-            onClick={() => navigate('/announcements')} 
-            className="w-full bg-brand-brown text-white hover:bg-brand-light-brown font-bold py-3.5 px-4 rounded-2xl transition-all duration-300 text-sm shadow-lg flex items-center justify-center gap-2 group active:scale-95"
-          >
-            <Megaphone size={18} className="group-hover:rotate-12 transition-transform" /> View Camp Announcements
-          </button>
+        <div className="mt-8 pt-6 border-t border-brand-beige">
+          <div className="grid grid-cols-2 gap-3">
+            <button 
+              type="button" 
+              onClick={() => navigate('/announcements')} 
+              className="flex flex-col items-center justify-center gap-2 bg-brand-brown text-white hover:bg-brand-light-brown font-bold p-4 rounded-2xl transition-all duration-300 text-[10px] shadow-lg group active:scale-95 text-center uppercase tracking-widest"
+            >
+              <Megaphone size={16} className="group-hover:rotate-12 transition-transform" /> 
+              Announcements
+            </button>
+            
+            <button 
+              type="button" 
+              onClick={() => navigate('/public-org')} 
+              className="flex flex-col items-center justify-center gap-2 bg-brand-sand/20 border border-brand-sand/50 text-brand-brown hover:bg-brand-sand/40 font-bold p-4 rounded-2xl transition-all duration-300 text-[10px] shadow-sm group active:scale-95 text-center uppercase tracking-widest"
+            >
+              <Map size={16} className="text-brand-brown group-hover:scale-110 transition-transform" /> 
+              Organization
+            </button>
+          </div>
           
-          <button 
-            type="button" 
-            onClick={() => navigate('/public-org')} 
-            className="w-full bg-brand-sand/30 border-2 border-brand-sand/50 text-brand-brown hover:bg-brand-sand/50 font-bold py-3.5 px-4 rounded-2xl transition-all duration-300 text-sm shadow-sm flex items-center justify-center gap-2 group active:scale-95"
-          >
-            <Map size={18} className="text-brand-brown group-hover:scale-110 transition-transform" /> Organization Board
-          </button>
-          
-          <div className="mt-4 text-center space-y-2">
-            <p className="text-[10px] text-brand-brown/40 px-6 font-black uppercase tracking-widest leading-loose">
-                LAKBAY CAMP 2026 • OFFICIAL PORTAL
+          <div className="mt-6 text-center space-y-1 opacity-40">
+            <p className="text-[8px] text-brand-brown px-6 font-black uppercase tracking-[0.2em] leading-loose">
+                LAKBAY CAMP • OFFICIAL PORTAL
             </p>
-            <p className="text-[9px] text-gray-300 font-bold">
+            <p className="text-[8px] text-brand-brown font-bold">
                 2 Peter 3:18
             </p>
           </div>

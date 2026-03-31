@@ -44,6 +44,7 @@ export default function TribeSorter() {
   const [searchTerm, setSearchTerm] = useState('');
   const [isSaveModalOpen, setIsSaveModalOpen] = useState(false);
   const [proposalName, setProposalName] = useState('');
+  const [showUnscoredOnly, setShowUnscoredOnly] = useState(false);
 
   // Sorter State
   const [groupCount, setGroupCount] = useState(10);
@@ -194,13 +195,15 @@ export default function TribeSorter() {
         tribes.push({ name, members: [] });
     }
 
-    // 2. Separate into Locked vs Unlocked
-    const pool = registrants.map(r => ({
-        ...r,
-        spirituality: localScores[r.id]?.spirituality || 1,
-        build: localScores[r.id]?.build || 1,
-        lockedTribe: localScores[r.id]?.lockedTribe || null
-    }));
+    // 2. Separate into Locked vs Unlocked (Exclude JAM)
+    const pool = registrants
+        .filter(r => (r.church || '').toUpperCase().trim() !== 'JAM')
+        .map(r => ({
+            ...r,
+            spirituality: localScores[r.id]?.spirituality || 1,
+            build: localScores[r.id]?.build || 1,
+            lockedTribe: localScores[r.id]?.lockedTribe || null
+        }));
 
     // 3. Place Locked first
     pool.filter(p => p.lockedTribe).forEach(p => {
@@ -225,7 +228,13 @@ export default function TribeSorter() {
         const countA = churchCounts[a.church] || 0;
         const countB = churchCounts[b.church] || 0;
         if (countA !== countB) return countB - countA;
-        return (b.spirituality + b.build) - (a.spirituality + a.build);
+        
+        const complexityA = a.spirituality + a.build;
+        const complexityB = b.spirituality + b.build;
+        if (complexityA !== complexityB) return complexityB - complexityA;
+        
+        // Final tie-breaker: Alphabetical stable sort
+        return (a.fullName || '').localeCompare(b.fullName || '');
     });
 
     // Distribute
@@ -449,26 +458,41 @@ export default function TribeSorter() {
           <div className="animate-in fade-in zoom-in-95 duration-500">
             {activeTab === 'grading' && (
               <div className="space-y-6">
-                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white/50 backdrop-blur-sm p-4 rounded-3xl border border-white/50">
-                   <div className="relative group/search flex-1 max-w-md">
-                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-300 group-focus-within/search:text-brand-brown transition-colors" size={16} />
-                      <input 
-                        type="text" 
-                        placeholder="Search participants by name or church..." 
-                        value={searchTerm}
-                        onChange={e => setSearchTerm(e.target.value)}
-                        className="w-full pl-10 pr-4 py-2 bg-white border border-gray-100 rounded-xl outline-none focus:border-brand-brown transition-all shadow-sm"
-                      />
-                   </div>
-                   <div className="flex items-center gap-2 text-gray-400 bg-gray-50/50 px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-wider">
-                      <Info size={14} className="text-brand-brown" />
-                      1 = Beginner | 5 = Mature
-                   </div>
-                </div>
+                 <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white/50 backdrop-blur-sm p-4 rounded-3xl border border-white/50">
+                    <div className="flex flex-1 items-center gap-3 max-w-2xl">
+                      <div className="relative group/search flex-1">
+                          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-300 group-focus-within/search:text-brand-brown transition-colors" size={16} />
+                          <input 
+                            type="text" 
+                            placeholder="Search participants by name or church..." 
+                            value={searchTerm}
+                            onChange={e => setSearchTerm(e.target.value)}
+                            className="w-full pl-10 pr-4 py-2 bg-white border border-gray-100 rounded-xl outline-none focus:border-brand-brown transition-all shadow-sm"
+                          />
+                      </div>
+                      <button
+                        onClick={() => setShowUnscoredOnly(!showUnscoredOnly)}
+                        className={`shrink-0 flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all border shadow-sm ${
+                          showUnscoredOnly 
+                            ? 'bg-brand-brown text-white border-brand-brown' 
+                            : 'bg-white text-gray-400 border-gray-200 hover:border-brand-sand hover:text-brand-brown'
+                        }`}
+                      >
+                        <LayoutGrid size={14} />
+                        {showUnscoredOnly ? 'Showing Unscored' : 'Filter Unscored'}
+                      </button>
+                    </div>
+                    <div className="flex items-center gap-2 text-gray-400 bg-gray-50/50 px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-wider">
+                       <Info size={14} className="text-brand-brown" />
+                       1 = Beginner | 5 = Mature
+                    </div>
+                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
                   {registrants
+                    .filter(r => (r.church || '').toUpperCase().trim() !== 'JAM')
                     .filter(r => (r.fullName || '').toLowerCase().includes(searchTerm.toLowerCase()) || (r.church || '').toLowerCase().includes(searchTerm.toLowerCase()))
+                    .filter(r => !showUnscoredOnly || (localScores[r.id]?.spirituality === 1 && localScores[r.id]?.build === 1))
                     .map(r => {
                       const scores = localScores[r.id] || { spirituality: 1, build: 1 };
                       const hasChanges = scores.spirituality !== (r.spirituality || 1) || scores.build !== (r.build || 1) || scores.lockedTribe !== (r.lockedTribe || null);
