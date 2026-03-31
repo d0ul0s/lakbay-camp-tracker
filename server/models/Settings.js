@@ -14,6 +14,7 @@ const DEFAULT_MATRIX = {
 
 const settingsSchema = new mongoose.Schema({
   churchList: { type: [String], default: [] },
+  churchColors: { type: mongoose.Schema.Types.Mixed, default: {} },
   waivedAgeChurches: { type: [String], default: [] },
   merchCosts: { type: mongoose.Schema.Types.Mixed, default: {} },
   ministries: { type: [String], default: ["Praise & Worship", "Children's Ministry", "Media/Tech", "Ushering"] },

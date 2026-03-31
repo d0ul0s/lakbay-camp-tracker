@@ -1,8 +1,9 @@
 import React, { useRef, useState, useEffect } from 'react';
 import api from '../api/axios';
 import { useAppStore } from '../store';
-import { Database, Download, Upload, AlertTriangle, Plus, Trash2, Image as ImageIcon } from 'lucide-react';
+import { Database, Download, Upload, AlertTriangle, Plus, Trash2, Image as ImageIcon, ChevronRight, X } from 'lucide-react';
 import ConfirmModal from '../components/ConfirmModal';
+import { LAKBAY_THEMES, getChurchVibrantColor } from '../utils/churchColorUtils';
 
 export default function Settings() {
   const { currentUser, appSettings, fetchGlobalSettings } = useAppStore();
@@ -15,6 +16,7 @@ export default function Settings() {
   
   const [addingField, setAddingField] = useState<string | null>(null);
   const [newItemText, setNewItemText] = useState('');
+  const [pickingColorFor, setPickingColorFor] = useState<string | null>(null);
 
   const [confirmModal, setConfirmModal] = useState<{isOpen: boolean, action: () => void, message: string}>({
     isOpen: false,
@@ -101,6 +103,21 @@ export default function Settings() {
     }
   };
 
+  const handleUpdateChurchColor = async (church: string, themeId: string) => {
+    if (!settings) return;
+    const currentColors = settings.churchColors || {};
+    const newColors = { ...currentColors, [church]: themeId };
+    try {
+      const res = await api.put('/api/settings', {
+        churchColors: newColors
+      });
+      setSettings(res.data);
+      setPickingColorFor(null);
+    } catch (err) {
+      console.error('Failed to update church color', err);
+    }
+  };
+
   const handleAddItem = async (field: string) => {
     if (!newItemText.trim() || !settings) return;
     const currentArray = settings[field] || [];
@@ -159,6 +176,7 @@ export default function Settings() {
   const renderArrayEditor = (title: string, field: string, description: string) => {
     const items = settings?.[field] || [];
     const isAdding = addingField === field;
+    const isChurchList = field === 'churchList';
 
     return (
       <div className="bg-white p-5 rounded-2xl shadow-sm border border-brand-beige">
@@ -167,8 +185,41 @@ export default function Settings() {
         
         <div className="space-y-2 mb-4">
           {items.map((item: string, idx: number) => (
-            <div key={idx} className="flex justify-between items-center bg-gray-50 p-4 rounded-xl border border-gray-100 shadow-sm">
-              <span className="font-bold text-gray-700 text-sm">{item}</span>
+            <div key={idx} className="flex justify-between items-center bg-gray-50 p-4 rounded-xl border border-gray-100 shadow-sm relative group/item">
+              <div className="flex items-center gap-3">
+                {isChurchList && (
+                   <div className="relative">
+                      <button 
+                         onClick={() => setPickingColorFor(pickingColorFor === item ? null : item)}
+                         className={`w-6 h-6 rounded-full border-2 border-white shadow-sm ring-1 ring-black/5 hover:scale-110 active:scale-95 transition-all flex items-center justify-center ${getChurchVibrantColor(item, settings?.churchColors)}`}
+                         title="Change church color theme"
+                      >
+                        <ChevronRight size={10} className={`text-white/50 transition-transform ${pickingColorFor === item ? 'rotate-90' : ''}`} />
+                      </button>
+
+                      {pickingColorFor === item && (
+                        <>
+                          <div className="fixed inset-0 z-[100]" onClick={() => setPickingColorFor(null)}></div>
+                          <div className="absolute left-0 top-full mt-3 bg-white border border-gray-200 rounded-2xl shadow-xl z-[110] p-3 grid grid-cols-6 gap-2 w-56 animate-in fade-in zoom-in-95 duration-200">
+                             <div className="col-span-6 mb-1 px-1 border-b pb-1 flex justify-between items-center">
+                               <p className="text-[9px] font-black uppercase text-gray-400 tracking-widest">Select Theme</p>
+                               <button onClick={() => setPickingColorFor(null)} className="text-gray-300 hover:text-gray-500"><X size={12} /></button>
+                             </div>
+                             {LAKBAY_THEMES.map(theme => (
+                               <button 
+                                 key={theme.id}
+                                 onClick={() => handleUpdateChurchColor(item, theme.id)}
+                                 className={`w-7 h-7 rounded-lg border-2 border-white shadow-sm ring-1 ring-black/5 hover:scale-110 active:scale-90 transition-all ${theme.vibrant} ${settings?.churchColors?.[item] === theme.id ? 'ring-2 ring-brand-brown ring-offset-1' : ''}`}
+                                 title={theme.name}
+                               />
+                             ))}
+                          </div>
+                        </>
+                      )}
+                   </div>
+                )}
+                <span className="font-bold text-gray-700 text-sm">{item}</span>
+              </div>
               <button 
                 onClick={() => handleRemoveItem(field, idx)}
                 className="text-gray-300 hover:text-red-500 transition-colors p-2 bg-white rounded-lg shadow-sm border border-gray-100 active:bg-red-50"

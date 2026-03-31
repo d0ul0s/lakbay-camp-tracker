@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { Users, Shield, Map, Tent, Star, Flag, Target, Hand, Loader2, ArrowLeft, ExternalLink } from 'lucide-react';
 import api from '../api/axios';
 import { useAppStore } from '../store';
+import { getChurchColor, getChurchVibrantColor } from '../utils/churchColorUtils';
 
 interface CampLeader {
   _id?: string;
@@ -36,54 +37,6 @@ const getCategories = (l: CampLeader) => {
   return [];
 };
 
-// Helper: Get color based on church name (Lighter backgrounds)
-const getChurchColor = (church: string) => {
-  if (!church) return 'bg-gray-100 text-gray-600 border-gray-200';
-
-  const colors = [
-    'bg-blue-50 text-blue-700 border-blue-100',
-    'bg-emerald-50 text-emerald-700 border-emerald-100',
-    'bg-purple-50 text-purple-700 border-purple-100',
-    'bg-amber-50 text-amber-700 border-amber-100',
-    'bg-rose-50 text-rose-700 border-rose-100',
-    'bg-indigo-50 text-indigo-700 border-indigo-100',
-    'bg-cyan-50 text-cyan-700 border-cyan-100',
-    'bg-orange-50 text-orange-700 border-orange-100',
-    'bg-lime-50 text-lime-800 border-lime-100',
-    'bg-pink-50 text-pink-700 border-pink-100',
-    'bg-teal-50 text-teal-700 border-teal-100',
-    'bg-fuchsia-50 text-fuchsia-700 border-fuchsia-100',
-    'bg-sky-50 text-sky-700 border-sky-100',
-    'bg-red-50 text-red-700 border-red-100',
-    'bg-green-50 text-green-700 border-green-100',
-    'bg-yellow-50 text-yellow-800 border-yellow-100',
-    'bg-violet-50 text-violet-700 border-violet-100',
-    'bg-slate-50 text-slate-700 border-slate-100',
-    'bg-stone-50 text-stone-700 border-stone-100'
-  ];
-
-  let hash = 0;
-  for (let i = 0; i < church.length; i++) {
-    hash = church.charCodeAt(i) + ((hash << 5) - hash);
-  }
-  return colors[Math.abs(hash) % colors.length];
-};
-
-// Helper: Get vibrant/saturated version of church color for legend indicators
-const getChurchVibrantColor = (church: string) => {
-  if (!church) return 'bg-gray-400';
-  const colors = [
-    'bg-blue-500', 'bg-emerald-500', 'bg-purple-500', 'bg-amber-500', 'bg-rose-500',
-    'bg-indigo-500', 'bg-cyan-500', 'bg-orange-500', 'bg-lime-500', 'bg-pink-500',
-    'bg-teal-500', 'bg-fuchsia-500', 'bg-sky-500', 'bg-red-500', 'bg-green-500',
-    'bg-yellow-500', 'bg-violet-500', 'bg-slate-500', 'bg-stone-500'
-  ];
-  let hash = 0;
-  for (let i = 0; i < church.length; i++) {
-    hash = church.charCodeAt(i) + ((hash << 5) - hash);
-  }
-  return colors[Math.abs(hash) % colors.length];
-};
 
 export default function PublicOrganization() {
   const { appSettings, isServerAwake } = useAppStore();
@@ -291,7 +244,7 @@ export default function PublicOrganization() {
                      <span className="text-[9px] font-black text-gray-400 uppercase tracking-widest mr-1 self-center">Church Legend:</span>
                      {appSettings?.churches?.filter((c: string) => c !== 'JAM').map((church: string) => (
                        <div key={church} className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg bg-white border border-gray-50 shadow-[0_1px_2px_rgba(0,0,0,0.02)]">
-                          <div className={`w-3 h-3 rounded-full border border-white shadow-sm ring-1 ring-black/5 ${getChurchVibrantColor(church)}`}></div>
+                          <div className={`w-3 h-3 rounded-full border border-white shadow-sm ring-1 ring-black/5 ${getChurchVibrantColor(church, appSettings?.churchColors)}`}></div>
                           <span className="text-[10px] font-bold text-gray-600 uppercase tracking-tight">{church}</span>
                        </div>
                      ))}
@@ -373,7 +326,7 @@ export default function PublicOrganization() {
                             <h5 className="text-[8px] font-black uppercase text-gray-300 tracking-widest mb-2 px-1">Facilitators</h5>
                             <div className="flex flex-wrap gap-1">
                               {g.facilitators.map((facil: string, i: number) => (
-                                <span key={i} className="bg-gray-50 text-gray-500 border border-gray-100 text-[9px] px-2 py-0.5 rounded font-bold">{facil}</span>
+                                <span key={i} className="bg-gray-50 text-gray-400 text-[10px] px-2.5 py-1 rounded-lg font-bold border border-gray-100">{facil}</span>
                               ))}
                             </div>
                           </div>
@@ -385,7 +338,7 @@ export default function PublicOrganization() {
                             <div className="flex flex-wrap gap-1 px-0.5">
                               {g.members.map((m: string, i: number) => {
                                 const reg = registrants.find(r => r.fullName === m);
-                                const colorClass = getChurchColor(reg?.church || '');
+                                const colorClass = getChurchColor(reg?.church || '', appSettings?.churchColors);
                                 return (
                                   <div
                                     key={i}

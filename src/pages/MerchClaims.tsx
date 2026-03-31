@@ -56,6 +56,7 @@ export default function MerchClaims() {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterChurch, setFilterChurch] = useState('All');
   const [filterStatus, setFilterStatus] = useState('All'); // All, Fully Claimed, Partial, Unclaimed
+  const [filterVerified, setFilterVerified] = useState('Verified'); // All, Verified, Unverified
 
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 30;
@@ -89,7 +90,8 @@ export default function MerchClaims() {
           limit: itemsPerPage,
           search: searchTerm,
           church: filterChurch,
-          merchStatus: filterStatus
+          merchStatus: filterStatus,
+          verification: filterVerified
         }
       });
       setPageRegistrants(res.data.registrants);
@@ -121,7 +123,7 @@ export default function MerchClaims() {
 
   useEffect(() => {
     fetchData();
-  }, [currentPage, searchTerm, filterChurch, filterStatus]);
+  }, [currentPage, searchTerm, filterChurch, filterStatus, filterVerified]);
 
   useEffect(() => {
     fetchSummary();
@@ -130,7 +132,7 @@ export default function MerchClaims() {
   // Reset pagination on filter change
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchTerm, filterChurch, filterStatus]);
+  }, [searchTerm, filterChurch, filterStatus, filterVerified]);
 
   const toggleClaim = async (regId: string, item: keyof typeof registrants[0]['merchClaims']) => {
     // Read directly from the synchronous Zustand store to bypass React's async rendering closure.
@@ -316,6 +318,16 @@ export default function MerchClaims() {
               <option value="Fully Claimed">Fully Claimed</option>
               <option value="Partial">Partial</option>
               <option value="Unclaimed">Unclaimed</option>
+            </select>
+
+            <select 
+              value={filterVerified} 
+              onChange={(e) => setFilterVerified(e.target.value)}
+              className="py-1.5 pl-3 pr-8 rounded-lg border border-gray-200 focus:outline-none focus:border-brand-brown focus:ring-1 bg-white w-full md:w-32 lg:w-40 transition-all text-xs lg:text-sm font-bold"
+            >
+              <option value="All">All Regs</option>
+              <option value="Verified">Verified Only</option>
+              <option value="Unverified">Unverified Only</option>
             </select>
           </div>
         </div>

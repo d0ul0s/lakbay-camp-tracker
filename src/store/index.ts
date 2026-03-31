@@ -403,6 +403,7 @@ export const useAppStore = create<AppState>()((set) => {
         const newSettings = {
           ...data,
           churches: data.churchList || data.churches || [],
+          churchColors: data.churchColors || {},
           ministries: data.ministries || [],
           expenseCategories: data.expenseCategories || [],
           paymentMethods: data.paymentMethods || [],
@@ -440,6 +441,7 @@ export const useAppStore = create<AppState>()((set) => {
         const newSettings = {
           ...settings,
           churches: settings.churchList || settings.churches || [],
+          churchColors: settings.churchColors || {},
           ministries: settings.ministries || [],
           expenseCategories: settings.expenseCategories || [],
           paymentMethods: settings.paymentMethods || [],

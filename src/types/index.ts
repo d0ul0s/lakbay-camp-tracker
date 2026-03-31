@@ -68,6 +68,7 @@ export interface AppSettings {
     pen: number;
   };
   churches: string[];
+  churchColors: Record<string, string>;
   ministries: string[];
   expenseCategories: string[];
   paymentMethods: string[];

@@ -1,12 +1,12 @@
-import React, { useState, useEffect, memo } from 'react';
+import React, { useState, useEffect, memo, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import api from '../api/axios';
 import { useAppStore } from '../store';
 import type { Registrant, ShirtSize, PaymentStatus, PaymentMethod } from '../types';
 import { PlusCircle, Search, Edit2, Trash2, X, Filter, Info, CheckSquare, Square, CheckCircle, Clock, ShieldAlert, Users, Loader2 } from 'lucide-react';
 import ConfirmModal from '../components/ConfirmModal';
+import { getChurchVibrantColor } from '../utils/churchColorUtils';
 
-// Memoized Row Component for Desktop
 const RegistrantRow = memo(({ 
   reg, 
   canVerify, 
@@ -18,7 +18,8 @@ const RegistrantRow = memo(({
   canDeleteAny,
   rolePerms,
   currentUserChurch,
-  isSyncing
+  isSyncing,
+  churchColors
 }: { 
   reg: Registrant, 
   canVerify: boolean, 
@@ -30,7 +31,8 @@ const RegistrantRow = memo(({
   canDeleteAny: boolean,
   rolePerms: any,
   currentUserChurch: string | null,
-  isSyncing: boolean
+  isSyncing: boolean,
+  churchColors?: Record<string, string>
 }) => {
   const userChurch = currentUserChurch?.toLowerCase().trim();
   const regChurch = reg.church?.toLowerCase().trim();
@@ -46,7 +48,10 @@ const RegistrantRow = memo(({
         <span className="text-[8px] text-gray-400 block mt-0.5 font-bold">{reg.shirtSize}</span>
       </td>
       <td className="px-2 lg:px-6 py-4 max-w-[120px] lg:max-w-[200px]">
-        <div className="truncate font-medium text-gray-800 text-[10px] lg:text-sm" title={reg.church}>{reg.church}</div>
+        <div className="flex items-center gap-2 truncate">
+          <div className={`w-2 h-2 rounded-full shrink-0 ${getChurchVibrantColor(reg.church || '', churchColors)}`}></div>
+          <div className="truncate font-medium text-gray-800 text-[10px] lg:text-sm" title={reg.church}>{reg.church}</div>
+        </div>
         <div className="flex flex-wrap gap-0.5 mt-1">
           {reg.ministry && reg.ministry.length > 0 ? reg.ministry.map(m => (
             <span key={m} className="px-1 py-0.5 bg-brand-sand/30 text-brand-brown border border-brand-sand rounded text-[7px] lg:text-[10px] uppercase font-bold tracking-wider">{m}</span>
@@ -119,7 +124,8 @@ const RegistrantCard = memo(({
   canDeleteAny,
   rolePerms,
   currentUserChurch,
-  isSyncing
+  isSyncing,
+  churchColors
 }: { 
   reg: Registrant, 
   canVerify: boolean, 
@@ -131,7 +137,8 @@ const RegistrantCard = memo(({
   canDeleteAny: boolean,
   rolePerms: any,
   currentUserChurch: string | null,
-  isSyncing: boolean
+  isSyncing: boolean,
+  churchColors?: Record<string, string>
 }) => {
   const userChurch = currentUserChurch?.toLowerCase().trim();
   const regChurch = reg.church?.toLowerCase().trim();
@@ -142,9 +149,12 @@ const RegistrantCard = memo(({
   return (
     <div className="mobile-card flex flex-col gap-1.5 !p-2">
       <div className="flex justify-between items-start">
-        <div className="flex-1 min-w-0">
-          <p className="font-black text-brand-brown text-[13px] leading-tight truncate">{reg.fullName}</p>
-          <p className="text-[8px] text-gray-400 font-bold uppercase tracking-wider mt-0.5 truncate">{reg.church}</p>
+        <div className="flex-1 min-w-0 flex items-center gap-2">
+          <div className={`w-1.5 h-1.5 rounded-full shrink-0 ${getChurchVibrantColor(reg.church || '', churchColors)}`}></div>
+          <div className="min-w-0">
+            <p className="font-black text-brand-brown text-[13px] leading-tight truncate">{reg.fullName}</p>
+            <p className="text-[8px] text-gray-400 font-bold uppercase tracking-wider mt-0.5 truncate">{reg.church}</p>
+          </div>
         </div>
         <div className={`shrink-0 p-1 rounded-lg transition-all shadow-sm ${isSyncing ? 'opacity-50 animate-pulse bg-gray-100' : (reg.verifiedByTreasurer ? 'bg-green-100 text-green-700 border border-green-200' : 'bg-orange-50 text-orange-500 border border-orange-100')}`}>
           {canVerify ? (
@@ -374,16 +384,27 @@ export default function Registrants() {
     fetchSummary();
   }, [currentUserId]);
 
-  // Derived visible data
-  const baseRegistrants = pageRegistrants;
+  const paginatedRegistrants = useMemo(() => {
+    return pageRegistrants.map(p => {
+      // Robust ID extraction
+      const pid = p.id || (p as any)._id;
+      if (!pid) return p;
+
+      // Find latest version of this registrant in the global store (handles optimistic & live sync)
+      const fromStore = registrants.find(r => {
+        const rid = r.id || (r as any)._id;
+        return rid === pid;
+      });
+      return fromStore || p;
+    });
+  }, [pageRegistrants, registrants]);
+
+  const totalPages = Math.ceil(total / itemsPerPage);
 
   // Reset page when filters change
   useEffect(() => {
     setCurrentPage(1);
   }, [searchTerm, filterChurch, filterStatus, filterMinistry, filterVerify]);
-
-  const totalPages = Math.ceil(total / itemsPerPage);
-  const paginatedRegistrants = baseRegistrants;
 
   // Summaries from state
   const { churchSummaries, totalExpected, totalCollected } = summaries;
@@ -482,14 +503,17 @@ export default function Registrants() {
   const handleBatchSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    // Validate: name must be non-empty and valid, age must be a positive number
+    // Validate: name must be non-empty and valid, age must be a positive number (unless waived)
     const invalidRows = batchData
       .map((d, idx) => ({ d, idx }))
-      .filter(({ d }) => !d.fullName || !NAME_REGEX.test(d.fullName) || !d.age || d.age < 1);
+      .filter(({ d }) => {
+        const isAgeWaived = settings.waivedAgeChurches?.includes(d.church);
+        return !d.fullName || !NAME_REGEX.test(d.fullName) || (!isAgeWaived && (!d.age || d.age < 1));
+      });
 
     if (invalidRows.length > 0) {
       const rowNums = invalidRows.map(({ idx }) => `#${idx + 1}`).join(', ');
-      setBatchError(`Please fill in a valid name AND age for rows: ${rowNums}. Age is required for all registrants.`);
+      setBatchError(`Please fill in a valid name AND age for rows: ${rowNums}. Age is required for all registrants except waived churches.`);
       return;
     }
 
@@ -584,6 +608,9 @@ export default function Registrants() {
     // Add to local syncing queue
     setSyncingIds(prev => new Set([...prev, regId]));
 
+    // Lock entity to prevent WebSocket echo from reverting the optimistic UI
+    lockEntity('registrants', regId);
+
     // Optimistic Update
     updateRegistrant(regId, {
       verifiedByTreasurer: nowVerified,
@@ -596,7 +623,9 @@ export default function Registrants() {
           verifiedByTreasurer: nowVerified,
           verifiedAt: nowVerified ? new Date().toISOString() : null
         });
-        // Success: Remove from syncing queue
+        // Success: Unlock and remove from syncing queue
+        unlockEntity('registrants', regId);
+        fetchSummary();
         setSyncingIds(prev => {
           const next = new Set(prev);
           next.delete(regId);
@@ -607,7 +636,8 @@ export default function Registrants() {
         if (retries > 0) {
           setTimeout(() => attemptSync(retries - 1), 2000); // Retry after 2s
         } else {
-          // Final failure: Revert and inform
+          // Final failure: Unlock, revert and inform
+          unlockEntity('registrants', regId);
           setSyncingIds(prev => {
             const next = new Set(prev);
             next.delete(regId);
@@ -827,9 +857,9 @@ export default function Registrants() {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
-              {paginatedRegistrants.length > 0 ? paginatedRegistrants.map((reg) => (
+              {paginatedRegistrants.length > 0 ? paginatedRegistrants.map((reg: Registrant) => (
                 <RegistrantRow 
-                  key={reg.id || (reg as any)._id}
+                  key={(reg as any)._id || reg.id}
                   reg={reg}
                   canVerify={!!canVerify}
                   handleToggleVerify={handleToggleVerify}
@@ -841,6 +871,7 @@ export default function Registrants() {
                   rolePerms={rolePerms}
                   currentUserChurch={currentUser?.church || null}
                   isSyncing={syncingIds.has((reg as any)._id || reg.id)}
+                  churchColors={appSettings?.churchColors}
                 />
               )) : (
                 <tr>
@@ -855,7 +886,7 @@ export default function Registrants() {
 
         {/* Mobile Cards */}
         <div className="md:hidden space-y-1.5 px-0.5 pb-32">
-          {paginatedRegistrants.length > 0 ? paginatedRegistrants.map(reg => (
+          {paginatedRegistrants.length > 0 ? paginatedRegistrants.map((reg: Registrant) => (
             <RegistrantCard 
               key={(reg as any)._id || reg.id}
               reg={reg}
@@ -869,6 +900,7 @@ export default function Registrants() {
               rolePerms={rolePerms}
               currentUserChurch={currentUser?.church || null}
               isSyncing={syncingIds.has((reg as any)._id || (reg as any).id)}
+              churchColors={appSettings?.churchColors}
             />
           )) : (
             <div className="mobile-card py-12 text-center text-gray-400">
@@ -1275,8 +1307,21 @@ export default function Registrants() {
 
                                   <div className="grid grid-cols-3 gap-3">
                                     <div>
-                                      <label className="block text-xs text-gray-500 mb-1 text-center">Age</label>
-                                      <input type="number" required min="1" max="100" value={row.age || ''} onChange={(e) => setBatchData(batchData.map((d, i) => i === idx ? { ...d, age: parseInt(e.target.value) || 0 } : d))} className="w-full px-2 py-2 text-sm rounded-lg border border-gray-200 focus:outline-none focus:border-brand-brown text-center" />
+                                      <label className="block text-xs text-gray-500 mb-1 text-center flex flex-col items-center gap-0.5 min-h-[32px] justify-end">
+                                        Age
+                                        {settings.waivedAgeChurches?.includes(row.church) && (
+                                          <span className="text-[7px] font-black text-amber-500 uppercase leading-none bg-amber-50 px-1 py-0.5 rounded border border-amber-100/50">Fill later</span>
+                                        )}
+                                      </label>
+                                      <input 
+                                        type="number" 
+                                        required={!settings.waivedAgeChurches?.includes(row.church)} 
+                                        min={settings.waivedAgeChurches?.includes(row.church) ? 0 : 1} 
+                                        max="100" 
+                                        value={row.age || ''} 
+                                        onChange={(e) => setBatchData(batchData.map((d, i) => i === idx ? { ...d, age: parseInt(e.target.value) || 0 } : d))} 
+                                        className={`w-full px-2 py-2 text-sm rounded-lg border focus:outline-none text-center ${(!row.age && !settings.waivedAgeChurches?.includes(row.church)) ? 'border-red-200 bg-red-50/20' : 'border-gray-200 focus:border-brand-brown'}`} 
+                                      />
                                     </div>
                                     <div>
                                       <label className="block text-xs text-gray-500 mb-1 text-center font-medium">Sex</label>

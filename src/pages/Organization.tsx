@@ -5,6 +5,7 @@ import { Link } from 'react-router-dom';
 import { Users, Shield, X, Edit2, Map, Tent, Star, Flag, Target, Hand, Loader2, Search, Check, ChevronDown, ArrowLeft } from 'lucide-react';
 import ConfirmModal from '../components/ConfirmModal';
 import api from '../api/axios';
+import { getChurchColor, getChurchVibrantColor } from '../utils/churchColorUtils';
 
 interface CampLeader {
   _id?: string;
@@ -38,54 +39,6 @@ const getCategories = (l: CampLeader) => {
   return [];
 };
 
-// Helper: Get color based on church name (Lighter backgrounds)
-const getChurchColor = (church: string) => {
-  if (!church) return 'bg-gray-100 text-gray-600 border-gray-200';
-
-  const colors = [
-    'bg-blue-50 text-blue-700 border-blue-100',
-    'bg-emerald-50 text-emerald-700 border-emerald-100',
-    'bg-purple-50 text-purple-700 border-purple-100',
-    'bg-amber-50 text-amber-700 border-amber-100',
-    'bg-rose-50 text-rose-700 border-rose-100',
-    'bg-indigo-50 text-indigo-700 border-indigo-100',
-    'bg-cyan-50 text-cyan-700 border-cyan-100',
-    'bg-orange-50 text-orange-700 border-orange-100',
-    'bg-lime-50 text-lime-800 border-lime-100',
-    'bg-pink-50 text-pink-700 border-pink-100',
-    'bg-teal-50 text-teal-700 border-teal-100',
-    'bg-fuchsia-50 text-fuchsia-700 border-fuchsia-100',
-    'bg-sky-50 text-sky-700 border-sky-100',
-    'bg-red-50 text-red-700 border-red-100',
-    'bg-green-50 text-green-700 border-green-100',
-    'bg-yellow-50 text-yellow-800 border-yellow-100',
-    'bg-violet-50 text-violet-700 border-violet-100',
-    'bg-slate-50 text-slate-700 border-slate-100',
-    'bg-stone-50 text-stone-700 border-stone-100'
-  ];
-
-  let hash = 0;
-  for (let i = 0; i < church.length; i++) {
-    hash = church.charCodeAt(i) + ((hash << 5) - hash);
-  }
-  return colors[Math.abs(hash) % colors.length];
-};
-
-// Helper: Get vibrant/saturated version of church color for legend indicators
-const getChurchVibrantColor = (church: string) => {
-  if (!church) return 'bg-gray-400';
-  const colors = [
-    'bg-blue-500', 'bg-emerald-500', 'bg-purple-500', 'bg-amber-500', 'bg-rose-500',
-    'bg-indigo-500', 'bg-cyan-500', 'bg-orange-500', 'bg-lime-500', 'bg-pink-500',
-    'bg-teal-500', 'bg-fuchsia-500', 'bg-sky-500', 'bg-red-500', 'bg-green-500',
-    'bg-yellow-500', 'bg-violet-500', 'bg-slate-500', 'bg-stone-500'
-  ];
-  let hash = 0;
-  for (let i = 0; i < church.length; i++) {
-    hash = church.charCodeAt(i) + ((hash << 5) - hash);
-  }
-  return colors[Math.abs(hash) % colors.length];
-};
 
 // Helper: Modern Facebook Solid Circular SVG Icon (2024 Version)
 const FacebookIcon = ({ size = 16, className = "" }: { size?: number, className?: string }) => (
@@ -627,7 +580,7 @@ export default function Organization() {
                             .filter((r) => (r.fullName || '').toLowerCase().includes(ungroupedSearch.toLowerCase()) || (r.church || '').toLowerCase().includes(ungroupedSearch.toLowerCase()))
                             .map((r) => (
                               <div key={r._id || r.id} className="flex items-center gap-2 px-3 py-1.5 bg-white border border-amber-100 rounded-xl shadow-[0_1px_2px_rgba(0,0,0,0.02)] transition-transform hover:scale-105 cursor-default group">
-                                <div className={`w-1.5 h-1.5 rounded-full ${getChurchVibrantColor(r.church || '')}`}></div>
+                                <div className={`w-1.5 h-1.5 rounded-full ${getChurchVibrantColor(r.church || '', appSettings?.churchColors)}`}></div>
                                 <span className="text-[11px] font-bold text-gray-700 truncate max-w-[120px]">{r.fullName}</span>
                                 <span className="text-[8px] font-black uppercase text-gray-300 tracking-tighter ml-auto opacity-0 group-hover:opacity-100 transition-opacity">{r.church}</span>
                               </div>
@@ -689,7 +642,7 @@ export default function Organization() {
                      <span className="text-[9px] font-black text-gray-400 uppercase tracking-widest mr-1 self-center">Church Legend:</span>
                      {effectiveChurches.map((church: string) => (
                        <div key={church} className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg bg-white border border-gray-50 shadow-[0_1px_2px_rgba(0,0,0,0.02)]">
-                          <div className={`w-3 h-3 rounded-full border border-white shadow-sm ring-1 ring-black/5 ${getChurchVibrantColor(church)}`}></div>
+                          <div className={`w-3 h-3 rounded-full border border-white shadow-sm ring-1 ring-black/5 ${getChurchVibrantColor(church, appSettings?.churchColors)}`}></div>
                           <span className="text-[10px] font-bold text-gray-600 uppercase tracking-tight">{church}</span>
                        </div>
                      ))}
@@ -800,7 +753,7 @@ export default function Organization() {
                             <div className="flex flex-wrap gap-1.5 px-0.5">
                               {g.members.map((m: string, i: number) => {
                                 const reg = registrants.find(r => (r.fullName || '').toLowerCase().trim() === m.toLowerCase().trim());
-                                const colorClass = getChurchColor(reg?.church || '');
+                                const colorClass = getChurchColor(reg?.church || '', appSettings?.churchColors);
                                 return (
                                   <div
                                     key={i}
