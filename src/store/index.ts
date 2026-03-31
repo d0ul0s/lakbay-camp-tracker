@@ -130,14 +130,17 @@ export const useAppStore = create<AppState>()((set) => {
     users: [],
     isLoading: false,
     globalError: null,
-    isServerAwake: false,
+    isServerAwake: sessionStorage.getItem('lakbay_server_awake') === 'true',
     hasBooted: !!initialCache,
     hasSyncedLive: false,
     pendingMutations: new Set<string>(),
 
     setLoading: (loading: boolean) => set({ isLoading: loading }),
     setGlobalError: (error: string | null) => set({ globalError: error }),
-    setServerAwake: (awake: boolean) => set({ isServerAwake: awake }),
+    setServerAwake: (awake: boolean) => {
+      sessionStorage.setItem('lakbay_server_awake', awake ? 'true' : 'false');
+      set({ isServerAwake: awake });
+    },
 
     lockEntity: (type, id) => set(state => {
       const next = new Set(state.pendingMutations);

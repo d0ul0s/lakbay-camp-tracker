@@ -13,6 +13,7 @@ import Users from './pages/Users';
 import Solicitations from './pages/Solicitations';
 import ActivityLogs from './pages/ActivityLogs';
 import Organization from './pages/Organization';
+import TribeSorter from './pages/TribeSorter';
 import AxiosInterceptor from './components/AxiosInterceptor';
 import ColdStartLoader from './components/ColdStartLoader';
 import ErrorBoundary from './components/ErrorBoundary';
@@ -41,6 +42,7 @@ const router = createBrowserRouter([
           { path: "/expenses", element: <Expenses /> },
           { path: "/solicitations", element: <Solicitations /> },
           { path: "/org", element: <Organization /> },
+          { path: "/tribe-sorter", element: <TribeSorter /> },
           { path: "/activity-logs", element: <ActivityLogs /> },
           { path: "/reports", element: <Reports /> },
           {

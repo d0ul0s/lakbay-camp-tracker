@@ -6,10 +6,17 @@ import { Loader2 } from 'lucide-react';
 export default function ColdStartLoader() {
   const { isServerAwake, setServerAwake } = useAppStore();
   const [hasError, setHasError] = useState(false);
+  const [showUI, setShowUI] = useState(false);
 
   useEffect(() => {
+    const uiTimeout = setTimeout(() => {
+      if (!isServerAwake) setShowUI(true);
+    }, 2000);
+
     if (isServerAwake) {
       setHasError(false);
+      setShowUI(false);
+      clearTimeout(uiTimeout);
       return;
     }
 
@@ -43,10 +50,11 @@ export default function ColdStartLoader() {
     return () => {
       isMounted = false;
       clearTimeout(timeoutId);
+      clearTimeout(uiTimeout);
     };
   }, [isServerAwake, setServerAwake]);
 
-  if (isServerAwake) return null;
+  if (isServerAwake || !showUI) return null;
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center bg-gray-50/95 backdrop-blur-sm">

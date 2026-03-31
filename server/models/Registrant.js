@@ -22,7 +22,10 @@ const registrantSchema = new mongoose.Schema({
     default: { tshirt: null, bag: null, notebook: null, pen: null }
   },
   verifiedByTreasurer: { type: Boolean, default: false },
-  verifiedAt: { type: Date, default: null }
+  verifiedAt: { type: Date, default: null },
+  spirituality: { type: Number, default: 1, min: 1, max: 5 },
+  build: { type: Number, default: 1, min: 1, max: 5 },
+  lockedTribe: { type: String, default: null }
 });
 
 // Compound index for fullName regex search and sorting

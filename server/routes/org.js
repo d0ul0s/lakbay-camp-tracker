@@ -21,7 +21,7 @@ const requireAdmin = (req, res, next) => {
 // GET all registrant names for group sorting (Public access for dashboard color-coding)
 router.get('/registrants', async (req, res) => {
   try {
-    const registrants = await Registrant.find({}, 'fullName church').sort({ fullName: 1 });
+    const registrants = await Registrant.find({}, 'fullName church sex spirituality build lockedTribe').sort({ fullName: 1 });
     res.json(registrants);
   } catch (err) {
     res.status(500).json({ message: err.message });
@@ -212,6 +212,83 @@ router.delete('/groups/:id', auth, requireAdmin, async (req, res) => {
     );
     
     res.json({ message: 'Group removed' });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
+// ===============================
+// TRIBE SORTER SPECIAL ROUTES
+// ===============================
+
+// PUT bulk update scores and locks
+router.put('/registrants/bulk-scores', auth, requireAdmin, async (req, res) => {
+  try {
+    const { updates } = req.body; // Array of { id, spirituality, build, lockedTribe }
+    if (!Array.isArray(updates)) return res.status(400).json({ message: 'Updates must be an array.' });
+
+    const bulkOps = updates.map(u => ({
+      updateOne: {
+        filter: { _id: u.id },
+        update: { 
+          $set: { 
+            spirituality: u.spirituality, 
+            build: u.build, 
+            lockedTribe: u.lockedTribe 
+          } 
+        }
+      }
+    }));
+
+    await Registrant.bulkWrite(bulkOps);
+
+    await logActivity(
+      req.user.id,
+      req.user.role,
+      'Bulk Graded Participants',
+      `Updated scores/locks for ${updates.length} participants`,
+      req.ip
+    );
+
+    res.json({ message: 'Scores updated successfully' });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
+// POST Apply Proposal to Live Tribes
+router.post('/groups/apply-proposal', auth, requireAdmin, async (req, res) => {
+  try {
+    const { tribes } = req.body; // Array of { name, members }
+    if (!Array.isArray(tribes)) return res.status(400).json({ message: 'Tribes must be an array.' });
+
+    // 1. Delete all existing groups
+    await CampGroup.deleteMany({});
+
+    // 2. Create new groups from proposal
+    const newGroups = tribes.map(t => new CampGroup({
+      name: t.name,
+      members: t.members,
+      // Initialize other fields as empty strings/arrays as per baseline
+      leader: '',
+      assistantLeader: '',
+      pointKeeper: '',
+      flagBearer: '',
+      facilitators: [],
+      grabMasters: []
+    }));
+
+    await CampGroup.insertMany(newGroups);
+
+    await logActivity(
+      req.user.id,
+      req.user.role,
+      'Applied Tribe Proposal',
+      `Re-organized camp into ${tribes.length} new tribes via sorter.`,
+      req.ip
+    );
+
+    res.json({ message: 'Proposal applied successfully' });
   } catch (err) {
     res.status(500).json({ message: err.message });
   }

@@ -30,6 +30,21 @@ export interface Registrant {
   };
   verifiedByTreasurer: boolean;
   verifiedAt: string | null;
+  spirituality?: number;
+  build?: number;
+  lockedTribe?: string | null;
+}
+
+export interface TribeProposal {
+  id: string;
+  name: string;
+  groupCount: number;
+  distribution: {
+    name: string;
+    members: string[];
+  }[];
+  metrics: Record<string, any>;
+  createdAt: string;
 }
 
 export type ExpenseCategory = 'Food' | 'Venue' | 'Supplies' | 'Transportation' | 'Others' | 'Merch Production';
