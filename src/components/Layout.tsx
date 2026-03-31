@@ -140,25 +140,26 @@ export default function Layout() {
     <div className="h-[100dvh] w-full overflow-hidden bg-brand-cream flex">
       {/* Sidebar Desktop/Tablet */}
       <aside className="hidden md:flex flex-col md:w-20 xl:w-64 bg-brand-brown text-brand-beige shadow-xl z-20 transition-all duration-300">
-        <div className="p-4 xl:p-6 text-center xl:text-left flex flex-col items-center xl:items-start relative">
-          <div className="flex items-center gap-2 xl:gap-3 xl:mb-1">
-            <div className="relative">
-              <img src="/logo.svg" alt="LAKBAY Logo" className="h-10 w-10 xl:h-12 xl:w-12 object-contain drop-shadow-md" />
-              <div className="xl:hidden absolute -bottom-1 -right-1 flex items-center justify-center p-0.5 rounded-full bg-brand-brown border border-white/10" title="Connection Status">
-                <div className={`w-2.5 h-2.5 rounded-full ${isSocketConnected ? 'bg-green-400 animate-pulse' : 'bg-red-400'}`} />
-              </div>
-            </div>
-            <h1 className="hidden xl:block text-3xl xl:text-4xl font-display tracking-widest text-white mt-1">LAKBAY</h1>
-          </div>
-          <div className="hidden xl:block">
-            <p className="text-sm text-brand-sand font-medium uppercase tracking-wider mt-1">{currentUser?.role}</p>
-            {currentUser?.church && <p className="text-xs text-white/70 mt-0.5 truncate">{currentUser.church}</p>}
+        <div className="p-4 xl:p-6 flex flex-col items-center xl:items-start relative group">
+          <div className="mb-2">
+            <h1 className="hidden xl:block text-3xl xl:text-4xl font-display tracking-[0.2em] text-white mt-1">LAKBAY</h1>
           </div>
           
-          {/* Socket Status Dot - Desktop */}
-          <div className="hidden xl:flex absolute top-6 right-6 items-center gap-1.5 px-2 py-0.5 rounded-full bg-white/5 border border-white/10" title="Connection Status">
-            <div className={`w-2 h-2 rounded-full ${isSocketConnected ? 'bg-green-400 animate-pulse' : 'bg-red-400'}`} />
-            <span className="text-[10px] font-bold text-white/50 uppercase tracking-tighter">Live</span>
+          <div className="hidden xl:flex items-end justify-between w-full gap-4">
+            <div className="min-w-0">
+               <p className="text-xs text-brand-sand font-bold uppercase tracking-widest leading-none mb-1">{currentUser?.role}</p>
+               {currentUser?.church && (
+                 <p className="text-[10px] text-white/40 truncate font-medium uppercase tracking-tight">
+                   {currentUser.church}
+                 </p>
+               )}
+            </div>
+
+            {/* Socket Status Dot - Desktop (Aligned with Church) */}
+            <div className="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-white/5 border border-white/10 shrink-0 mb-0.5" title="Live Connection">
+              <div className={`w-1.5 h-1.5 rounded-full ${isSocketConnected ? 'bg-green-400 animate-pulse' : 'bg-red-400'}`} />
+              <span className="text-[8px] font-black text-white/40 uppercase tracking-widest">Live</span>
+            </div>
           </div>
         </div>
         

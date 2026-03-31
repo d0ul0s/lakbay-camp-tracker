@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import { useAppStore } from '../store';
-import { Users, DollarSign, ShoppingBag, PlusCircle, ArrowRight, HeartHandshake, ShieldCheck, Loader2 } from 'lucide-react';
+import { Users, DollarSign, ShoppingBag, PlusCircle, HeartHandshake, Loader2, Zap } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 
@@ -18,7 +18,7 @@ export default function Dashboard() {
   const canAddSolicitations = isAdmin || rolePerms?.solicitations?.add === true;
   const canLogExpenses = isAdmin || rolePerms?.expenses?.add === true;
   const canAddRegistrants = isAdmin || rolePerms?.registrants?.add === true;
-  const canViewFinancials = isAdmin || rolePerms?.reports?.view === true || rolePerms?.expenses?.viewAll === true;
+
 
   // Financial stats (Memoized)
   const stats = useMemo(() => {
@@ -47,12 +47,14 @@ export default function Dashboard() {
     const totalIncomeVerified = verifiedReg + verifiedSol;
     const totalExpensesVerified = verifiedExp;
     const netBalance = totalIncomeVerified - totalExpensesVerified;
-    
+
     const totalIncomeRecorded = totalRegRecorded + totalSolRecorded;
     const totalExpensesRecorded = totalExpRecorded;
 
     return {
       totalRegistrants: registrants.length,
+      registrantsExcludeJam: registrants.filter(r => (r.church || '').toUpperCase().trim() !== 'JAM').length,
+      jamRegistrants: registrants.filter(r => (r.church || '').toUpperCase().trim() === 'JAM').length,
       totalRegRecorded,
       verifiedReg,
       regGap,
@@ -73,23 +75,17 @@ export default function Dashboard() {
   }, [registrants, solicitations, expenses]);
 
   const {
-    totalRegistrants,
+    registrantsExcludeJam,
+    jamRegistrants,
     totalRegRecorded,
     verifiedReg,
-    regGap,
     totalSolRecorded,
     verifiedSol,
-    solGap,
-    totalExpRecorded,
-    verifiedExp,
-    expGap,
     totalItemsExpected,
     totalItemsClaimed,
     totalIncomeVerified,
     totalExpensesVerified,
-    netBalance,
-    totalIncomeRecorded,
-    totalExpensesRecorded
+    netBalance
   } = stats;
 
   // Charts use TOTAL recorded for better visualization of progress
@@ -139,7 +135,7 @@ export default function Dashboard() {
         {/* Actions - Desktop Only */}
         <div className="hidden md:flex flex-wrap gap-3">
           {canAddRegistrants && (
-            <Link 
+            <Link
               to="/registrants"
               className="flex items-center gap-2 bg-brand-brown text-white px-5 py-2.5 rounded-xl font-bold hover:bg-brand-light-brown transition-colors shadow-sm"
             >
@@ -147,7 +143,7 @@ export default function Dashboard() {
             </Link>
           )}
           {canLogExpenses && (
-            <Link 
+            <Link
               to="/expenses"
               className="flex items-center gap-2 bg-gray-800 text-white px-5 py-2.5 rounded-xl font-bold hover:bg-gray-700 transition-colors shadow-sm"
             >
@@ -155,7 +151,7 @@ export default function Dashboard() {
             </Link>
           )}
           {canAddSolicitations && (
-            <Link 
+            <Link
               to="/solicitations"
               className="flex items-center gap-2 bg-green-700 text-white px-5 py-2.5 rounded-xl font-bold hover:bg-green-800 transition-colors shadow-sm"
             >
@@ -167,14 +163,25 @@ export default function Dashboard() {
 
       {/* KPI Cards */}
       <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-3 md:gap-6">
-        {/* Total Registrants */}
+        {/* Main Participants (Excluding JAM) */}
         <div className="bg-white p-3 md:p-6 rounded-2xl shadow-sm border border-brand-beige flex items-start gap-3 hover:shadow-md transition-shadow">
           <div className="p-2.5 bg-blue-50 text-blue-600 rounded-lg">
             <Users size={20} />
           </div>
           <div>
-            <p className="text-[10px] text-gray-400 font-bold uppercase tracking-tight">Total Registrants</p>
-            <h3 className="text-2xl font-bold text-gray-800 leading-tight">{totalRegistrants}</h3>
+            <p className="text-[10px] text-gray-400 font-bold uppercase tracking-tight">Participants (Campers)</p>
+            <h3 className="text-2xl font-bold text-gray-800 leading-tight">{registrantsExcludeJam}</h3>
+          </div>
+        </div>
+
+        {/* JAM Registrants Only */}
+        <div className="bg-white p-3 md:p-6 rounded-2xl shadow-sm border border-brand-beige flex items-start gap-3 hover:shadow-md transition-shadow">
+          <div className="p-2.5 bg-amber-50 text-amber-600 rounded-lg">
+            <HeartHandshake size={20} />
+          </div>
+          <div>
+            <p className="text-[10px] text-gray-400 font-bold uppercase tracking-tight">Total STAFF</p>
+            <h3 className="text-2xl font-bold text-gray-800 leading-tight">{jamRegistrants}</h3>
           </div>
         </div>
 
@@ -188,8 +195,8 @@ export default function Dashboard() {
             <div className="flex items-end gap-1.5 leading-tight">
               <h3 className="text-2xl font-bold text-gray-800">₱{verifiedReg.toLocaleString()}</h3>
             </div>
-            <p className={`text-[9px] italic mt-0.5 ${regGap > 0 ? 'text-orange-400 font-bold' : 'text-gray-300'}`}>
-              ₱{regGap.toLocaleString()} pending
+            <p className={`text-[9px] italic mt-0.5 text-gray-300`}>
+              Verified
             </p>
           </div>
         </div>
@@ -202,23 +209,49 @@ export default function Dashboard() {
           <div>
             <p className="text-[10px] text-gray-400 font-bold uppercase tracking-tight">Solicitations</p>
             <h3 className="text-2xl font-bold text-gray-800 leading-tight">₱{verifiedSol.toLocaleString()}</h3>
-            <p className={`text-[9px] italic mt-0.5 ${solGap > 0 ? 'text-orange-400 font-bold' : 'text-gray-300'}`}>
-              ₱{solGap.toLocaleString()} pending
+            <p className={`text-[9px] italic mt-0.5 text-gray-300`}>
+              Verified
             </p>
           </div>
         </div>
 
         {/* Total Income */}
         <div className="bg-white p-4 rounded-xl shadow-sm border border-brand-beige flex items-start gap-3 hover:shadow-md transition-shadow">
-          <div className="p-2.5 bg-brand-brown/10 text-brand-brown rounded-lg">
+          <div className="p-2.5 bg-green-50 text-green-700 rounded-lg">
             <DollarSign size={20} />
           </div>
           <div>
             <p className="text-[10px] text-gray-400 font-bold uppercase tracking-tight">Total Income (Net)</p>
-            <h3 className="text-2xl font-bold text-brand-brown leading-tight">₱{totalIncomeVerified.toLocaleString()}</h3>
-            <p className={`text-[9px] italic mt-0.5 ${(totalIncomeRecorded - totalIncomeVerified) > 0 ? 'text-orange-400 font-bold' : 'text-gray-300'}`}>
-              ₱{(totalIncomeRecorded - totalIncomeVerified).toLocaleString()} pending
+            <h3 className="text-2xl font-bold text-green-700 leading-tight">₱{totalIncomeVerified.toLocaleString()}</h3>
+            <p className={`text-[9px] italic mt-0.5 text-gray-300`}>
+              Verified
             </p>
+          </div>
+        </div>
+
+        {/* Total Expenses */}
+        <div className="bg-white p-4 rounded-xl shadow-sm border border-brand-beige flex items-start gap-3 hover:shadow-md transition-shadow outline outline-1 outline-red-50">
+          <div className="p-2.5 bg-red-50 text-red-600 rounded-lg">
+            <ShoppingBag size={20} />
+          </div>
+          <div>
+            <p className="text-[10px] text-gray-400 font-bold uppercase tracking-tight">Total Expenses</p>
+            <h3 className="text-2xl font-bold text-red-600 leading-tight">₱{totalExpensesVerified.toLocaleString()}</h3>
+            <p className={`text-[9px] italic mt-0.5 text-gray-300`}>
+              Verified
+            </p>
+          </div>
+        </div>
+
+        {/* Total Balance */}
+        <div className={`bg-white p-4 rounded-xl shadow-sm border border-brand-beige flex items-start gap-3 hover:shadow-md transition-shadow ring-1 ${netBalance >= 0 ? 'ring-brand-sand/20' : 'ring-red-100'}`}>
+          <div className={`p-2.5 rounded-lg ${netBalance >= 0 ? 'bg-brand-sand/30 text-brand-brown' : 'bg-red-50 text-red-500'}`}>
+            <Zap size={20} fill={netBalance >= 0 ? 'currentColor' : 'none'} opacity={netBalance >= 0 ? 0.3 : 1} />
+          </div>
+          <div>
+            <p className="text-[10px] text-gray-400 font-bold uppercase tracking-tight">Net Balance (LIVE)</p>
+            <h3 className={`text-2xl font-bold leading-tight ${netBalance >= 0 ? 'text-brand-brown' : 'text-red-500'}`}>₱{netBalance.toLocaleString()}</h3>
+            <p className="text-[9px] text-gray-400 italic mt-0.5 font-medium tracking-tight">Verified Snapshot</p>
           </div>
         </div>
 
@@ -240,32 +273,6 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {canViewFinancials && (
-        <div className="lg:col-span-3 bg-white rounded-xl shadow-sm border border-brand-beige overflow-hidden">
-          <div className="px-5 py-3 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
-            <h3 className="font-display text-lg text-brand-brown tracking-wide">Camp Financial Summary</h3>
-            <Link to="/reports" className="text-xs text-brand-light-brown hover:underline flex items-center gap-1 font-medium">
-              Report Detail <ArrowRight size={14} />
-            </Link>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-3 divide-y md:divide-y-0 md:divide-x divide-gray-100">
-            <div className="p-4 text-center bg-white">
-              <p className="text-gray-400 text-[9px] font-black uppercase tracking-widest">Total Income</p>
-              <p className="text-2xl font-black text-green-600">₱{totalIncomeVerified.toLocaleString()}</p>
-            </div>
-            <div className="p-4 text-center bg-white">
-              <p className="text-gray-400 text-[9px] font-black uppercase tracking-widest">Total Expenses</p>
-              <p className="text-2xl font-black text-red-500">₱{totalExpensesVerified.toLocaleString()}</p>
-            </div>
-            <div className="p-4 text-center bg-white">
-              <p className="text-gray-400 text-[9px] font-black uppercase tracking-widest">Net Balance</p>
-              <p className={`text-2xl font-black ${netBalance >= 0 ? 'text-brand-brown' : 'text-red-500'}`}>
-                ₱{netBalance.toLocaleString()}
-              </p>
-            </div>
-          </div>
-        </div>
-      )}
 
 
       {/* Financial Charts (All Roles) */}
@@ -316,82 +323,6 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* Verified Gap Table (Admin) */}
-      {canViewFinancials && (
-        <div className="bg-white rounded-2xl shadow-sm border border-brand-beige overflow-hidden col-span-1 lg:col-span-2">
-          <div className="px-6 py-4 border-b border-gray-100 bg-gray-50/50 flex items-center gap-2">
-            <ShieldCheck size={20} className="text-brand-brown" />
-            <h3 className="font-display text-xl text-brand-brown tracking-wide">Verification Gap</h3>
-          </div>
-          {/* Mobile Card List */}
-          <div className="md:hidden divide-y divide-gray-100">
-            {[
-              { label: 'Registration Fees', total: totalRegRecorded, verified: verifiedReg, gap: regGap },
-              { label: 'Solicitations', total: totalSolRecorded, verified: verifiedSol, gap: solGap },
-              { label: 'TOTAL INCOME', total: totalIncomeRecorded, verified: totalIncomeVerified, gap: totalIncomeRecorded - totalIncomeVerified, isMain: true },
-              { label: 'Manual Expenses', total: totalExpRecorded, verified: verifiedExp, gap: expGap },
-              { label: 'TOTAL EXPENSES', total: totalExpensesRecorded, verified: totalExpensesVerified, gap: totalExpensesRecorded - totalExpensesVerified, isMain: true }
-            ].map(row => (
-              <div key={row.label} className={`p-3 ${row.gap > 0 ? 'bg-orange-50/30' : ''} ${row.isMain ? 'bg-gray-50' : ''}`}>
-                <div className="flex justify-between items-center mb-1">
-                  <span className={`text-xs font-bold ${row.isMain ? 'text-brand-brown' : 'text-gray-700'}`}>{row.label}</span>
-                  {row.gap > 0 ? (
-                    <span className="text-[9px] font-black text-orange-600 px-1.5 py-0.5 bg-orange-100 rounded-full tracking-tighter">GAP: ₱{row.gap.toLocaleString()} ⚠️</span>
-                  ) : (
-                    <span className="text-[8px] font-black text-green-600 uppercase tracking-tighter">Verified ✔</span>
-                  )}
-                </div>
-                <div className="grid grid-cols-2 gap-2 text-[10px]">
-                  <div className="flex justify-between border-r border-gray-100 pr-2">
-                    <span className="text-gray-400 uppercase tracking-tighter">Recorded</span>
-                    <span className="font-bold text-gray-700">₱{row.total.toLocaleString()}</span>
-                  </div>
-                  <div className="flex justify-between pl-1">
-                    <span className="text-gray-400 uppercase tracking-tighter">Verified</span>
-                    <span className="font-bold text-green-700">₱{row.verified.toLocaleString()}</span>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-
-          {/* Desktop Table */}
-          <div className="hidden md:block overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead className="text-xs text-gray-400 uppercase bg-gray-50 border-b border-gray-100">
-                <tr>
-                  <th className="px-6 py-3 font-medium text-left">Category</th>
-                  <th className="px-6 py-3 font-medium text-right">Total Recorded</th>
-                  <th className="px-6 py-3 font-medium text-right">Verified (₱)</th>
-                  <th className="px-6 py-3 font-medium text-right">Gap</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-50">
-                {[
-                  { label: 'Registration Fees', total: totalRegRecorded, verified: verifiedReg, gap: regGap },
-                  { label: 'Solicitations', total: totalSolRecorded, verified: verifiedSol, gap: solGap },
-                  { label: 'TOTAL INCOME', total: totalIncomeRecorded, verified: totalIncomeVerified, gap: totalIncomeRecorded - totalIncomeVerified, isMain: true },
-                  { label: 'Manual Expenses', total: totalExpRecorded, verified: verifiedExp, gap: expGap },
-                  { label: 'TOTAL EXPENSES', total: totalExpensesRecorded, verified: totalExpensesVerified, gap: totalExpensesRecorded - totalExpensesVerified, isMain: true }
-                ].map(row => (
-                  <tr key={row.label} className={`${row.gap > 0 ? 'bg-orange-50/50' : ''} ${(row as any).isMain ? 'bg-gray-50 border-y border-gray-100 font-bold' : ''}`}>
-                    <td className="px-6 py-3 font-medium text-gray-800">{(row as any).isMain ? <span className="text-brand-brown">{row.label}</span> : row.label}</td>
-                    <td className="px-6 py-3 text-right text-gray-700">₱{row.total.toLocaleString()}</td>
-                    <td className="px-6 py-3 text-right text-green-700 font-medium">₱{row.verified.toLocaleString()}</td>
-                    <td className="px-6 py-3 text-right">
-                      {row.gap > 0 ? (
-                        <span className="font-bold text-orange-600">₱{row.gap.toLocaleString()} ⚠️</span>
-                      ) : (
-                        <span className="text-green-600 font-bold">✔ Fully Verified</span>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
 
 
     </div>

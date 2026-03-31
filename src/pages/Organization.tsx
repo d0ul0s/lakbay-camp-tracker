@@ -163,8 +163,8 @@ export default function Organization() {
   const [leaderForm, setLeaderForm] = useState<Partial<CampLeader>>({ categories: ['Registration'], name: '', roleTitle: '', churchRef: '', image: '', socialLink: '' });
   const [groupForm, setGroupForm] = useState<Partial<CampGroup>>({ name: '', leader: '', assistantLeader: '', pointKeeper: '', flagBearer: '', facilitators: [], grabMasters: [], members: [] });
 
-  // Local raw input states for comma-separated fields
-  const [membersRaw, setMembersRaw] = useState('');
+  // Local raw input state for manual member entry
+  const [manualName, setManualName] = useState('');
 
   // Local search filter states for modal
   const [facilSearch, setFacilSearch] = useState('');
@@ -173,18 +173,17 @@ export default function Organization() {
   const [ungroupedSearch, setUngroupedSearch] = useState('');
 
   useEffect(() => {
-    if (groupModal.isOpen && groupModal.group) {
-      setMembersRaw(groupModal.group.members?.join(', ') || '');
-    } else if (groupModal.isOpen) {
-      setMembersRaw('');
+    if (groupModal.isOpen && !groupModal.group) {
+      setManualName('');
       setFacilSearch('');
       setRegistrySearch('');
-    } else {
+    } else if (!groupModal.isOpen) {
       // Modal just closed — clear modal-local searches to prevent leaking into main page
       setRegistrySearch('');
       setFacilSearch('');
+      setManualName('');
     }
-  }, [groupModal.isOpen, groupModal.group]);
+  }, [groupModal.isOpen]);
 
   const ALL_CATEGORIES = [
     'Camp Head', 'Registration', 'Food', 'Arts & Decorations',
@@ -760,22 +759,56 @@ export default function Organization() {
 
                         {g.members?.length > 0 && (
                           <div className="mt-4 pt-4 border-t border-gray-100">
-                            <h5 className="text-[8px] font-black uppercase text-gray-400 tracking-widest mb-3 px-1">Members ({g.members.length})</h5>
-                            <div className="flex flex-wrap gap-1.5 px-0.5">
-                              {g.members.map((m: string, i: number) => {
-                                const reg = registrants.find(r => (r.fullName || '').toLowerCase().trim() === m.toLowerCase().trim());
-                                const colorClass = getChurchColor(reg?.church || '', appSettings?.churchColors);
-                                return (
-                                  <div
-                                    key={i}
-                                    className={`text-[10px] sm:text-[11px] px-2.5 py-1 rounded-lg font-bold border ${colorClass} transition-transform hover:scale-105 cursor-default shadow-sm`}
-                                    title={reg?.church || 'Unknown Church'}
-                                  >
-                                    {m}
-                                  </div>
-                                );
-                              })}
-                            </div>
+                            {/* Partition members by registration status */}
+                            {(() => {
+                              const registered = g.members.filter(m => registrants.some(r => (r.fullName || '').toLowerCase().trim() === m.toLowerCase().trim()));
+                              const pending = g.members.filter(m => !registrants.some(r => (r.fullName || '').toLowerCase().trim() === m.toLowerCase().trim()));
+                              
+                              return (
+                                <div className="space-y-4">
+                                  {registered.length > 0 && (
+                                    <div>
+                                      <h5 className="text-[8px] font-black uppercase text-gray-400 tracking-widest mb-3 px-1">Registered Members ({registered.length})</h5>
+                                      <div className="flex flex-wrap gap-1.5 px-0.5">
+                                        {registered.map((m: string, i: number) => {
+                                          const reg = registrants.find(r => (r.fullName || '').toLowerCase().trim() === m.toLowerCase().trim());
+                                          const colorClass = getChurchColor(reg?.church || '', appSettings?.churchColors);
+                                          return (
+                                            <div
+                                              key={i}
+                                              className={`text-[10px] sm:text-[11px] px-2.5 py-1 rounded-lg font-bold border ${colorClass} transition-transform hover:scale-105 cursor-default shadow-sm`}
+                                              title={reg?.church || 'Unknown Church'}
+                                            >
+                                              {m}
+                                            </div>
+                                          );
+                                        })}
+                                      </div>
+                                    </div>
+                                  )}
+                                  
+                                  {pending.length > 0 && (
+                                    <div className="bg-amber-50/20 p-2.5 rounded-2xl border border-amber-100/50">
+                                      <h5 className="text-[8px] font-black uppercase text-amber-600/60 tracking-widest mb-2.5 px-1 flex items-center gap-1.5">
+                                        <div className="w-1 h-1 rounded-full bg-amber-400 animate-pulse" />
+                                        Pending Registration ({pending.length})
+                                      </h5>
+                                      <div className="flex flex-wrap gap-1.5 px-0.5">
+                                        {pending.map((m: string, i: number) => (
+                                          <div
+                                            key={i}
+                                            className="text-[10px] sm:text-[11px] px-2.5 py-1 rounded-lg font-bold border bg-white border-amber-300/40 text-amber-800 border-dashed transition-transform hover:scale-105 cursor-default shadow-sm"
+                                            title="Not yet registered in system"
+                                          >
+                                            {m}
+                                          </div>
+                                        ))}
+                                      </div>
+                                    </div>
+                                  )}
+                                </div>
+                              );
+                            })()}
                           </div>
                         )}
                       </div>
@@ -986,33 +1019,133 @@ export default function Organization() {
                 </div>
               </div>
 
-              <div className="space-y-3">
+              <div className="space-y-4">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 px-1">
-                  <label className="block text-xs text-gray-500 font-bold uppercase tracking-widest">Participants/Members Listing</label>
+                  <label className="block text-xs text-gray-500 font-bold uppercase tracking-widest flex items-center gap-2"><Users size={14} className="text-brand-brown" /> Tribe Members Listing</label>
                   <div className="relative group/regshow flex-1 sm:max-w-xs">
                     <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within/regshow:text-brand-brown transition-colors" size={12} />
                     <input 
                       type="text" 
-                      placeholder="Filter registry..." 
+                      placeholder="Filter registrants list..." 
                       className="w-full pl-8 pr-3 py-1.5 bg-gray-50 border border-gray-100 rounded-lg text-xs outline-none focus:border-brand-brown/30 focus:bg-white transition-all font-medium"
                       value={registrySearch}
                       onChange={e => setRegistrySearch(e.target.value)}
                     />
                   </div>
                 </div>
-                <div className="p-4 bg-gray-50 rounded-2xl border border-gray-100">
-                  <textarea
-                    value={membersRaw}
-                    onChange={e => {
-                      setMembersRaw(e.target.value);
-                      const list = e.target.value.split(',').map(s => s.trim()).filter(s => s !== '');
-                      setGroupForm({ ...groupForm, members: list });
+
+                {/* 1. Manual Entry Row */}
+                <div className="flex gap-2 p-1.5 bg-brand-brown/5 rounded-xl border border-brand-sand/20 group-focus-within:border-brand-brown/40 transition-all">
+                  <input
+                    type="text"
+                    value={manualName}
+                    onChange={e => setManualName(e.target.value)}
+                    onKeyDown={e => {
+                      if (e.key === 'Enter' && manualName.trim()) {
+                        e.preventDefault();
+                        const current = (groupForm.members || []);
+                        if (!current.some(name => name.toLowerCase().trim() === manualName.trim().toLowerCase())) {
+                          setGroupForm({ ...groupForm, members: [...current, manualName.trim()] });
+                        }
+                        setManualName('');
+                      }
                     }}
-                    rows={3}
-                    placeholder="Separate names with commas (e.g. John Doe, Jane Smith)"
-                    className="w-full bg-transparent border-none outline-none text-sm font-medium resize-none placeholder:text-gray-300 mb-2 border-b border-gray-200 pb-2"
+                    placeholder="Type name (even with commas)..."
+                    className="flex-1 bg-transparent border-none outline-none text-xs font-bold px-2 placeholder:text-gray-300 placeholder:font-normal"
                   />
-                  <div className="flex flex-wrap gap-1.5 max-h-48 overflow-y-auto pt-2 custom-scrollbar">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (manualName.trim()) {
+                        const current = (groupForm.members || []);
+                        if (!current.some(name => name.toLowerCase().trim() === manualName.trim().toLowerCase())) {
+                          setGroupForm({ ...groupForm, members: [...current, manualName.trim()] });
+                        }
+                        setManualName('');
+                      }
+                    }}
+                    className="bg-brand-brown text-white px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest hover:bg-brand-light-brown transition-all active:scale-95"
+                  >
+                    Add Manually
+                  </button>
+                </div>
+
+                <div className="p-4 bg-gray-50 rounded-2xl border border-gray-100 shadow-inner">
+                  {/* Active Tribe Members (Partitioned Chips) */}
+                  <div className="space-y-4 mb-4">
+                    {(() => {
+                      const allMembers = groupForm.members || [];
+                      const registered = allMembers.filter(m => registrants.some(r => (r.fullName || '').toLowerCase().trim() === m.toLowerCase().trim()));
+                      const pending = allMembers.filter(m => !registrants.some(r => (r.fullName || '').toLowerCase().trim() === m.toLowerCase().trim()));
+
+                      if (allMembers.length === 0) {
+                        return <p className="text-[10px] text-gray-400 italic px-2 py-4 border-2 border-dashed border-gray-200 w-full rounded-2xl text-center">No members assigned yet. Add from registry below or type manually above.</p>;
+                      }
+
+                      return (
+                        <>
+                          {registered.length > 0 && (
+                            <div>
+                               <p className="text-[8px] font-black uppercase text-gray-400 tracking-widest mb-2 px-1">Official Registrants ({registered.length})</p>
+                               <div className="flex flex-wrap gap-2">
+                                  {registered.map((m: string, i: number) => (
+                                    <div
+                                      key={i}
+                                      className="flex items-center gap-1.5 py-1.5 pl-3 pr-1.5 rounded-xl text-[11px] font-bold border shadow-sm bg-white border-brand-sand/30 text-gray-700 animate-in zoom-in-95"
+                                    >
+                                      <span className="truncate max-w-[120px]">{m}</span>
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          const next = allMembers.filter(name => name !== m);
+                                          setGroupForm({ ...groupForm, members: next });
+                                        }}
+                                        className="w-5 h-5 flex items-center justify-center rounded-lg hover:bg-gray-100 text-gray-400 hover:text-red-500 transition-colors"
+                                      >
+                                        <X size={10} />
+                                      </button>
+                                    </div>
+                                  ))}
+                               </div>
+                            </div>
+                          )}
+
+                          {pending.length > 0 && (
+                            <div className="bg-amber-50/30 p-3 rounded-2xl border border-amber-100">
+                               <p className="text-[8px] font-black uppercase text-amber-600 tracking-widest mb-2 px-1">Manual/Guest Entries ({pending.length})</p>
+                               <div className="flex flex-wrap gap-2">
+                                  {pending.map((m: string, i: number) => (
+                                    <div
+                                      key={i}
+                                      className="flex items-center gap-1.5 py-1.5 pl-3 pr-1.5 rounded-xl text-[11px] font-bold border shadow-md bg-white border-amber-400/50 text-amber-900 border-dashed animate-in zoom-in-95"
+                                    >
+                                      <span className="truncate max-w-[120px]">{m}</span>
+                                      <span className="text-[7px] bg-amber-200 text-amber-700 px-1 py-0.5 rounded font-black uppercase tracking-tighter">Manual</span>
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          const next = allMembers.filter(name => name !== m);
+                                          setGroupForm({ ...groupForm, members: next });
+                                        }}
+                                        className="w-5 h-5 flex items-center justify-center rounded-lg hover:bg-amber-100 text-amber-400 hover:text-red-500 transition-colors"
+                                      >
+                                        <X size={10} />
+                                      </button>
+                                    </div>
+                                  ))}
+                               </div>
+                            </div>
+                          )}
+                        </>
+                      );
+                    })()}
+                  </div>
+
+                  <div className="border-t border-gray-100 pt-4 mb-2">
+                     <p className="text-[9px] font-black uppercase text-gray-300 tracking-widest mb-3">Tribe Registry Toggle</p>
+                  </div>
+
+                  <div className="flex flex-wrap gap-1.5 max-h-48 overflow-y-auto custom-scrollbar">
                     {registrants
                       .filter(r => r.church !== 'JAM')
                       .filter(reg => (reg.fullName || '').toLowerCase().includes(registrySearch.toLowerCase()) || (reg.church || '').toLowerCase().includes(registrySearch.toLowerCase()))
@@ -1022,17 +1155,18 @@ export default function Organization() {
                           type="button"
                           onClick={() => {
                             const current = groupForm.members || [];
-                            const next = current.includes(reg.fullName) ? current.filter(n => n !== reg.fullName) : [...current, reg.fullName];
+                            const next = current.some(name => name.toLowerCase().trim() === reg.fullName.toLowerCase().trim()) 
+                              ? current.filter(n => n.toLowerCase().trim() !== reg.fullName.toLowerCase().trim()) 
+                              : [...current, reg.fullName];
                             setGroupForm({ ...groupForm, members: next });
-                            setMembersRaw(next.join(', '));
                           }}
-                          className={`text-[9px] px-2.5 py-1.5 rounded-lg font-black transition-all border shadow-sm ${ (groupForm.members || []).includes(reg.fullName) 
-                            ? 'bg-brand-brown border-brand-brown text-white ring-2 ring-brand-sand/50' 
+                          className={`text-[9px] px-2.5 py-1.5 rounded-lg font-black transition-all border shadow-sm ${ (groupForm.members || []).some(name => name.toLowerCase().trim() === reg.fullName.toLowerCase().trim()) 
+                            ? 'bg-brand-brown border-brand-brown text-white ring-2 ring-brand-sand/50 shadow-md' 
                             : 'bg-white border-gray-100 text-gray-400 hover:border-brand-brown hover:text-brand-brown' }`}
                         >
                         <div className="flex flex-col items-center gap-0.5">
                           <span>{reg.fullName}</span>
-                          <span className={`text-[7px] opacity-70 ${ (groupForm.members || []).includes(reg.fullName) ? 'text-brand-cream' : 'text-gray-300' }`}>{reg.church ? reg.church : ''}</span>
+                          <span className={`text-[7px] opacity-70 ${ (groupForm.members || []).some(name => name.toLowerCase().trim() === reg.fullName.toLowerCase().trim()) ? 'text-brand-cream' : 'text-gray-300' }`}>{reg.church ? reg.church : ''}</span>
                         </div>
                       </button>
                       ))}
