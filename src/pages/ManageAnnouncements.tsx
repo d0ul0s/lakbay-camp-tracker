@@ -29,7 +29,8 @@ export default function ManageAnnouncements() {
   const [isPreview, setIsPreview] = useState(false);
   
   const isAdmin = currentUser?.role?.toLowerCase().trim() === 'admin';
-  const rolePerms = currentUser?.permissionMatrix?.[currentUser.role!];
+  const roleKey = currentUser?.role?.toLowerCase().trim() || '';
+  const rolePerms = currentUser?.permissionMatrix?.[roleKey];
   const canManageAnnounce = isAdmin || (rolePerms?.announcements?.view === true);
 
   const initialForm: Omit<Announcement, '_id' | 'id' | 'createdAt' | 'updatedAt'> = {

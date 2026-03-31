@@ -8,7 +8,8 @@
  */
 function requirePermission(page, action) {
   return (req, res, next) => {
-    if (req.user.role === 'admin') return next();
+    if (req.user && req.user.role === 'admin') return next();
+    if (!req.user) return res.status(401).json({ message: 'Unauthorized: User not found in request.' });
 
     const matrix = req.permissionMatrix;
     if (!matrix) {
@@ -73,7 +74,11 @@ async function getCachedSettings() {
 }
 
 async function attachPermissions(req, res, next) {
-  if (req.user.role === 'admin') return next(); // admin always full access
+  if (req.user && req.user.role === 'admin') return next(); // admin always full access
+  if (!req.user) {
+    req.permissionMatrix = DEFAULT_MATRIX;
+    return next();
+  }
   try {
     const settings = await getCachedSettings();
     const dbMatrix = (settings && settings.permissionMatrix) ? settings.permissionMatrix : {};
