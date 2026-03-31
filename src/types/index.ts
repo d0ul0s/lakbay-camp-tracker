@@ -112,3 +112,18 @@ export interface AppUser {
   role: UserRole;
   church: string;
 }
+
+export type AnnouncementType = 'General' | 'Alert' | 'Reminder' | 'Schedule';
+
+export interface Announcement {
+  _id?: string;
+  id?: string;
+  title: string;
+  content: string;
+  type: AnnouncementType;
+  priority: boolean;
+  targetDate: string | null;
+  createdAt?: string;
+  updatedAt?: string;
+  createdBy?: string;
+}

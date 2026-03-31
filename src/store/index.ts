@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { UserRole, PermissionMatrix, AppSettings, Registrant, Expense, Solicitation } from '../types';
+import type { UserRole, PermissionMatrix, AppSettings, Registrant, Expense, Solicitation, Announcement } from '../types';
 import api from '../api/axios';
 
 // Mirror of DEFAULT_MATRIX from Settings model — ensures any missing DB key always has a valid fallback
@@ -51,6 +51,7 @@ function updateCache(state: any, updates: any) {
       registrants: merged.registrants,
       expenses: merged.expenses,
       solicitations: merged.solicitations,
+      announcements: merged.announcements,
       appSettings: merged.appSettings
     }));
   } catch(e) {}
@@ -82,6 +83,10 @@ interface AppState {
   syncUser: (action: string, data: any) => void;
   fetchUsers: (silent?: boolean) => Promise<void>;
   syncSettings: (data: any) => void;
+
+  announcements: Announcement[];
+  fetchAnnouncements: (silent?: boolean) => Promise<void>;
+  syncAnnouncement: (action: string, data: any) => void;
 
   // In-flight mutation lock — prevents WebSocket echoes from overriding optimistic UI
   pendingMutations: Set<string>;
@@ -127,6 +132,7 @@ export const useAppStore = create<AppState>()((set) => {
     registrants: initialCache?.registrants || [],
     expenses: initialCache?.expenses || [],
     solicitations: initialCache?.solicitations || [],
+    announcements: initialCache?.announcements || [],
     users: [],
     isLoading: false,
     globalError: null,
@@ -190,6 +196,7 @@ export const useAppStore = create<AppState>()((set) => {
         registrants: [],
         expenses: [],
         solicitations: [],
+        announcements: [],
         hasBooted: false,
         hasSyncedLive: false
       });
@@ -240,6 +247,44 @@ export const useAppStore = create<AppState>()((set) => {
         console.error("Global settings fetch failed", err);
       }
     },
+
+    fetchAnnouncements: async (silent = false) => {
+      if (!silent) set({ isLoading: true });
+      try {
+        const res = await api.get('/api/announcements');
+        if (Array.isArray(res.data)) {
+          set({ announcements: res.data });
+          updateCache(useAppStore.getState(), { announcements: res.data });
+        }
+      } catch (err) {
+        console.error("Failed to fetch announcements", err);
+      } finally {
+        if (!silent) set({ isLoading: false });
+      }
+    },
+
+    syncAnnouncement: (action, data) => set(state => {
+      if (state.pendingMutations.has(`announcements:${data.id || data._id}`)) return state;
+      
+      let next = [...state.announcements];
+      if (action === 'added') {
+        const exists = next.find(a => a.id === data.id || a.id === data._id);
+        if (!exists) next = [data, ...next].sort((a, b) => {
+          if (a.priority !== b.priority) return b.priority ? 1 : -1;
+          return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+        });
+      } else if (action === 'updated') {
+        next = next.map(a => (a.id === data.id || a.id === data._id) ? data : a).sort((a, b) => {
+          if (a.priority !== b.priority) return b.priority ? 1 : -1;
+          return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+        });
+      } else if (action === 'deleted') {
+        next = next.filter(a => a.id !== (data._id || data.id));
+      }
+
+      updateCache(state, { announcements: next });
+      return { announcements: next };
+    }),
 
     fetchRegistrants: async (silent = false) => {
       if (!silent) set({ isLoading: true });
@@ -440,7 +485,7 @@ export const useAppStore = create<AppState>()((set) => {
 
       try {
         const res = await api.get('/api/boot');
-        const { registrants, expenses, solicitations, settings } = res.data;
+        const { registrants, expenses, solicitations, announcements, settings } = res.data;
         const newSettings = {
           ...settings,
           churches: settings.churchList || settings.churches || [],
@@ -455,6 +500,7 @@ export const useAppStore = create<AppState>()((set) => {
           registrants,
           expenses,
           solicitations,
+          announcements,
           appSettings: newSettings,
         };
         

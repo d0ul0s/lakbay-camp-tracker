@@ -13,6 +13,8 @@ import TribeSorter from './pages/TribeSorter';
 import AxiosInterceptor from './components/AxiosInterceptor';
 import ColdStartLoader from './components/ColdStartLoader';
 import ErrorBoundary from './components/ErrorBoundary';
+import PublicAnnouncements from './pages/PublicAnnouncements';
+import ManageAnnouncements from './pages/ManageAnnouncements';
 
 const router = createBrowserRouter([
   {
@@ -23,6 +25,11 @@ const router = createBrowserRouter([
   {
     path: "/public-org",
     element: <PublicOrganization />,
+    errorElement: <ErrorBoundary />
+  },
+  {
+    path: "/announcements",
+    element: <PublicAnnouncements />,
     errorElement: <ErrorBoundary />
   },
   {
@@ -39,6 +46,7 @@ const router = createBrowserRouter([
           { path: "/settings", element: <Settings /> },
           { path: "/org", element: <Organization /> },
           { path: "/tribe-sorter", element: <TribeSorter /> },
+          { path: "/announcements/manage", element: <ManageAnnouncements /> },
         ]
       }
     ]
