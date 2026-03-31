@@ -126,6 +126,7 @@ export default function Layout() {
   if (hasAccess('reports')) navigation.push({ name: 'Reports', href: '/reports', icon: FileDown });
   
   if (isAdmin) {
+    navigation.push({ name: 'Docs & Printing', href: '/docs', icon: FileDown });
     navigation.push({ name: 'Tribe Sorter', href: '/tribe-sorter', icon: Trophy });
     navigation.push({ name: 'System Auth', href: '/users', icon: UserCog, mobile: false });
     navigation.push({ name: 'Settings', href: '/settings', icon: Settings, mobile: false });

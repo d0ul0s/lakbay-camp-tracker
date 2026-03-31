@@ -1,7 +1,7 @@
 import React, { useRef, useState, useEffect } from 'react';
 import api from '../api/axios';
 import { useAppStore } from '../store';
-import { Database, Download, Upload, AlertTriangle, Plus, Trash2, Image as ImageIcon, ChevronRight, X } from 'lucide-react';
+import { Database, Download, Upload, AlertTriangle, Plus, Trash2, Image as ImageIcon, ChevronRight, X, FileText } from 'lucide-react';
 import ConfirmModal from '../components/ConfirmModal';
 import { LAKBAY_THEMES, getChurchVibrantColor } from '../utils/churchColorUtils';
 
@@ -173,6 +173,16 @@ export default function Settings() {
     if (photoInputRef.current) photoInputRef.current.value = '';
   };
 
+  const handleUpdateBranding = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value } = e.target;
+    setSettings((prev: any) => ({ ...prev, [name]: value }));
+    try {
+      await api.put('/api/settings', { [name]: value });
+    } catch (err) {
+      console.error('Failed to update branding', err);
+    }
+  };
+
   const renderArrayEditor = (title: string, field: string, description: string) => {
     const items = settings?.[field] || [];
     const isAdding = addingField === field;
@@ -202,8 +212,8 @@ export default function Settings() {
                           <div className="fixed inset-0 z-[100]" onClick={() => setPickingColorFor(null)}></div>
                           <div className="absolute left-0 top-full mt-3 bg-white border border-gray-200 rounded-2xl shadow-xl z-[110] p-3 grid grid-cols-6 gap-2 w-56 animate-in fade-in zoom-in-95 duration-200">
                              <div className="col-span-6 mb-1 px-1 border-b pb-1 flex justify-between items-center">
-                               <p className="text-[9px] font-black uppercase text-gray-400 tracking-widest">Select Theme</p>
-                               <button onClick={() => setPickingColorFor(null)} className="text-gray-300 hover:text-gray-500"><X size={12} /></button>
+                                <p className="text-[9px] font-black uppercase text-gray-400 tracking-widest">Select Theme</p>
+                                <button onClick={() => setPickingColorFor(null)} className="text-gray-300 hover:text-gray-500"><X size={12} /></button>
                              </div>
                              {LAKBAY_THEMES.map(theme => (
                                <button 
@@ -277,6 +287,118 @@ export default function Settings() {
   return (
     <div className="space-y-6 max-w-4xl mx-auto md:mx-0 pb-12">
       <h2 className="text-3xl font-display text-brand-brown tracking-wide mb-6">System Settings</h2>
+
+      {/* Camp Official Branding */}
+      <div className="bg-white p-6 rounded-[2rem] shadow-xl shadow-brand-sand/20 border border-brand-beige mb-8 relative overflow-hidden group">
+         <div className="absolute top-0 right-0 p-8 opacity-5 group-hover:scale-110 transition-transform pointer-events-none">
+            <ImageIcon size={100} className="text-brand-brown" />
+         </div>
+
+         <div className="relative z-10">
+            <div className="flex items-center gap-3 mb-6">
+               <div className="p-3 bg-brand-brown text-white rounded-2xl shadow-lg">
+                  <Database size={24} />
+               </div>
+               <div>
+                  <h3 className="text-2xl font-display text-brand-brown">Camp Official Details</h3>
+                  <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Global Branding for Document Generation</p>
+               </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+               <div className="space-y-1.5 truncate">
+                  <label className="text-[10px] font-black text-brand-light-brown uppercase tracking-widest ml-1">Event Name</label>
+                  <input 
+                    name="campName"
+                    value={settings?.campName || ''}
+                    onChange={handleUpdateBranding}
+                    placeholder="e.g. LAKBAY 2026"
+                    className="w-full px-5 py-4 rounded-2xl bg-brand-cream/30 border border-brand-sand/30 focus:border-brand-brown focus:bg-white outline-none transition-all font-bold text-brand-brown placeholder:text-gray-300"
+                  />
+               </div>
+               <div className="space-y-1.5 truncate">
+                  <label className="text-[10px] font-black text-brand-light-brown uppercase tracking-widest ml-1">Organization / Church</label>
+                  <input 
+                    name="churchName"
+                    value={settings?.churchName || ''}
+                    onChange={handleUpdateBranding}
+                    placeholder="e.g. United Pentecostal Church"
+                    className="w-full px-5 py-4 rounded-2xl bg-brand-cream/30 border border-brand-sand/30 focus:border-brand-brown focus:bg-white outline-none transition-all font-bold text-brand-brown placeholder:text-gray-300"
+                  />
+               </div>
+               <div className="space-y-1.5 truncate">
+                  <label className="text-[10px] font-black text-brand-light-brown uppercase tracking-widest ml-1">Dates</label>
+                  <input 
+                    name="campDate"
+                    value={settings?.campDate || ''}
+                    onChange={handleUpdateBranding}
+                    placeholder="e.g. April 15-18, 2026"
+                    className="w-full px-5 py-4 rounded-2xl bg-brand-cream/30 border border-brand-sand/30 focus:border-brand-brown focus:bg-white outline-none transition-all font-bold text-brand-brown placeholder:text-gray-300"
+                  />
+               </div>
+               <div className="space-y-1.5 truncate">
+                  <label className="text-[10px] font-black text-brand-light-brown uppercase tracking-widest ml-1">Location / Venue</label>
+                  <input 
+                    name="campLocation"
+                    value={settings?.campLocation || ''}
+                    onChange={handleUpdateBranding}
+                    placeholder="e.g. Garden of Gethsemane, Bataan"
+                    className="w-full px-5 py-4 rounded-2xl bg-brand-cream/30 border border-brand-sand/30 focus:border-brand-brown focus:bg-white outline-none transition-all font-bold text-brand-brown placeholder:text-gray-300"
+                  />
+               </div>
+               <div className="space-y-1.5 md:col-span-2 truncate">
+                  <label className="text-[10px] font-black text-brand-light-brown uppercase tracking-widest ml-1">Official Signatory / Coordinator</label>
+                  <input 
+                    name="campSignatory"
+                    value={settings?.campSignatory || ''}
+                    onChange={handleUpdateBranding}
+                    placeholder="Name of Camp Director or Authorized Person"
+                    className="w-full px-5 py-4 rounded-2xl bg-brand-cream/30 border border-brand-sand/30 focus:border-brand-brown focus:bg-white outline-none transition-all font-bold text-brand-brown placeholder:text-gray-300"
+                  />
+               </div>
+
+               {/* Official Document Templates */}
+               <div className="md:col-span-2 mt-4 pt-6 border-t border-brand-sand/20 space-y-6">
+                  <div className="flex items-center gap-2 mb-2">
+                     <FileText size={16} className="text-brand-brown" />
+                     <h4 className="text-xs font-black uppercase text-brand-brown tracking-[0.2em]">Official Document Templates</h4>
+                  </div>
+                  
+                  <div className="grid grid-cols-1 gap-6">
+                     <div className="space-y-2">
+                        <div className="flex justify-between items-end px-1">
+                           <label className="text-[10px] font-black text-brand-light-brown uppercase tracking-widest">Default Waiver Text</label>
+                           <span className="text-[8px] font-bold text-brand-brown/50 uppercase tracking-tighter">Use {"{{name}}"}, {"{{church}}"}</span>
+                        </div>
+                        <textarea 
+                          name="waiverTemplate"
+                          value={settings?.waiverTemplate || ''}
+                          onChange={(e: any) => handleUpdateBranding(e)}
+                          rows={4}
+                          placeholder="I, {{name}}, hereby voluntarily participate in..."
+                          className="w-full px-5 py-4 rounded-2xl bg-brand-cream/20 border border-brand-sand/20 focus:border-brand-brown focus:bg-white outline-none transition-all font-bold text-brand-brown placeholder:text-gray-300 text-sm leading-relaxed"
+                        />
+                     </div>
+                     
+                     <div className="space-y-2">
+                        <div className="flex justify-between items-end px-1">
+                           <label className="text-[10px] font-black text-brand-light-brown uppercase tracking-widest">Solicitation Letter Body</label>
+                           <span className="text-[8px] font-bold text-brand-brown/50 uppercase tracking-tighter">Use {"{{name}}"}, {"{{amount}}"}, {"{{camp_name}}"}</span>
+                        </div>
+                        <textarea 
+                          name="solicitationTemplate"
+                          value={settings?.solicitationTemplate || ''}
+                          onChange={(e: any) => handleUpdateBranding(e)}
+                          rows={6}
+                          placeholder="Greetings! We are writing to you in anticipation of {{camp_name}}..."
+                          className="w-full px-5 py-4 rounded-2xl bg-brand-cream/20 border border-brand-sand/20 focus:border-brand-brown focus:bg-white outline-none transition-all font-bold text-brand-brown placeholder:text-gray-300 text-sm leading-relaxed"
+                        />
+                     </div>
+                  </div>
+               </div>
+            </div>
+         </div>
+      </div>
       
       {/* List Configurations */}
       {settings && (

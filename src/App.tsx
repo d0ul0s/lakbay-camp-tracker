@@ -19,6 +19,7 @@ import ManageAnnouncements from './pages/ManageAnnouncements';
 import MerchClaims from './pages/MerchClaims';
 import ActivityLogs from './pages/ActivityLogs';
 import Reports from './pages/Reports';
+import DocumentRegistry from './pages/DocumentRegistry';
 import Users from './pages/Users';
 
 import PointsManagement from './pages/PointsManagement';
@@ -61,6 +62,7 @@ const router = createBrowserRouter([
           { path: "/merch", element: <MerchClaims /> },
           { path: "/activity-logs", element: <ActivityLogs /> },
           { path: "/reports", element: <Reports /> },
+          { path: "/docs", element: <DocumentRegistry /> },
           { path: "/users", element: <Users /> },
           { path: "/tribe-sorter", element: <TribeSorter /> },
           { path: "/announcements/manage", element: <ManageAnnouncements /> },

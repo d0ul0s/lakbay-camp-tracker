@@ -89,6 +89,13 @@ export interface AppSettings {
   paymentMethods: string[];
   solicitationTypes: string[];
   shirtSizePhoto: string | null;
+  campName?: string;
+  churchName?: string;
+  campDate?: string;
+  campLocation?: string;
+  campSignatory?: string;
+  waiverTemplate?: string;
+  solicitationTemplate?: string;
   permissionMatrix?: PermissionMatrix;
 }
 
