@@ -36,7 +36,7 @@ router.post('/', requirePermission('points', 'add'), async (req, res) => {
       today.setHours(0, 0, 0, 0);
 
       const todayMerit = await PointLog.find({
-        createdBy: req.user._id,
+        createdBy: req.user.id,
         type: 'merit',
         createdAt: { $gte: today }
       });
@@ -46,7 +46,7 @@ router.post('/', requirePermission('points', 'add'), async (req, res) => {
 
       if (totalGivenToday + pointValue > DAILY_QUOTA) {
         return res.status(403).json({ 
-          message: `Daily merit quota exceeded manually. You have ${DAILY_QUOTA - totalGivenToday} points left for today.` 
+          message: `Daily merit quota exceeded. You have ${DAILY_QUOTA - totalGivenToday} points left for today.` 
         });
       }
     }
@@ -59,9 +59,9 @@ router.post('/', requirePermission('points', 'add'), async (req, res) => {
       type,
       points: finalPoints,
       reason,
-      createdBy: req.user._id,
+      createdBy: req.user.id,
       verified: isAdmin, // Admins auto-verify their only entries
-      verifiedBy: isAdmin ? req.user._id : undefined,
+      verifiedBy: isAdmin ? req.user.id : undefined,
       verifiedAt: isAdmin ? new Date() : undefined
     });
 
@@ -85,7 +85,7 @@ router.put('/:id/verify', requirePermission('points', 'verify'), async (req, res
     if (!log) return res.status(404).json({ message: 'Log entry not found' });
 
     log.verified = true;
-    log.verifiedBy = req.user._id;
+    log.verifiedBy = req.user.id;
     log.verifiedAt = new Date();
 
     const saved = await log.save();
