@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { useAppStore } from '../store';
 import { Link } from 'react-router-dom';
-import { Users, Shield, X, Edit2, Map, Tent, Star, Flag, Target, Hand, Loader2, Search, Check, ChevronDown, ArrowLeft, Printer } from 'lucide-react';
+import { Users, Shield, X, Edit2, Map, Tent, Star, Flag, Target, Hand, Loader2, Search, Check, ChevronDown, ArrowLeft, Printer, ShieldAlert } from 'lucide-react';
 import ConfirmModal from '../components/ConfirmModal';
 import api from '../api/axios';
 import { getChurchColor, getChurchVibrantColor } from '../utils/churchColorUtils';

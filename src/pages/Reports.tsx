@@ -7,7 +7,7 @@ import { format } from 'date-fns';
 import type { Registrant, Expense, Solicitation } from '../types';
 
 export default function Reports() {
-  const { currentUser, setLoading } = useAppStore();
+  const { currentUser } = useAppStore();
   const [registrants, setRegistrants] = useState<Registrant[]>([]);
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [solicitations, setSolicitations] = useState<Solicitation[]>([]);

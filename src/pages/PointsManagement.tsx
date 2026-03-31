@@ -2,16 +2,13 @@ import { useState, useEffect, useMemo } from 'react';
 import { 
   Trophy, 
   PlusCircle, 
-  MinusCircle, 
-  CheckCircle2, 
   Clock, 
-  History, 
+  History as HistoryIcon, 
   Search, 
   TrendingUp, 
   TrendingDown,
   ShieldCheck,
   AlertCircle,
-  MoreVertical,
   Trash2,
   Check,
   X
@@ -20,7 +17,6 @@ import { useAppStore } from '../store';
 import api from '../api/axios';
 import { format, isToday } from 'date-fns';
 import toast from 'react-hot-toast';
-import type { PointLog } from '../types';
 
 export default function PointsManagement() {
   const { 
@@ -28,9 +24,7 @@ export default function PointsManagement() {
     pointLogs, 
     fetchPointLogs, 
     syncPointLog,
-    appSettings, 
-    fetchGlobalSettings,
-    isLoading: storeLoading
+    fetchGlobalSettings
   } = useAppStore();
 
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -166,7 +160,7 @@ export default function PointsManagement() {
         <div className="flex bg-white p-1 rounded-2xl shadow-sm border border-brand-sand/30">
           {[
             { id: 'scoreboard', label: 'Scoreboard', icon: <Trophy size={16} /> },
-            { id: 'history', label: 'All Logs', icon: <History size={16} /> },
+            { id: 'history', label: 'All Logs', icon: <HistoryIcon size={16} /> },
             { id: 'verify', label: 'Pending', icon: <Clock size={16} />, count: pendingCount }
           ].map(view => (
             <button
@@ -469,7 +463,7 @@ export default function PointsManagement() {
                     </div>
                  ) : (
                     <div className="py-32 text-center">
-                       <History size={48} className="mx-auto text-gray-100 mb-4" />
+                       <HistoryIcon size={48} className="mx-auto text-gray-100 mb-4" />
                        <p className="text-gray-400 font-medium">No activity matching your search or filters.</p>
                        <button onClick={() => setSearchQuery('')} className="text-brand-brown font-bold text-xs mt-2 underline">Clear Search</button>
                     </div>
