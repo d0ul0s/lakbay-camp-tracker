@@ -8,10 +8,8 @@ import {
   TrendingUp, 
   TrendingDown,
   ShieldCheck,
-  AlertCircle,
   Trash2,
-  Check,
-  X
+  Check
 } from 'lucide-react';
 import { useAppStore } from '../store';
 import api from '../api/axios';
