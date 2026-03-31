@@ -13,6 +13,7 @@ const mergePermissions = (defaults, saved) => {
   const result = JSON.parse(JSON.stringify(defaults));
   if (!saved || typeof saved !== 'object') return result;
   
+  // Merge defaults with saved settings
   Object.keys(defaults).forEach(role => {
     if (!saved[role] || typeof saved[role] !== 'object') {
       result[role] = defaults[role];
@@ -26,6 +27,14 @@ const mergePermissions = (defaults, saved) => {
       });
     }
   });
+
+  // Preserve any roles from DB not in defaults (e.g. dynamic roles if they existed)
+  Object.keys(saved).forEach(role => {
+    if (!result[role]) {
+      result[role] = saved[role];
+    }
+  });
+
   return result;
 };
 

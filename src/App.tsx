@@ -15,6 +15,10 @@ import ColdStartLoader from './components/ColdStartLoader';
 import ErrorBoundary from './components/ErrorBoundary';
 import PublicAnnouncements from './pages/PublicAnnouncements';
 import ManageAnnouncements from './pages/ManageAnnouncements';
+import MerchClaims from './pages/MerchClaims';
+import ActivityLogs from './pages/ActivityLogs';
+import Reports from './pages/Reports';
+import Users from './pages/Users';
 
 const router = createBrowserRouter([
   {
@@ -45,6 +49,10 @@ const router = createBrowserRouter([
           { path: "/solicitations", element: <Solicitations /> },
           { path: "/settings", element: <Settings /> },
           { path: "/org", element: <Organization /> },
+          { path: "/merch", element: <MerchClaims /> },
+          { path: "/activity-logs", element: <ActivityLogs /> },
+          { path: "/reports", element: <Reports /> },
+          { path: "/users", element: <Users /> },
           { path: "/tribe-sorter", element: <TribeSorter /> },
           { path: "/announcements/manage", element: <ManageAnnouncements /> },
         ]

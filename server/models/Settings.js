@@ -1,6 +1,15 @@
 const mongoose = require('mongoose');
 
 const DEFAULT_MATRIX = {
+  treasurer: {
+    dashboard: { view: true },
+    registrants: { view: true, viewAll: true, add: true, editOwn: true, editAny: false, deleteOwn: true, deleteAny: false },
+    merch: { view: true, toggleOwn: false, toggleAll: true },
+    expenses: { view: true, viewAll: true, add: true, editOwn: true, editAny: false, deleteOwn: true, deleteAny: false },
+    solicitations: { view: true, add: true, edit: true, delete: true, verify: true },
+    reports: { view: true, exportCsv: true },
+    activitylogs: { view: true }
+  },
   coordinator: {
     dashboard: { view: true },
     registrants: { view: true, viewAll: true, add: true, editOwn: true, editAny: false, deleteOwn: true, deleteAny: false },
