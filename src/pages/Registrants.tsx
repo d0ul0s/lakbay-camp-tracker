@@ -285,6 +285,7 @@ export default function Registrants() {
   const [batchData, setBatchData] = useState<Omit<Registrant, 'id' | 'dateRegistered'>[]>([]);
   const [formError, setFormError] = useState<string | null>(null);
   const [batchError, setBatchError] = useState<string | null>(null);
+  const [isBatchSaving, setIsBatchSaving] = useState(false);
 
   // Auto-save batch draft to prevent data loss on unintended reload
   useEffect(() => {
@@ -521,7 +522,8 @@ export default function Registrants() {
     if (validData.length === 0) return;
 
     setBatchError(null);
-    localStorage.removeItem('lakbay_batch_registrants'); // Clear draft on valid submission
+    setIsBatchSaving(true);
+    
     // Optimistic batch add with temp entries
     const tempDocs = validData.map(d => ({
       ...d,
@@ -529,10 +531,13 @@ export default function Registrants() {
       dateRegistered: new Date().toISOString()
     }));
     syncRegistrant('imported', tempDocs);
-    setIsBatchModalOpen(false);
-    setBatchData([]);
 
     api.post(`/api/registrants/batch`, { registrants: validData }).then((res) => {
+      // SUCCESS PATH
+      localStorage.removeItem('lakbay_batch_registrants'); // Clear draft only on success
+      setIsBatchModalOpen(false);
+      setBatchData([]);
+      
       // Graceful handoff: Swap temp optimistic UI instantly to prevent duplicates.
       tempDocs.forEach(d => syncRegistrant('deleted', { _id: d._id }));
       syncRegistrant('imported', res.data);
@@ -540,8 +545,12 @@ export default function Registrants() {
       fetchData();
     }).catch(err => {
       console.error(err);
+      const msg = err.response?.data?.message || 'Failed to register participants. Some entries might be duplicates.';
+      setBatchError(msg);
       // Immediate rollback on error
       tempDocs.forEach(d => syncRegistrant('deleted', { _id: d._id }));
+    }).finally(() => {
+      setIsBatchSaving(false);
     });
   };
 
@@ -1280,7 +1289,8 @@ export default function Registrants() {
                         <button 
                           type="button" 
                           onClick={() => setBatchData(batchData.filter((_: any, i: number) => i !== idx))} 
-                          className="p-1.5 text-red-400 hover:bg-red-50 rounded-lg transition-all opacity-100 lg:opacity-0 group-hover:opacity-100"
+                          disabled={isBatchSaving}
+                          className="p-1.5 text-red-400 hover:bg-red-50 rounded-lg transition-all opacity-100 lg:opacity-0 group-hover:opacity-100 disabled:opacity-30 disabled:cursor-not-allowed"
                           title="Remove this registrant"
                         >
                           <Trash2 size={18} />
@@ -1457,7 +1467,12 @@ export default function Registrants() {
                   );
                 })}
               </div>
-              <button type="button" onClick={addBatchRow} className="mt-4 flex items-center justify-center gap-2 w-full py-3 border-2 border-dashed border-gray-300 rounded-xl text-gray-500 hover:border-brand-brown hover:text-brand-brown transition-colors font-medium">
+              <button 
+                type="button" 
+                onClick={addBatchRow} 
+                disabled={isBatchSaving}
+                className="mt-4 flex items-center justify-center gap-2 w-full py-3 border-2 border-dashed border-gray-300 rounded-xl text-gray-500 hover:border-brand-brown hover:text-brand-brown transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+              >
                 <PlusCircle size={20} /> Add Another Row
               </button>
 
@@ -1465,16 +1480,25 @@ export default function Registrants() {
                 <button
                   type="button"
                   onClick={() => setIsBatchModalOpen(false)}
-                  className="px-5 py-2.5 rounded-lg border border-gray-300 text-gray-600 font-medium hover:bg-white transition-colors"
+                  disabled={isBatchSaving}
+                  className="px-5 py-2.5 rounded-lg border border-gray-300 text-gray-600 font-medium hover:bg-white transition-colors disabled:opacity-50"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  disabled={batchData.length === 0 || batchData.some(d => d.fullName && !NAME_REGEX.test(d.fullName))}
+                  disabled={isBatchSaving || batchData.length === 0 || batchData.some(d => d.fullName && !NAME_REGEX.test(d.fullName))}
                   className="px-6 py-2.5 rounded-lg bg-brand-brown text-white font-bold hover:bg-brand-light-brown transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
                 >
-                  <Users size={18} /> Process Batch ({batchData.length})
+                  {isBatchSaving ? (
+                    <>
+                      <Loader2 size={18} className="animate-spin" /> Processing...
+                    </>
+                  ) : (
+                    <>
+                      <Users size={18} /> Process Batch ({batchData.length})
+                    </>
+                  )}
                 </button>
               </div>
             </form>

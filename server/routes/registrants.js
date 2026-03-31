@@ -217,27 +217,46 @@ router.post('/batch', requirePermission('registrants', 'add'), async (req, res) 
     if (!Array.isArray(registrants)) return res.status(400).json({ message: 'Payload must be an array of registrants.' });
     
     const namesInBatch = new Set();
-    const savedDocs = [];
+    const batchDuplicates = [];
+    const normalizedInput = [];
 
+    // PASS 1: Internal payload validation
     for (const data of registrants) {
       const trimmedName = data.fullName?.trim();
       if (!trimmedName) continue;
-
-      // 1. Check for duplicates within the batch itself
+      
       const lowerName = trimmedName.toLowerCase();
       if (namesInBatch.has(lowerName)) {
-        return res.status(400).json({ message: `Duplicate name "${trimmedName}" found within the batch file.` });
+        batchDuplicates.push(trimmedName);
       }
       namesInBatch.add(lowerName);
+      normalizedInput.push({ ...data, fullName: trimmedName });
+    }
 
-      // 2. Check for duplicates in the database
-      const existing = await Registrant.findOne({ 
-        fullName: { $regex: new RegExp(`^${trimmedName}$`, 'i') } 
+    if (batchDuplicates.length > 0) {
+      return res.status(400).json({ 
+        message: `Internal duplicates found within the batch: ${batchDuplicates.join(', ')}. Please remove or edit them first.`,
+        duplicates: batchDuplicates
       });
-      if (existing) {
-        return res.status(400).json({ message: `Registrant "${trimmedName}" already exists in the system.` });
-      }
+    }
 
+    // PASS 2: Database duplicate validation (Bulk check)
+    const batchNames = Array.from(namesInBatch);
+    const existingInDb = await Registrant.find({ 
+      fullName: { $in: batchNames.map(n => new RegExp(`^${n}$`, 'i')) }
+    });
+
+    if (existingInDb.length > 0) {
+      const existingNames = existingInDb.map(r => r.fullName);
+      return res.status(400).json({ 
+         message: `Some registrants already exist in the system: ${existingNames.join(', ')}. No new registrants were added.`,
+         duplicates: existingNames
+      });
+    }
+
+    // PASS 3: Execution (Only if validation passed)
+    const savedDocs = [];
+    for (const data of normalizedInput) {
       if (role !== 'admin') {
         if (userChurch) data.church = userChurch;
         // Security: Prevent auto-verifying batch imported records
@@ -249,7 +268,7 @@ router.post('/batch', requirePermission('registrants', 'add'), async (req, res) 
       savedDocs.push(newRegistrant);
     }
 
-    // Broadcast update before logging activity
+    // Broadcast update immediately
     req.io.emit('DATA_UPDATED', { 
       type: 'registrants', 
       action: 'imported', 
