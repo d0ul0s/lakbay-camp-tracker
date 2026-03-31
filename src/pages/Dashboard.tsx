@@ -85,6 +85,8 @@ export default function Dashboard() {
     totalItemsClaimed,
     totalIncomeVerified,
     totalExpensesVerified,
+    totalIncomeRecorded,
+    totalExpensesRecorded,
     netBalance
   } = stats;
 
@@ -195,8 +197,8 @@ export default function Dashboard() {
             <div className="flex items-end gap-1.5 leading-tight">
               <h3 className="text-2xl font-bold text-gray-800">₱{verifiedReg.toLocaleString()}</h3>
             </div>
-            <p className={`text-[9px] italic mt-0.5 text-gray-300`}>
-              Verified
+            <p className={`text-[9px] italic mt-0.5 ${(totalRegRecorded - verifiedReg) > 0 ? 'text-orange-400 font-bold' : 'text-gray-300'}`}>
+              {(totalRegRecorded - verifiedReg) > 0 ? `₱${(totalRegRecorded - verifiedReg).toLocaleString()} pending` : 'Verified'}
             </p>
           </div>
         </div>
@@ -209,8 +211,8 @@ export default function Dashboard() {
           <div>
             <p className="text-[10px] text-gray-400 font-bold uppercase tracking-tight">Solicitations</p>
             <h3 className="text-2xl font-bold text-gray-800 leading-tight">₱{verifiedSol.toLocaleString()}</h3>
-            <p className={`text-[9px] italic mt-0.5 text-gray-300`}>
-              Verified
+            <p className={`text-[9px] italic mt-0.5 ${(totalSolRecorded - verifiedSol) > 0 ? 'text-orange-400 font-bold' : 'text-gray-300'}`}>
+              {(totalSolRecorded - verifiedSol) > 0 ? `₱${(totalSolRecorded - verifiedSol).toLocaleString()} pending` : 'Verified'}
             </p>
           </div>
         </div>
@@ -223,8 +225,8 @@ export default function Dashboard() {
           <div>
             <p className="text-[10px] text-gray-400 font-bold uppercase tracking-tight">Total Income (Net)</p>
             <h3 className="text-2xl font-bold text-green-700 leading-tight">₱{totalIncomeVerified.toLocaleString()}</h3>
-            <p className={`text-[9px] italic mt-0.5 text-gray-300`}>
-              Verified
+            <p className={`text-[9px] italic mt-0.5 ${(totalIncomeRecorded - totalIncomeVerified) > 0 ? 'text-orange-400 font-bold' : 'text-gray-300'}`}>
+               {(totalIncomeRecorded - totalIncomeVerified) > 0 ? `₱${(totalIncomeRecorded - totalIncomeVerified).toLocaleString()} pending` : 'Verified'}
             </p>
           </div>
         </div>
@@ -237,8 +239,8 @@ export default function Dashboard() {
           <div>
             <p className="text-[10px] text-gray-400 font-bold uppercase tracking-tight">Total Expenses</p>
             <h3 className="text-2xl font-bold text-red-600 leading-tight">₱{totalExpensesVerified.toLocaleString()}</h3>
-            <p className={`text-[9px] italic mt-0.5 text-gray-300`}>
-              Verified
+            <p className={`text-[9px] italic mt-0.5 ${(totalExpensesRecorded - totalExpensesVerified) > 0 ? 'text-orange-400 font-bold' : 'text-gray-300'}`}>
+              {(totalExpensesRecorded - totalExpensesVerified) > 0 ? `₱${(totalExpensesRecorded - totalExpensesVerified).toLocaleString()} pending` : 'Verified'}
             </p>
           </div>
         </div>

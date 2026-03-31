@@ -23,7 +23,8 @@ import {
   X,
   Minus,
   Cloud,
-  RotateCcw
+  RotateCcw,
+  Printer
 } from 'lucide-react';
 import type { Registrant, TribeProposal } from '../types';
 import toast from 'react-hot-toast';
@@ -665,6 +666,12 @@ export default function TribeSorter() {
                             </h3>
                             <div className="flex items-center gap-2">
                                <button 
+                                 onClick={() => window.print()}
+                                 className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 text-gray-600 rounded-xl text-sm font-bold hover:bg-gray-50 transition-all shadow-sm"
+                               >
+                                 <Printer size={16} /> Print Tribes
+                               </button>
+                               <button 
                                  onClick={() => setIsSaveModalOpen(true)}
                                  className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 text-gray-600 rounded-xl text-sm font-bold hover:bg-gray-50 transition-all shadow-sm"
                                >
@@ -673,10 +680,10 @@ export default function TribeSorter() {
                                <button 
                                  onClick={applyProposalToLive}
                                  className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-xl text-sm font-bold hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-900/10"
-                               >
-                                 <Map size={16} /> Apply to LIVE
-                               </button>
-                            </div>
+                                >
+                                  <Map size={16} /> Apply to LIVE
+                                </button>
+                             </div>
                          </div>
 
                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

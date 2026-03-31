@@ -59,11 +59,11 @@ export default function Reports() {
       'GCash Ref': r.gcRef || 'N/A',
       'Amount Paid': r.amountPaid,
       'Verified': r.verifiedByTreasurer ? 'Yes' : 'No',
-      'Date Registered': format(new Date(r.dateRegistered), 'MMM d, yyyy'),
-      'T-Shirt Claimed': r.merchClaims.tshirt ? `Yes (${r.merchClaimDates?.tshirt ? format(new Date(r.merchClaimDates.tshirt), 'MMM d, h:mm a') : 'Legacy'})` : 'No',
-      'Bag Claimed': r.merchClaims.bag ? `Yes (${r.merchClaimDates?.bag ? format(new Date(r.merchClaimDates.bag), 'MMM d, h:mm a') : 'Legacy'})` : 'No',
-      'Notebook Claimed': r.merchClaims.notebook ? `Yes (${r.merchClaimDates?.notebook ? format(new Date(r.merchClaimDates.notebook), 'MMM d, h:mm a') : 'Legacy'})` : 'No',
-      'Pen Claimed': r.merchClaims.pen ? `Yes (${r.merchClaimDates?.pen ? format(new Date(r.merchClaimDates.pen), 'MMM d, h:mm a') : 'Legacy'})` : 'No',
+      'Date Registered': r.dateRegistered ? format(new Date(r.dateRegistered), 'MMM d, yyyy') : 'N/A',
+      'T-Shirt Claimed': r.merchClaims?.tshirt ? `Yes (${r.merchClaimDates?.tshirt ? format(new Date(r.merchClaimDates.tshirt), 'MMM d, h:mm a') : 'Legacy'})` : 'No',
+      'Bag Claimed': r.merchClaims?.bag ? `Yes (${r.merchClaimDates?.bag ? format(new Date(r.merchClaimDates.bag), 'MMM d, h:mm a') : 'Legacy'})` : 'No',
+      'Notebook Claimed': r.merchClaims?.notebook ? `Yes (${r.merchClaimDates?.notebook ? format(new Date(r.merchClaimDates.notebook), 'MMM d, h:mm a') : 'Legacy'})` : 'No',
+      'Pen Claimed': r.merchClaims?.pen ? `Yes (${r.merchClaimDates?.pen ? format(new Date(r.merchClaimDates.pen), 'MMM d, h:mm a') : 'Legacy'})` : 'No',
     }));
     downloadCSV(data, `LAKBAY_Registrants_${format(new Date(), 'yyyy-MM-dd')}.csv`);
   };
