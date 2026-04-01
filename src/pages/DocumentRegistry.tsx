@@ -12,8 +12,6 @@ import {
 import { useAppStore } from '../store';
 import api from '../api/axios';
 
-// Loaded via local script tag in index.html for hardware-independent reliability
-declare const html2pdf: any;
 
 type DocTemplate = 'waiver' | 'solicitation';
 
@@ -34,7 +32,6 @@ export default function DocumentRegistry() {
   const [activeTab, setActiveTab] = useState<DocTemplate>('waiver');
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [searchQuery, setSearchQuery] = useState('');
-  const [isExporting, setIsExporting] = useState(false);
   const [manualSponsorName, setManualSponsorName] = useState('');
   const [manualSignatoryName, setManualSignatoryName] = useState('');
   const [showClearConfirm, setShowClearConfirm] = useState(false);
@@ -153,47 +150,6 @@ export default function DocumentRegistry() {
 
   const handlePrint = () => {
     window.print();
-  };
-
-  const handleDownloadPDF = async () => {
-    if (selectedIds.size === 0) return;
-    setIsExporting(true);
-
-    try {
-      if (typeof html2pdf === 'undefined') {
-        alert("PDF Engine is still loading. Please wait a few seconds or use the Print button.");
-        return;
-      }
-
-      const ids = Array.from(selectedIds);
-      const total = ids.length;
-
-      const fileName = total === 1
-        ? `LAKBAY_DOCUMENT_${new Date().getTime()}.pdf`
-        : `LAKBAY_BATCH_${total}_DOCS_${new Date().getTime()}.pdf`;
-
-      const opt = {
-        margin: 0,
-        filename: fileName,
-        image: { type: 'jpeg' as const, quality: 0.95 },
-        html2canvas: { scale: 2, useCORS: true, letterRendering: true, logging: false, scrollX: 0, scrollY: 0 },
-        jsPDF: { unit: 'in', format: 'a4', orientation: 'portrait' as const }
-      };
-
-      // The key is to wait for React to finish rendering the large batch area
-      // BEFORE we try to access printRef.current
-      await new Promise(resolve => setTimeout(resolve, 800));
-
-      const element = printRef.current;
-      if (!element) throw new Error('Staging area could not be initialized.');
-
-      await html2pdf().from(element).set(opt).save();
-    } catch (err: any) {
-      console.error('PDF Generation Failed:', err);
-      alert(`Export Failed: ${err.message || 'Unknown Error'}. Please try selecting fewer items or use the Print button.`);
-    } finally {
-      setIsExporting(false);
-    }
   };
 
   const renderDocument = (item: any, type: DocTemplate) => {
@@ -511,11 +467,11 @@ I understand that this event involves various physical activities, spiritual ses
                     </div>
                     <button
                       onClick={handlePrint}
-                      disabled={selectedIds.size === 0 || isExporting}
+                      disabled={selectedIds.size === 0}
                       className="flex items-center justify-center gap-2 bg-brand-brown text-white px-5 py-2.5 rounded-xl shadow-lg hover:bg-brand-light-brown active:scale-[0.98] transition-all font-black uppercase text-[10px] tracking-[0.2em] disabled:opacity-40 shrink-0"
                     >
-                      {isExporting ? <Loader2 className="animate-spin" size={16} /> : <Printer size={16} />}
-                      {isExporting ? 'Preparing...' : 'Print'}
+                      <Printer size={16} />
+                      Print
                     </button>
                   </div>
                 </>
