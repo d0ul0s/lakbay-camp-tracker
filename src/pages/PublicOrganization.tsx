@@ -299,8 +299,8 @@ export default function PublicOrganization() {
                   <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest mr-2 self-center flex items-center gap-2"><Info size={14} className="text-brand-sand" /> Church Legend:</span>
                   {effectiveChurches.map(church => (
                     <div key={church} className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-white/60 border border-white shadow-sm">
-                       <div className={`w-3 h-3 rounded-full border-2 border-white shadow-sm ${getChurchVibrantColor(church, appSettings?.churchColors)}`}></div>
-                       <span className="text-[10px] font-bold text-gray-600 uppercase tracking-tight">{church}</span>
+                       <div className={`w-3 h-3 rounded-full border-2 border-white shadow-sm ${getChurchVibrantColor(church.trim(), appSettings?.churchColors)}`}></div>
+                       <span className="text-[10px] font-bold text-gray-600 uppercase tracking-tight">{church.trim()}</span>
                     </div>
                   ))}
                </div>
@@ -363,7 +363,7 @@ export default function PublicOrganization() {
                                 <div className="flex flex-wrap gap-1.5">
                                   {registered.map((m, i) => {
                                     const reg = registrants.find(r => (r.fullName || '').toLowerCase().trim() === m.toLowerCase().trim());
-                                    const colorClass = getChurchColor(reg?.church || '', appSettings?.churchColors);
+                                    const colorClass = getChurchColor((reg?.church || '').trim(), appSettings?.churchColors);
                                     return (
                                       <div key={i} className={`text-[10px] px-3 py-1.5 rounded-xl font-bold border ${colorClass} shadow-sm backdrop-blur-sm transition-transform hover:scale-105 cursor-default`}>
                                         {m}
@@ -410,9 +410,9 @@ export default function PublicOrganization() {
                      <div className="flex flex-wrap gap-2">
                         {ungrouped.map(r => (
                           <div key={r._id || r.id} className="flex items-center gap-3 px-4 py-2 bg-white/80 rounded-2xl border border-brand-sand/10 shadow-sm transition-transform hover:scale-105">
-                             <div className={`w-2 h-2 rounded-full ${getChurchVibrantColor(r.church || '', appSettings?.churchColors)} shadow-sm`}></div>
+                             <div className={`w-2 h-2 rounded-full ${getChurchVibrantColor((r.church || '').trim(), appSettings?.churchColors)} shadow-sm`}></div>
                              <span className="text-xs font-bold text-gray-700">{r.fullName}</span>
-                             <span className="text-[8px] font-black text-gray-300 uppercase tracking-widest border-l pl-3 ml-1">{r.church}</span>
+                             <span className="text-[8px] font-black text-gray-300 uppercase tracking-widest border-l pl-3 ml-1">{r.church?.trim()}</span>
                           </div>
                         ))}
                      </div>

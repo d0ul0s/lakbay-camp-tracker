@@ -185,9 +185,12 @@ export const useAppStore = create<AppState>()((set) => {
         if (res.data) set({ appSettings: {
           ...res.data,
           churches: res.data.churchList || res.data.churches || [],
+          churchColors: res.data.churchColors || {},
           ministries: res.data.ministries || [],
           expenseCategories: res.data.expenseCategories || [],
           paymentMethods: res.data.paymentMethods || [],
+          solicitationTypes: res.data.solicitationTypes || [],
+          waivedAgeChurches: res.data.waivedAgeChurches || [],
           shirtSizePhoto: res.data.shirtSizePhoto || null
         }});
       }).catch(err => console.error("Initial settings fetch failed", err));
@@ -228,9 +231,12 @@ export const useAppStore = create<AppState>()((set) => {
             return { currentUser: updatedUser, appSettings: {
               ...res.data,
               churches: res.data.churchList || res.data.churches || [],
+              churchColors: res.data.churchColors || {},
               ministries: res.data.ministries || [],
               expenseCategories: res.data.expenseCategories || [],
               paymentMethods: res.data.paymentMethods || [],
+              solicitationTypes: res.data.solicitationTypes || [],
+              waivedAgeChurches: res.data.waivedAgeChurches || [],
               shirtSizePhoto: res.data.shirtSizePhoto || null
             } };
           });
@@ -250,9 +256,12 @@ export const useAppStore = create<AppState>()((set) => {
           set({ appSettings: {
             ...res.data,
             churches: res.data.churchList || res.data.churches || [],
+            churchColors: res.data.churchColors || {},
             ministries: res.data.ministries || [],
             expenseCategories: res.data.expenseCategories || [],
             paymentMethods: res.data.paymentMethods || [],
+            solicitationTypes: res.data.solicitationTypes || [],
+            waivedAgeChurches: res.data.waivedAgeChurches || [],
             shirtSizePhoto: res.data.shirtSizePhoto || null
           }});
         }
@@ -504,6 +513,8 @@ export const useAppStore = create<AppState>()((set) => {
           ministries: data.ministries || [],
           expenseCategories: data.expenseCategories || [],
           paymentMethods: data.paymentMethods || [],
+          solicitationTypes: data.solicitationTypes || [],
+          waivedAgeChurches: data.waivedAgeChurches || [],
           shirtSizePhoto: data.shirtSizePhoto || null
         };
         
@@ -542,6 +553,8 @@ export const useAppStore = create<AppState>()((set) => {
           ministries: settings.ministries || [],
           expenseCategories: settings.expenseCategories || [],
           paymentMethods: settings.paymentMethods || [],
+          solicitationTypes: settings.solicitationTypes || [],
+          waivedAgeChurches: settings.waivedAgeChurches || [],
           shirtSizePhoto: settings.shirtSizePhoto || null
         };
         

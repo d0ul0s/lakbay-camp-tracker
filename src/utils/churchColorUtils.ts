@@ -56,10 +56,15 @@ export const LAKBAY_THEMES: ChurchTheme[] = [
 export const getChurchColor = (church: string, churchColors?: Record<string, string>) => {
   if (!church) return 'bg-gray-100 text-gray-600 border-gray-200';
 
-  // 1. Check for manual override
-  if (churchColors?.[church]) {
-    const theme = LAKBAY_THEMES.find(t => t.id === churchColors[church]);
-    if (theme) return `${theme.bg} ${theme.text} ${theme.border}`;
+  // 1. Check for manual override (Case-insensitive & Trimmed)
+  if (churchColors) {
+    const normalizedTarget = church.toLowerCase().trim();
+    const matchKey = Object.keys(churchColors).find(k => k.toLowerCase().trim() === normalizedTarget);
+    
+    if (matchKey) {
+      const theme = LAKBAY_THEMES.find(t => t.id === churchColors[matchKey]);
+      if (theme) return `${theme.bg} ${theme.text} ${theme.border}`;
+    }
   }
 
   // 2. Fallback to hash-based selection
@@ -77,10 +82,15 @@ export const getChurchColor = (church: string, churchColors?: Record<string, str
 export const getChurchVibrantColor = (church: string, churchColors?: Record<string, string>) => {
   if (!church) return 'bg-gray-400';
 
-  // 1. Check for manual override
-  if (churchColors?.[church]) {
-    const theme = LAKBAY_THEMES.find(t => t.id === churchColors[church]);
-    if (theme) return theme.vibrant;
+  // 1. Check for manual override (Case-insensitive & Trimmed)
+  if (churchColors) {
+    const normalizedTarget = church.toLowerCase().trim();
+    const matchKey = Object.keys(churchColors).find(k => k.toLowerCase().trim() === normalizedTarget);
+    
+    if (matchKey) {
+      const theme = LAKBAY_THEMES.find(t => t.id === churchColors[matchKey]);
+      if (theme) return theme.vibrant;
+    }
   }
 
   // 2. Fallback to hash-based selection
