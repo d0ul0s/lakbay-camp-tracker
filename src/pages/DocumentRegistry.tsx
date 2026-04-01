@@ -5,7 +5,6 @@ import {
   Users,
   HeartHandshake,
   Check,
-  FileDown,
   Loader2,
   Image,
   ShieldCheck,
@@ -92,42 +91,6 @@ export default function DocumentRegistry() {
     logoUrl: appSettings?.logoUrl || null
   };
 
-  const handleManualExport = async () => {
-    setIsManualExporting(true);
-    
-    try {
-      if (typeof html2pdf === 'undefined') {
-        alert("PDF Engine is still loading. Please wait a few seconds or use the Print button.");
-        return;
-      }
-
-      // Wait for React to render the manualPrintRef
-      await new Promise(resolve => setTimeout(resolve, 600));
-      
-      const element = manualPrintRef.current;
-      if (!element) throw new Error('Manual document staging area could not be found.');
-
-      const rawName = manualSponsorName || 'RECIPIENT';
-      const safeName = rawName.toUpperCase().replace(/[^A-Z0-9]/g, '_');
-      
-      const opt = {
-        margin: 0,
-        filename: `LAKBAY_SOLICITATION_${safeName}_${new Date().getTime()}.pdf`,
-        image: { type: 'jpeg' as const, quality: 0.98 },
-        html2canvas: { scale: 3, useCORS: true, letterRendering: true, logging: false, scrollX: 0, scrollY: 0 },
-        jsPDF: { unit: 'in', format: 'a4', orientation: 'portrait' as const }
-      };
-
-      await html2pdf().from(element).set(opt).save();
-      setManualSponsorName('');
-    } catch (err: any) {
-      console.error('Manual Export Failed:', err);
-      alert(`Manual Export Failed: ${err.message || 'Unknown Error'}. Please try the Print button.`);
-    } finally {
-      setIsManualExporting(false);
-    }
-  };
-
   const handleManualPrint = async () => {
     setIsManualExporting(true);
     // Wait for render
@@ -135,39 +98,6 @@ export default function DocumentRegistry() {
       window.print();
       setIsManualExporting(false);
     }, 600);
-  };
-
-  const handleDownloadPDF = async () => {
-    if (selectedIds.size === 0) return;
-    setIsExporting(true);
-
-    try {
-      if (typeof html2pdf === 'undefined') {
-        alert("PDF Engine is still loading. Please wait a few seconds or use the Print button.");
-        return;
-      }
-
-      // 1. Wait for batch area to render off-screen
-      await new Promise(resolve => setTimeout(resolve, 800));
-      
-      const element = printRef.current;
-      if (!element) throw new Error('Document staging area could not be found.');
-
-      const opt = {
-        margin: 0,
-        filename: `LAKBAY_BATCH_${activeTab.toUpperCase()}_${new Date().getTime()}.pdf`,
-        image: { type: 'jpeg' as const, quality: 0.98 },
-        html2canvas: { scale: 3, useCORS: true, letterRendering: true, logging: false, scrollX: 0, scrollY: 0 },
-        jsPDF: { unit: 'in', format: 'a4', orientation: 'portrait' as const }
-      };
-
-      await html2pdf().from(element).set(opt).save();
-    } catch (err: any) {
-      console.error('Batch Export Failed:', err);
-      alert(`Export Failed: ${err.message || 'Unknown Error'}. Please try selecting fewer items or use the Print button.`);
-    } finally {
-      setIsExporting(false);
-    }
   };
 
   const replaceTags = (text: string, item: any) => {
@@ -225,9 +155,50 @@ export default function DocumentRegistry() {
     window.print();
   };
 
+  const handleDownloadPDF = async () => {
+    if (selectedIds.size === 0) return;
+    setIsExporting(true);
+
+    try {
+      if (typeof html2pdf === 'undefined') {
+        alert("PDF Engine is still loading. Please wait a few seconds or use the Print button.");
+        return;
+      }
+
+      const ids = Array.from(selectedIds);
+      const total = ids.length;
+
+      const fileName = total === 1
+        ? `LAKBAY_DOCUMENT_${new Date().getTime()}.pdf`
+        : `LAKBAY_BATCH_${total}_DOCS_${new Date().getTime()}.pdf`;
+
+      const opt = {
+        margin: 0,
+        filename: fileName,
+        image: { type: 'jpeg' as const, quality: 0.95 },
+        html2canvas: { scale: 2, useCORS: true, letterRendering: true, logging: false, scrollX: 0, scrollY: 0 },
+        jsPDF: { unit: 'in', format: 'a4', orientation: 'portrait' as const }
+      };
+
+      // The key is to wait for React to finish rendering the large batch area
+      // BEFORE we try to access printRef.current
+      await new Promise(resolve => setTimeout(resolve, 800));
+
+      const element = printRef.current;
+      if (!element) throw new Error('Staging area could not be initialized.');
+
+      await html2pdf().from(element).set(opt).save();
+    } catch (err: any) {
+      console.error('PDF Generation Failed:', err);
+      alert(`Export Failed: ${err.message || 'Unknown Error'}. Please try selecting fewer items or use the Print button.`);
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
   const renderDocument = (item: any, type: DocTemplate) => {
     const content = type === 'waiver'
-      ? (appSettings?.waiverTemplate || `I, _________________________, the parent/legal guardian of {{name}}, a member of {{church}}, hereby give my full consent for my child to participate in the {{camp_name}} at {{camp_location}}.
+      ? (appSettings?.waiverTemplate || `I, _________________________, the parent/legal guardian of {{name}}, a member of {{church}}, hereby give my full consent for my child to participate in the {{camp_name}} on {{camp_date}} at {{camp_location}}.
 
 I understand that this event involves various physical activities, spiritual sessions, and communal living. By signing this document, I acknowledge the following on behalf of my child:
 
@@ -332,14 +303,6 @@ I understand that this event involves various physical activities, spiritual ses
 
           {type === 'waiver' && (
             <div className="flex flex-col items-start mt-12 gap-8 w-full max-w-sm">
-              <div className="w-full">
-                <p className="font-serif italic text-gray-600 mb-4 text-sm">Camper's Name:</p>
-                <div className="font-display text-brand-brown border-b-2 border-brand-brown/30 pb-1 text-left text-xl">
-                  {item?.fullName || '_________________________'}
-                </div>
-                <p className="font-sans font-black uppercase tracking-[0.2em] text-gray-400 text-[8px] mt-1">Registered Delegate</p>
-              </div>
-
               <div className="flex gap-8 w-full">
                 <div className="flex-1">
                   <p className="font-serif italic text-gray-600 mb-4 text-sm">Parent/Guardian Signature:</p>
@@ -374,215 +337,144 @@ I understand that this event involves various physical activities, spiritual ses
               <p className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] mt-0.5">Automated Documentation</p>
             </div>
 
-            <div className="flex items-center gap-1.5 p-1 bg-white border border-brand-sand/50 rounded-xl shadow-sm">
+            <div className="flex items-center gap-1 p-1 bg-white border border-brand-sand/50 rounded-xl shadow-sm">
               <button
                 onClick={() => { setActiveTab('waiver'); setSelectedIds(new Set()); setSearchQuery(''); }}
-                className={`flex items-center gap-2 px-6 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === 'waiver' ? 'bg-brand-brown text-white shadow-sm' : 'text-gray-400 hover:text-brand-brown'}`}
+                className={`flex items-center gap-1.5 px-4 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === 'waiver' ? 'bg-brand-brown text-white shadow-sm' : 'text-gray-400 hover:text-brand-brown'}`}
               >
-                <ShieldCheck size={14} /> Parent Consent
+                <ShieldCheck size={13} /> Consent
               </button>
               <button
                 onClick={() => { setActiveTab('solicitation'); setSelectedIds(new Set()); setSearchQuery(''); }}
-                className={`flex items-center gap-2 px-6 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === 'solicitation' ? 'bg-brand-brown text-white shadow-sm' : 'text-gray-400 hover:text-brand-brown'}`}
+                className={`flex items-center gap-1.5 px-4 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === 'solicitation' ? 'bg-brand-brown text-white shadow-sm' : 'text-gray-400 hover:text-brand-brown'}`}
               >
-                <HeartHandshake size={14} /> Letters
+                <HeartHandshake size={13} /> Letters
               </button>
             </div>
           </div>
 
-          <div className="space-y-4">
-            {/* REGISTRY LIST (Ultra-Compact Peak) */}
-            <div className="bg-white rounded-3xl md:rounded-[2.5rem] border-2 border-brand-sand shadow-2xl overflow-hidden flex flex-col">
+          <div>
+            <div className="bg-white rounded-2xl border-2 border-brand-sand shadow-xl overflow-hidden flex flex-col">
 
-              {/* OFFICIAL DOCUMENT HUB (Solicitation Only) */}
+              {/* SOLICITATION TAB */}
               {activeTab === 'solicitation' && (
-                <div className="p-4 md:p-6 border-b border-gray-100 bg-brand-cream/5 animate-in slide-in-from-top-2 duration-500">
-                  <div className="flex items-center justify-between mb-4 md:mb-6 px-1">
-                    <div className="space-y-0.5 md:space-y-1">
-                      <span className="text-[10px] font-black text-brand-brown/60 uppercase tracking-[0.25em] ">Executive Document Suite</span>
-                      <h3 className="text-xl md:text-2xl font-display text-brand-brown tracking-tighter leading-none">Official Document Hub</h3>
+                <div className="p-4 space-y-3 animate-in slide-in-from-top-2 duration-300">
+
+                  {/* Recipient + Signatory row */}
+                  <div className="flex flex-col sm:flex-row gap-3">
+                    <div className="flex-1">
+                      <label className="text-[9px] font-black text-brand-brown/50 uppercase tracking-widest mb-1 flex items-center gap-1">
+                        <Users size={10} /> Recipient
+                      </label>
+                      <input
+                        id="manual_sponsor_name"
+                        type="text"
+                        value={manualSponsorName}
+                        onChange={e => setManualSponsorName(e.target.value)}
+                        placeholder="e.g. ABC Corporation"
+                        className="w-full px-3 py-2.5 border-2 border-brand-sand/20 rounded-xl focus:border-brand-brown outline-none font-bold text-gray-700 bg-white transition-all placeholder:text-gray-200 text-sm"
+                      />
                     </div>
-                    <div className="text-right hidden md:block">
-                      <span className="text-[8px] font-black text-brand-brown/40 uppercase tracking-widest bg-brand-brown/5 px-2 py-1 rounded-full border border-brand-brown/10 italic">Authorized</span>
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6 mb-4 md:mb-6">
-                    {/* LEFT COLUMN: RECIPIENT */}
-                    <div className="space-y-3">
-                      <div className="flex items-center gap-2 mb-1">
-                        <div className="w-8 h-8 rounded-lg bg-brand-brown/5 flex items-center justify-center text-brand-brown shrink-0 border border-brand-brown/5">
-                          <Users size={14} strokeWidth={2.5} />
-                        </div>
-                        <div>
-                          <h4 className="text-[10px] font-black text-brand-brown uppercase tracking-widest leading-none">Recipient</h4>
-                        </div>
-                      </div>
-
-                      <div className="bg-white p-4 rounded-[1.5rem] border border-brand-sand/30 shadow-sm space-y-3">
-                        <div>
-                          <label className="text-[9px] font-black text-brand-brown/40 uppercase tracking-widest ml-1 mb-1 block">Recipient Name / Organization</label>
-                          <input
-                            id="manual_sponsor_name"
-                            type="text"
-                            value={manualSponsorName}
-                            onChange={e => setManualSponsorName(e.target.value)}
-                            placeholder="e.g. ABC Corporation"
-                            className="w-full px-4 py-3 border-2 border-brand-sand/10 rounded-xl focus:border-brand-brown outline-none font-bold text-gray-700 bg-brand-cream/5 transition-all placeholder:text-gray-200 text-sm"
-                          />
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* RIGHT COLUMN: SIGNATORY */}
-                    <div className="space-y-3">
-                      <div className="flex items-center gap-2 mb-1">
-                        <div className="w-8 h-8 rounded-lg bg-brand-brown/5 flex items-center justify-center text-brand-brown shrink-0 border border-brand-brown/5">
-                          <Check size={14} strokeWidth={2.5} />
-                        </div>
-                        <div>
-                          <h4 className="text-[10px] font-black text-brand-brown uppercase tracking-widest leading-none">Authorized Signatory</h4>
-                        </div>
-                      </div>
-                      <div className="bg-white p-6 rounded-[2rem] shadow-inner space-y-6">
-                        <div>
-                          <label className="text-[10px] font-black text-brand-brown/50 uppercase tracking-[0.2em] ml-2 mb-2 block">Authorized Signature Name</label>
-                          <input
-                            id="manual_signatory_name"
-                            type="text"
-                            value={manualSignatoryName}
-                            onChange={e => setManualSignatoryName(e.target.value)}
-                            placeholder="Name of Signatory..."
-                            className="w-full px-6 py-4 border-2 border-brand-sand/10 rounded-2xl focus:border-brand-brown outline-none font-bold text-gray-700 bg-brand-cream/5 transition-all placeholder:text-gray-200 text-sm"
-                          />
-                        </div>
-
-                        {/* E-SIGNATURE UPLOAD */}
-                        <div className="p-4 rounded-2xl border-2 border-dashed border-brand-sand/20 bg-brand-cream/5 space-y-4">
-                          <div className="flex items-center justify-between">
-                            <span className="text-[10px] font-black text-brand-brown/50 uppercase tracking-[0.15em] flex items-center gap-2">
-                              <Image size={14} className="text-brand-light-brown" /> Electronic Signature
-                            </span>
-                            {currentUser?.eSignatureUrl && (
-                              <div className="flex items-center gap-1">
-                                <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
-                                <span className="text-[8px] font-black text-green-500 uppercase tracking-widest">Authenticated</span>
-                              </div>
-                            )}
-                          </div>
-
-                          <div className="flex items-center gap-2">
-                            <div className="w-28 h-14 bg-white border-2 border-brand-sand/10 rounded-xl overflow-hidden flex items-center justify-center shadow-lg group relative">
-                              {currentUser?.eSignatureUrl ? (
-                                <img src={currentUser.eSignatureUrl} alt="E-Signature" className="max-w-[85%] max-h-[85%] object-contain" />
-                              ) : (
-                                <div className="text-[8px] text-gray-300 uppercase font-black text-center px-2">No Signature Uploaded</div>
-                              )}
-                              <div className="absolute inset-0 bg-brand-brown/0 group-hover:bg-brand-brown/5 transition-colors pointer-events-none" />
-                            </div>
-                            <div className="flex flex-col flex-1 gap-2">
-                              <label className="w-full flex items-center justify-center px-4 py-2.5 bg-brand-brown text-white rounded-xl cursor-pointer hover:bg-brand-light-brown transition-all text-[10px] font-black uppercase tracking-[0.2em] shadow-lg shadow-brand-brown/10 active:translate-y-0.5">
-                                {isManualExporting ? 'Applying...' : (currentUser?.eSignatureUrl ? 'Change' : 'Upload Signature')}
-                                <input
-                                  type="file"
-                                  className="hidden"
-                                  accept="image/*"
-                                  onChange={async (e) => {
-                                    const file = e.target.files?.[0];
-                                    if (!file) return;
-
-                                    const reader = new FileReader();
-                                    reader.onloadend = async () => {
-                                      try {
-                                        const base64 = reader.result as string;
-                                        const res = await api.put('/api/auth/profile', { eSignatureUrl: base64 });
-                                        if (res.data.user) {
-                                          // @ts-ignore
-                                          const updated = { ...currentUser, ...res.data.user };
-                                          useAppStore.setState({ currentUser: updated });
-                                          sessionStorage.setItem('lakbay_auth', JSON.stringify(updated));
-                                        }
-                                      } catch (err) {
-                                        console.error("Signature upload failed", err);
-                                      }
-                                    };
-                                    reader.readAsDataURL(file);
-                                  }}
-                                />
-                              </label>
-                              {currentUser?.eSignatureUrl && (
-                                <button
-                                  onClick={() => setShowClearConfirm(true)}
-                                  className="w-full py-1.5 border border-red-200 text-red-500 rounded-lg hover:bg-red-50 transition-all text-[8px] font-black uppercase tracking-widest active:scale-95"
-                                >
-                                  Clear Signature
-                                </button>
-                              )}
-                            </div>
-                          </div>
-                        </div>
-                      </div>
+                    <div className="flex-1">
+                      <label className="text-[9px] font-black text-brand-brown/50 uppercase tracking-widest mb-1 flex items-center gap-1">
+                        <Check size={10} /> Signatory
+                      </label>
+                      <input
+                        id="manual_signatory_name"
+                        type="text"
+                        value={manualSignatoryName}
+                        onChange={e => setManualSignatoryName(e.target.value)}
+                        placeholder="Name of Signatory..."
+                        className="w-full px-3 py-2.5 border-2 border-brand-sand/20 rounded-xl focus:border-brand-brown outline-none font-bold text-gray-700 bg-white transition-all placeholder:text-gray-200 text-sm"
+                      />
                     </div>
                   </div>
-                  <div className="flex flex-col md:flex-row gap-3 items-center justify-between pt-4 border-t border-brand-sand/10 px-1">
-                    <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest italic opacity-60">
-                      * Generates an official solicitation letter.
-                    </p>
-                    <div className="flex gap-2 w-full">
-                      <div className="flex-1">
-                        <button
-                          onClick={handleManualExport}
-                          disabled={isManualExporting}
-                          className="w-full bg-brand-brown text-white px-6 py-4 rounded-xl shadow-xl hover:bg-brand-light-brown active:scale-[0.98] disabled:opacity-50 transition-all flex items-center justify-center gap-3 font-black uppercase text-xs tracking-[0.25em]"
-                        >
-                          {isManualExporting ? <Loader2 size={20} className="animate-spin" /> : (
-                            <>
-                              <FileDown size={20} />
-                              <span>Download PDF</span>
-                            </>
-                          )}
-                        </button>
+
+                  {/* E-Signature + Print row */}
+                  <div className="flex flex-col sm:flex-row items-center gap-3 pt-2 border-t border-brand-sand/10">
+                    <div className="flex items-center gap-2 flex-1 w-full min-w-0">
+                      <div className="w-20 h-10 bg-brand-cream/10 border border-brand-sand/20 rounded-lg overflow-hidden flex items-center justify-center shrink-0">
+                        {currentUser?.eSignatureUrl ? (
+                          <img src={currentUser.eSignatureUrl} alt="E-Signature" className="max-w-full max-h-full object-contain" />
+                        ) : (
+                          <Image size={14} className="text-gray-300" />
+                        )}
                       </div>
+                      <div className="flex flex-col gap-1 min-w-0">
+                        <label className="flex items-center justify-center px-3 py-1.5 bg-brand-brown/5 border border-brand-sand/30 text-brand-brown rounded-lg cursor-pointer hover:bg-brand-brown/10 transition-all text-[9px] font-black uppercase tracking-widest whitespace-nowrap">
+                          {currentUser?.eSignatureUrl ? 'Change' : 'Upload Signature'}
+                          <input type="file" className="hidden" accept="image/*" onChange={async (e) => {
+                            const file = e.target.files?.[0];
+                            if (!file) return;
+                            const reader = new FileReader();
+                            reader.onloadend = async () => {
+                              const base64 = reader.result as string;
+                              try {
+                                const res = await api.put('/api/auth/profile', { eSignatureUrl: base64 });
+                                if (res.data.user) {
+                                  useAppStore.setState({ currentUser: { ...currentUser, ...res.data.user } });
+                                }
+                              } catch (err) { console.error(err); }
+                            };
+                            reader.readAsDataURL(file);
+                          }} />
+                        </label>
+                        {currentUser?.eSignatureUrl && (
+                          <button onClick={() => setShowClearConfirm(true)} className="text-[8px] font-black uppercase tracking-widest text-red-400 hover:text-red-500 transition-colors text-left">
+                            Clear
+                          </button>
+                        )}
+                      </div>
+                      {currentUser?.eSignatureUrl && (
+                        <div className="flex items-center gap-1 ml-1 shrink-0">
+                          <div className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse" />
+                          <span className="text-[8px] font-black text-green-500 uppercase tracking-widest hidden sm:block">Signed</span>
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="relative group/tip w-full sm:w-auto shrink-0">
                       <button
                         onClick={handleManualPrint}
                         disabled={isManualExporting}
-                        className="bg-white border-2 border-brand-brown text-brand-brown px-5 py-4 rounded-xl shadow-md hover:bg-brand-cream active:scale-95 transition-all flex items-center justify-center disabled:opacity-30"
+                        className="w-full sm:w-auto bg-brand-brown text-white px-5 py-2.5 rounded-xl shadow-lg hover:bg-brand-light-brown active:scale-[0.98] disabled:opacity-50 transition-all flex items-center justify-center gap-2 font-black uppercase text-[10px] tracking-[0.2em]"
                       >
-                        <Printer size={20} />
+                        {isManualExporting ? <Loader2 size={16} className="animate-spin" /> : <Printer size={16} />}
+                        Print Letter
                       </button>
                     </div>
                   </div>
                 </div>
               )}
 
+              {/* PARENT CONSENT TAB */}
               {activeTab === 'waiver' && (
                 <>
-                  <div className="p-5 border-b border-gray-100 bg-brand-cream/10">
-                    <div className="relative mb-3">
-                      <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-brand-brown/40" size={16} />
+                  <div className="p-3 border-b border-gray-100 bg-brand-cream/10">
+                    <div className="relative mb-2">
+                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-brand-brown/40" size={14} />
                       <input
                         type="text"
                         value={searchQuery}
                         onChange={e => setSearchQuery(e.target.value)}
                         placeholder="Find Recorded Campers..."
-                        className="w-full pl-12 pr-4 py-3 bg-white rounded-2xl border-2 border-brand-sand/20 focus:border-brand-brown focus:outline-none font-bold text-brand-brown placeholder:text-gray-300 text-sm shadow-sm transition-all"
+                        className="w-full pl-9 pr-4 py-2 bg-white rounded-xl border-2 border-brand-sand/20 focus:border-brand-brown focus:outline-none font-bold text-brand-brown placeholder:text-gray-300 text-sm shadow-sm transition-all"
                       />
                     </div>
-                    <div className="flex items-center justify-between px-2">
-                      <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">
-                        {filteredData.length} TOTAL CAMPER RECORDS
+                    <div className="flex items-center justify-between px-1">
+                      <span className="text-[9px] font-black text-gray-400 uppercase tracking-widest">
+                        {filteredData.length} records
                       </span>
                       <button
                         onClick={selectAll}
-                        className="text-[10px] font-black text-brand-brown hover:text-brand-light-brown transition-colors uppercase tracking-widest"
+                        className="text-[9px] font-black text-brand-brown hover:text-brand-light-brown transition-colors uppercase tracking-widest"
                       >
-                        {selectedIds.size === filteredData.length ? '[ DESELECT ALL ]' : '[ SELECT ALL ]'}
+                        {selectedIds.size === filteredData.length ? '[ Deselect All ]' : '[ Select All ]'}
                       </button>
                     </div>
                   </div>
 
-                  {/* LIST PANE (SHRUNKEN TO EXACTLY 5 ITEMS) */}
-                  <div className="max-h-[290px] overflow-y-auto p-4 custom-scrollbar bg-white/50">
+                  <div className="max-h-[240px] overflow-y-auto p-3 custom-scrollbar bg-white/50">
                     {filteredData.length > 0 ? filteredData.map((item: any) => {
                       const id = item.id || item._id;
                       const isSelected = selectedIds.has(id);
@@ -590,65 +482,41 @@ I understand that this event involves various physical activities, spiritual ses
                         <div
                           key={id}
                           onClick={() => toggleSelect(id)}
-                          className={`p-3 rounded-2xl mb-2 cursor-pointer transition-all flex items-center justify-between border-2 ${isSelected ? 'bg-brand-brown text-white border-brand-brown shadow-lg -translate-y-0.5' : 'bg-white border-brand-cream/40 hover:border-brand-sand text-gray-700'}`}
+                          className={`px-3 py-2 rounded-xl mb-1.5 cursor-pointer transition-all flex items-center justify-between border-2 ${isSelected ? 'bg-brand-brown text-white border-brand-brown shadow-md -translate-y-0.5' : 'bg-white border-brand-cream/40 hover:border-brand-sand text-gray-700'}`}
                         >
                           <div className="min-w-0">
-                            <h4 className="font-display uppercase tracking-tight truncate text-sm">
-                              {item.fullName}
-                            </h4>
-                            <p className={`text-[10px] font-bold opacity-60 uppercase truncate tracking-widest`}>
-                              {item.church}
-                            </p>
+                            <h4 className="font-display uppercase tracking-tight truncate text-sm leading-none">{item.fullName}</h4>
+                            <p className="text-[9px] font-bold opacity-50 uppercase truncate tracking-widest mt-0.5">{item.church}</p>
                           </div>
-                          <div className={`w-6 h-6 rounded-lg flex items-center justify-center border-2 transition-all ${isSelected ? 'bg-white text-brand-brown border-white' : 'border-brand-sand/30 bg-brand-cream/10'}`}>
-                            {isSelected && <Check size={14} className="stroke-[4]" />}
+                          <div className={`w-5 h-5 rounded-md flex items-center justify-center border-2 transition-all shrink-0 ml-3 ${isSelected ? 'bg-white text-brand-brown border-white' : 'border-brand-sand/30 bg-brand-cream/10'}`}>
+                            {isSelected && <Check size={12} className="stroke-[4]" />}
                           </div>
                         </div>
                       );
                     }) : (
-                      <div className="text-center py-10 opacity-20">
-                        <Search size={48} className="mx-auto mb-4" />
-                        <p className="font-display text-xl uppercase italic">No Matches Found</p>
+                      <div className="text-center py-8 opacity-20">
+                        <Search size={36} className="mx-auto mb-3" />
+                        <p className="font-display text-lg uppercase italic">No Matches Found</p>
                       </div>
                     )}
                   </div>
 
-                  <div className="p-6 bg-brand-cream/20 border-t-2 border-brand-sand/50 flex flex-col gap-4">
-                    <div className="flex items-center justify-between px-2">
-                      <div className="flex items-center gap-3">
-                        <div className="w-12 h-12 rounded-2xl bg-brand-brown text-white flex items-center justify-center font-display text-xl shadow-lg">
-                          {selectedIds.size}
-                        </div>
-                        <div className="flex flex-col">
-                          <span className="text-[10px] font-black text-brand-brown/40 uppercase tracking-[0.2em] leading-none">Selected</span>
-                          <span className="text-xs font-black text-brand-brown uppercase">Batch Queue</span>
-                        </div>
-                      </div>
-                      <div className="text-right">
-                        <p className="text-[9px] font-black text-brand-brown/40 uppercase tracking-widest leading-none">Status</p>
-                        <p className="text-[10px] font-black text-brand-brown uppercase mt-1">{selectedIds.size > 0 ? 'Ready to Print' : 'Waiting...'}</p>
-                      </div>
+                  <div className="px-3 py-2.5 bg-brand-cream/10 border-t border-brand-sand/30 flex items-center gap-3">
+                    <div className="w-9 h-9 rounded-xl bg-brand-brown text-white flex items-center justify-center font-display text-base shadow shrink-0">
+                      {selectedIds.size}
                     </div>
-
-                    <div className="space-y-3">
-                      <button
-                        onClick={handleDownloadPDF}
-                        disabled={selectedIds.size === 0 || isExporting}
-                        className="w-full flex items-center justify-center gap-3 bg-brand-brown text-white py-4 rounded-2xl shadow-xl hover:bg-brand-light-brown active:scale-[0.98] transition-all font-black uppercase text-xs tracking-[0.25em] disabled:opacity-50"
-                      >
-                        {isExporting ? <Loader2 className="animate-spin" size={20} /> : <FileDown size={20} />}
-                        {isExporting ? 'GENERATING PDF...' : `DOWNLOAD ${selectedIds.size === 1 ? 'PDF' : 'BATCH PDF'}`}
-                      </button>
-                      
-                      <button
-                        onClick={handlePrint}
-                        disabled={selectedIds.size === 0 || isExporting}
-                        className="w-full flex items-center justify-center gap-3 bg-white border-2 border-brand-brown text-brand-brown py-3 rounded-2xl shadow-md hover:bg-brand-cream active:scale-[0.98] transition-all font-black uppercase text-[10px] tracking-widest disabled:opacity-50"
-                      >
-                        {isExporting ? <Loader2 className="animate-spin" size={16} /> : <Printer size={16} />}
-                        {isExporting ? 'PREPARING...' : `PRINT BATCH`}
-                      </button>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-[9px] font-black text-brand-brown/40 uppercase tracking-widest leading-none">Batch Queue</p>
+                      <p className="text-[10px] font-black text-brand-brown uppercase">{selectedIds.size > 0 ? 'Ready to Print' : 'Select campers above'}</p>
                     </div>
+                    <button
+                      onClick={handlePrint}
+                      disabled={selectedIds.size === 0 || isExporting}
+                      className="flex items-center justify-center gap-2 bg-brand-brown text-white px-5 py-2.5 rounded-xl shadow-lg hover:bg-brand-light-brown active:scale-[0.98] transition-all font-black uppercase text-[10px] tracking-[0.2em] disabled:opacity-40 shrink-0"
+                    >
+                      {isExporting ? <Loader2 className="animate-spin" size={16} /> : <Printer size={16} />}
+                      {isExporting ? 'Preparing...' : 'Print'}
+                    </button>
                   </div>
                 </>
               )}
