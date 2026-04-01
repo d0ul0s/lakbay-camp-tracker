@@ -1250,88 +1250,11 @@ export default function Organization() {
         }
       `}</style>
       
-      <div id="print-root" className="hidden print:block p-0 bg-white font-serif text-black">
-        {/* 1. PRINT DEPARTMENTS */}
-        {activeTab === 'departments' && (
-          <div className="flex flex-col text-black px-10">
-            {/* Dossier Header (Single for Departments) */}
-            <div className="bg-black text-white p-6 flex flex-col items-center justify-center text-center mb-10">
-               <h1 className="text-4xl font-bold tracking-[0.2em] uppercase leading-none mb-2">LAKBAY CAMP 2026</h1>
-               <p className="text-[10px] font-black tracking-[0.5em] uppercase border-t border-white/20 pt-2 opacity-80">
-                  Official Organizational Roster • Generated {new Date().toLocaleDateString()}
-               </p>
-            </div>
-
-            <div className="space-y-12">
-              {Array.from(new Set(staff.flatMap(s => getCategories(s))))
-                .filter(cat => cat !== 'Youth Leader')
-                .sort((a, b) => a === 'Camp Head' ? -1 : b === 'Camp Head' ? 1 : a.localeCompare(b))
-                .map(category => (
-                  <div key={category} className="break-inside-avoid">
-                     <h2 className="bg-black text-white px-4 py-2 text-sm font-black uppercase tracking-widest mb-4 inline-block self-start text-white">
-                        DEPARTMENT: {category}
-                     </h2>
-                     <div className="grid grid-cols-2 gap-x-12 gap-y-2 border-t-4 border-black pt-4">
-                        {staff.filter(s => getCategories(s).includes(category)).map((s, idx) => (
-                          <div key={s._id || s.id} className="flex justify-between items-baseline border-b border-gray-100 py-1.5">
-                             <div className="flex items-center gap-3">
-                                <span className="text-[10px] opacity-30 font-bold">{idx + 1}.</span>
-                                <span className="text-sm font-bold">{s.name}</span>
-                             </div>
-                             <div className="text-right">
-                                <p className="text-[9px] font-black uppercase italic opacity-60 leading-none mb-1">{s.roleTitle || 'Personnel'}</p>
-                                {s.churchRef && s.churchRef !== 'JAM' && <p className="text-[7px] font-bold opacity-40 uppercase tracking-tighter">{s.churchRef}</p>}
-                             </div>
-                          </div>
-                        ))}
-                     </div>
-                  </div>
-                ))}
-            </div>
-          </div>
-        )}
-
-        {/* 2. PRINT LEADERS */}
-        {activeTab === 'leaders' && (
-          <div className="flex flex-col text-black px-10">
-            {/* Dossier Header (Single for Leaders) */}
-            <div className="bg-black text-white p-6 flex flex-col items-center justify-center text-center mb-10">
-               <h1 className="text-4xl font-bold tracking-[0.2em] uppercase leading-none mb-2">LAKBAY CAMP 2026</h1>
-               <p className="text-[10px] font-black tracking-[0.5em] uppercase border-t border-white/20 pt-2 opacity-80">
-                  Official Organizational Roster • Generated {new Date().toLocaleDateString()}
-               </p>
-            </div>
-
-            <div className="break-inside-avoid">
-               <h2 className="bg-black text-white px-4 py-2 text-sm font-black uppercase tracking-widest mb-4 inline-block self-start text-white">
-                  HEAD YOUTH LEADERS DIRECTORY
-               </h2>
-               <div className="grid grid-cols-2 gap-x-12 gap-y-2 border-t-4 border-black pt-4">
-                  {effectiveChurches.map((churchName, idx) => {
-                    const ldr = youthLeaders.find(yl => yl.churchRef === churchName);
-                    return (
-                      <div key={churchName} className="flex justify-between items-baseline border-b border-gray-100 py-1.5">
-                         <div className="flex items-center gap-3">
-                            <span className="text-[10px] opacity-30 font-bold">{idx + 1}.</span>
-                            <span className="text-sm font-bold">{churchName}</span>
-                         </div>
-                         <div className="text-right">
-                            <p className="text-[11px] font-black uppercase leading-none mb-1">{ldr?.name || '---'}</p>
-                            <p className="text-[8px] font-bold opacity-40 uppercase tracking-tighter italic">{ldr?.roleTitle || 'CHURCH HEAD'}</p>
-                         </div>
-                      </div>
-                    );
-                  })}
-               </div>
-            </div>
-          </div>
-        )}
-
-        {/* 3. PRINT TRIBES */}
-        {activeTab === 'groups' && (
-          <div className="flex flex-col text-black px-10">
+      <div id="print-root" className="hidden print:block p-0 bg-white font-serif">
+        {activeTab === 'groups' ? (
+          <div className="flex flex-col text-black">
              {groups.map((tribe, tribeIdx) => (
-                <div key={tribe._id} className="print-page-break border-2 border-black p-8 relative min-h-[27.7cm] flex flex-col uppercase">
+                <div key={tribe._id} className="print-page-break border-2 border-black p-8 relative min-h-[27.7cm] flex flex-col">
                    {/* Per-Page Header */}
                    <div className="bg-black text-white p-6 flex flex-col items-center justify-center text-center mb-10">
                       <h1 className="text-4xl font-bold tracking-[0.2em] uppercase leading-none mb-2 text-white">LAKBAY CAMP 2026</h1>
@@ -1407,6 +1330,44 @@ export default function Organization() {
                    </div>
                 </div>
              ))}
+          </div>
+        ) : (
+          <div className="flex flex-col text-black px-10">
+            {/* Dossier Header (Single for Departments) */}
+            <div className="bg-black text-white p-6 flex flex-col items-center justify-center text-center mb-10">
+               <h1 className="text-4xl font-bold tracking-[0.2em] uppercase leading-none mb-2 text-white">LAKBAY CAMP 2026</h1>
+               <p className="text-[10px] font-black tracking-[0.5em] uppercase border-t border-white/20 pt-2 opacity-80 text-white">
+                  Official Organizational Roster • Generated {new Date().toLocaleDateString()}
+               </p>
+            </div>
+
+            <div className="space-y-12">
+              {/* Personnel Listing Table */}
+              {Array.from(new Set(leaders.flatMap(s => getCategories(s))))
+                .filter(cat => activeTab === 'leaders' ? cat === 'Youth Leader' : cat !== 'Youth Leader')
+                .sort((a, b) => a === 'Camp Head' ? -1 : b === 'Camp Head' ? 1 : a.localeCompare(b))
+                .map(category => (
+                  <div key={category} className="break-inside-avoid">
+                     <h2 className="bg-black text-white px-4 py-2 text-sm font-black uppercase tracking-widest mb-4 inline-block self-start text-white">
+                        DEPARTMENT: {category}
+                     </h2>
+                     <div className="grid grid-cols-2 gap-x-12 gap-y-2 border-t-4 border-black pt-4">
+                        {leaders.filter(s => getCategories(s).includes(category)).map((s, idx) => (
+                          <div key={s._id || s.id} className="flex justify-between items-baseline border-b border-gray-100 py-1.5">
+                             <div className="flex items-center gap-3">
+                                <span className="text-[10px] opacity-30 font-bold">{idx + 1}.</span>
+                                <span className="text-sm font-bold">{s.name}</span>
+                             </div>
+                             <div className="text-right">
+                                <p className="text-[9px] font-black uppercase italic opacity-60 leading-none mb-1">{s.roleTitle || 'Personnel'}</p>
+                                {s.churchRef && s.churchRef !== 'JAM' && <p className="text-[7px] font-bold opacity-40 uppercase tracking-tighter">{s.churchRef}</p>}
+                             </div>
+                          </div>
+                        ))}
+                     </div>
+                  </div>
+                ))}
+            </div>
           </div>
         )}
 
