@@ -96,7 +96,11 @@ export default function ManageAnnouncements() {
     }
   };
 
-  const handleDelete = async (id: string) => {
+  const handleDelete = async (id: string | null | undefined) => {
+    if (!id) {
+       toast.error('Invalid ID — cannot delete');
+       return;
+    }
     if (!window.confirm('Are you sure you want to delete this announcement?')) return;
     
     try {
@@ -104,7 +108,13 @@ export default function ManageAnnouncements() {
       syncAnnouncement('deleted', { _id: id, id });
       toast.success('Announcement deleted');
     } catch (err: any) {
-      toast.error(err.response?.data?.message || 'Failed to delete');
+      // The AxiosInterceptor handles 401s and Server Sleeps.
+      // We only show a specific error if it's not a global networking issue.
+      if (!err.response && !err.request) {
+        toast.error('Network failure — check connection');
+      } else {
+        toast.error(err.response?.data?.message || 'Failed to delete');
+      }
     }
   };
 

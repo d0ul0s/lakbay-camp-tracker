@@ -292,7 +292,11 @@ export const useAppStore = create<AppState>()((set) => {
           return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
         });
       } else if (action === 'deleted') {
-        next = next.filter(a => a.id !== (data._id || data.id));
+        const idToDelete = data._id || data.id;
+        next = next.filter(a => {
+          const aId = a._id || a.id;
+          return aId !== idToDelete;
+        });
       }
 
       updateCache(state, { announcements: next });

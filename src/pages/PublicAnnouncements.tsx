@@ -33,6 +33,15 @@ export default function PublicAnnouncements() {
     fetchPublicData();
   }, []);
 
+  const safeFormat = (dateStr: string | null | undefined, formatStr: string, fallback: string = 'Just now') => {
+    if (!dateStr) return fallback;
+    try {
+      return format(parseISO(dateStr), formatStr);
+    } catch (e) {
+      return fallback;
+    }
+  };
+
   const getTypeIcon = (type: AnnouncementType) => {
     switch (type) {
       case 'Alert': return <AlertTriangle className="text-red-500" size={24} />;
@@ -116,7 +125,7 @@ export default function PublicAnnouncements() {
                              </span>
                              {ann.targetDate && (
                                 <span className="flex items-center gap-1.5 text-blue-500 bg-blue-50 px-2 py-0.5 rounded-md">
-                                    <Calendar size={12} /> {format(parseISO(ann.targetDate), 'MMM d')}
+                                    <Calendar size={12} /> {safeFormat(ann.targetDate, 'MMM d', 'TBD')}
                                 </span>
                              )}
                         </div>
@@ -127,7 +136,7 @@ export default function PublicAnnouncements() {
                     </p>
                     
                     <div className="pt-4 flex items-center gap-2 text-[9px] font-black text-gray-300 uppercase tracking-widest">
-                       Posted {format(parseISO(ann.createdAt!), 'MMM d, yyyy')} • {format(parseISO(ann.createdAt!), 'h:mm a')}
+                       Posted {safeFormat(ann.createdAt, 'MMM d, yyyy')} • {safeFormat(ann.createdAt, 'h:mm a')}
                     </div>
                   </div>
                 </div>
