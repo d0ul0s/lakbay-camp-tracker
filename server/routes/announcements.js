@@ -3,6 +3,7 @@ const router = express.Router();
 const Announcement = require('../models/Announcement');
 const logActivity = require('../utils/logger');
 const { attachPermissions, requirePermission } = require('../middleware/permissions');
+const auth = require('../middleware/auth');
 
 // Public GET - No auth required for reading
 router.get('/', async (req, res) => {
@@ -16,7 +17,8 @@ router.get('/', async (req, res) => {
 });
 
 // Attachment of permissions to req.user for use in routes
-router.use(attachPermissions);
+// Must run AFTER auth to populate req.user
+router.use(auth, attachPermissions);
 
 // Admin CRUD - Authorized Only
 router.post('/', requirePermission('settings', 'edit'), async (req, res) => {

@@ -96,6 +96,8 @@ export interface AppSettings {
   campSignatory?: string;
   waiverTemplate?: string;
   solicitationTemplate?: string;
+  logoUrl?: string;
+  documentFooter?: string;
   permissionMatrix?: PermissionMatrix;
 }
 
