@@ -125,8 +125,11 @@ export default function Layout() {
   if (hasAccess('org')) navigation.push({ name: 'Organization', href: '/org', icon: Map });
   if (hasAccess('reports')) navigation.push({ name: 'Reports', href: '/reports', icon: FileDown });
   
-  if (isAdmin) {
+  if (isAdmin || currentUser?.role?.toLowerCase().trim() === 'coordinator') {
     navigation.push({ name: 'Docs & Printing', href: '/docs', icon: FileDown });
+  }
+
+  if (isAdmin) {
     navigation.push({ name: 'Tribe Sorter', href: '/tribe-sorter', icon: Trophy });
     navigation.push({ name: 'System Auth', href: '/users', icon: UserCog, mobile: false });
     navigation.push({ name: 'Settings', href: '/settings', icon: Settings, mobile: false });

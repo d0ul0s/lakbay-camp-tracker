@@ -37,6 +37,14 @@ const settingsSchema = new mongoose.Schema({
   paymentMethods: { type: [String], default: ['Cash (In-person)', 'GCash', 'Maya', 'Bank Transfer', 'Check'] },
   solicitationTypes: { type: [String], default: ["Individual", "Church Pledge", "Fundraising"] },
   shirtSizePhoto: { type: String, default: null },
+  campName: { type: String, default: 'LAKBAY 2026' },
+  churchName: { type: String, default: 'UNITED PENTECOSTAL CHURCH PHILIPPINES' },
+  campDate: { type: String, default: 'MAY 20-23, 2026' },
+  campLocation: { type: String, default: 'SUMMER CAMP VENUE' },
+  campSignatory: { type: String, default: 'CAMP DIRECTOR' },
+  logoUrl: { type: String, default: null },
+  waiverTemplate: { type: String, default: '' },
+  solicitationTemplate: { type: String, default: '' },
   permissionMatrix: { type: mongoose.Schema.Types.Mixed, default: DEFAULT_MATRIX }
 }, { strict: false });
 

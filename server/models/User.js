@@ -8,7 +8,8 @@ const userSchema = new mongoose.Schema({
     type: String,
     enum: ['admin', 'coordinator'],
     required: true
-  }
+  },
+  eSignatureUrl: { type: String }
 });
 
 userSchema.pre('save', async function(next) {

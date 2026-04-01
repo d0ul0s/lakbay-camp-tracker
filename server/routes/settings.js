@@ -5,8 +5,30 @@ const Settings = require('../models/Settings');
 router.get('/', async (req, res) => {
   try {
     let settings = await Settings.findOne({}, null, { strict: false }).lean();
+    
+    // Ensure defaults for branding fields even on leand objects
+    if (settings) {
+      const brandingFields = [
+        'campName', 'churchName', 'campDate', 'campLocation', 'campSignatory',
+        'waiverTemplate', 'solicitationTemplate'
+      ];
+      brandingFields.forEach(field => {
+        if (settings[field] === undefined) {
+          settings[field] = Settings.schema.path(field)?.defaultValue || '';
+        }
+      });
+    }
+
     if (!settings) {
-      const doc = await Settings.create({ churchList: [], merchCosts: {} });
+      const doc = await Settings.create({ 
+        churchList: [], 
+        merchCosts: {},
+        campName: 'LAKBAY 2026',
+        churchName: 'UNITED PENTECOSTAL CHURCH PHILIPPINES',
+        campDate: 'MAY 20-23, 2026',
+        campLocation: 'SUMMER CAMP VENUE',
+        campSignatory: 'CAMP DIRECTOR'
+      });
       settings = doc.toObject();
     }
 
@@ -45,7 +67,9 @@ router.put('/', async (req, res) => {
     const fields = [
       'churchList', 'churchColors', 'waivedAgeChurches', 'merchCosts', 'ministries', 
       'expenseCategories', 'paymentMethods', 
-      'solicitationTypes', 'shirtSizePhoto', 'permissionMatrix'
+      'solicitationTypes', 'shirtSizePhoto', 'permissionMatrix',
+      'campName', 'churchName', 'campDate', 'campLocation', 'campSignatory',
+      'waiverTemplate', 'solicitationTemplate', 'logoUrl'
     ];
     
     fields.forEach(field => {

@@ -123,6 +123,7 @@ export interface AppUser {
   pin: string;
   role: UserRole;
   church: string;
+  eSignatureUrl?: string;
 }
 
 export type AnnouncementType = 'General' | 'Alert' | 'Reminder' | 'Schedule';

@@ -231,4 +231,36 @@ router.delete('/users/:id', auth, async (req, res) => {
   }
 });
 
+// GET CURRENT USER
+router.get('/me', auth, async (req, res) => {
+  try {
+    const user = await User.findById(req.user.id).select('-pin');
+    if (!user) return res.status(404).json({ message: 'User not found' });
+    res.json(user);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
+// UPDATE PROFILE (Self)
+router.put('/profile', auth, async (req, res) => {
+  const { eSignatureUrl } = req.body;
+  try {
+    const user = await User.findById(req.user.id);
+    if (!user) return res.status(404).json({ message: 'User not found' });
+
+    if (eSignatureUrl !== undefined) user.eSignatureUrl = eSignatureUrl;
+
+    await user.save();
+    await cache.refreshUserCache();
+
+    const userData = user.toObject();
+    delete userData.pin;
+
+    res.json({ message: 'Profile updated successfully', user: userData });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
 module.exports = router;

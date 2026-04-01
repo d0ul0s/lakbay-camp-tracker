@@ -66,7 +66,7 @@ function updateCache(state: any, updates: any) {
 
 interface AppState {
   // Auth State
-  currentUser: { _id?: string; role: UserRole; church: string | null; permissionMatrix?: PermissionMatrix } | null;
+  currentUser: { _id?: string; role: UserRole; church: string | null; permissionMatrix?: PermissionMatrix; eSignatureUrl?: string } | null;
   login: (user: { _id?: string; role: UserRole; church: string | null; permissionMatrix?: PermissionMatrix }) => void;
   logout: () => void;
   refreshPermissions: () => Promise<void>;

@@ -1,7 +1,7 @@
 import React, { useRef, useState, useEffect } from 'react';
 import api from '../api/axios';
 import { useAppStore } from '../store';
-import { Database, Download, Upload, AlertTriangle, Plus, Trash2, Image as ImageIcon, ChevronRight, X, FileText } from 'lucide-react';
+import { Database, Download, Upload, AlertTriangle, Plus, Trash2, Image as ImageIcon, ChevronRight, X, FileText, Save, Loader2 } from 'lucide-react';
 import ConfirmModal from '../components/ConfirmModal';
 import { LAKBAY_THEMES, getChurchVibrantColor } from '../utils/churchColorUtils';
 
@@ -9,18 +9,21 @@ export default function Settings() {
   const { currentUser, appSettings, fetchGlobalSettings } = useAppStore();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const photoInputRef = useRef<HTMLInputElement>(null);
+  const logoInputRef = useRef<HTMLInputElement>(null);
   const [importStatus, setImportStatus] = useState<{ type: 'success' | 'error' | null, msg: string }>({ type: null, msg: '' });
   const [photoError, setPhotoError] = useState('');
-  
+  const [logoError, setLogoError] = useState('');
+  const [isSavingBranding, setIsSavingBranding] = useState(false);
+
   const [settings, setSettings] = useState<any>(null);
-  
+
   const [addingField, setAddingField] = useState<string | null>(null);
   const [newItemText, setNewItemText] = useState('');
   const [pickingColorFor, setPickingColorFor] = useState<string | null>(null);
 
-  const [confirmModal, setConfirmModal] = useState<{isOpen: boolean, action: () => void, message: string}>({
+  const [confirmModal, setConfirmModal] = useState<{ isOpen: boolean, action: () => void, message: string }>({
     isOpen: false,
-    action: () => {},
+    action: () => { },
     message: ''
   });
 
@@ -29,22 +32,22 @@ export default function Settings() {
     if (appSettings) {
       setSettings(appSettings);
     }
-    
+
     // Always trigger a silent refresh
     fetchGlobalSettings(true);
   }, []);
 
   useEffect(() => {
-    // Update local settings when store arrives (if not currently adding/deleting)
-    if (appSettings && !addingField) {
+    // Update local settings when store arrives (if not currently adding/deleting/saving)
+    if (appSettings && !addingField && !isSavingBranding) {
       setSettings(appSettings);
     }
-  }, [appSettings, addingField]);
-  
+  }, [appSettings, addingField, isSavingBranding]);
+
   if (currentUser?.role !== 'admin') {
     return null;
   }
-  
+
   const handleExport = async () => {
     try {
       setImportStatus({ type: null, msg: '' });
@@ -55,16 +58,16 @@ export default function Settings() {
       link.href = URL.createObjectURL(blob);
       link.download = `LAKBAY_Backup_${new Date().toISOString().split('T')[0]}.json`;
       link.click();
-    } catch(err) {
+    } catch (err) {
       console.error(err);
       setImportStatus({ type: 'error', msg: 'Failed to export backup.' });
     }
   };
-  
+
   const handleImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    
+
     setConfirmModal({
       isOpen: true,
       message: 'Uploading a JSON backup file will permanently overwrite all current system data. This action cannot be undone.',
@@ -98,6 +101,7 @@ export default function Settings() {
         [field]: newArray
       });
       setSettings(res.data);
+      await fetchGlobalSettings(true);
     } catch (err) {
       console.error(err);
     }
@@ -148,14 +152,14 @@ export default function Settings() {
   const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    
+
     if (file.size > 2 * 1024 * 1024) {
       setPhotoError('File size exceeds 2MB limit. Please upload a smaller image.');
       if (photoInputRef.current) photoInputRef.current.value = '';
       return;
     }
     setPhotoError('');
-    
+
     const reader = new FileReader();
     reader.onload = async (event) => {
       try {
@@ -173,13 +177,66 @@ export default function Settings() {
     if (photoInputRef.current) photoInputRef.current.value = '';
   };
 
-  const handleUpdateBranding = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > 2 * 1024 * 1024) {
+      setLogoError('File size exceeds 2MB limit.');
+      if (logoInputRef.current) logoInputRef.current.value = '';
+      return;
+    }
+    setLogoError('');
+
+    const reader = new FileReader();
+    reader.onload = async (event) => {
+      try {
+        const base64 = event.target?.result as string;
+        const res = await api.put('/api/settings', {
+          logoUrl: base64
+        });
+        setSettings(res.data);
+        await fetchGlobalSettings(true);
+      } catch (err) {
+        setLogoError('Error saving logo: ' + (err as any).message);
+      }
+    };
+    reader.readAsDataURL(file);
+    if (logoInputRef.current) logoInputRef.current.value = '';
+  };
+
+  const handleUpdateBranding = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
     setSettings((prev: any) => ({ ...prev, [name]: value }));
+  };
+
+  const handleSaveBranding = async () => {
+    if (!settings) return;
+    setIsSavingBranding(true);
     try {
-      await api.put('/api/settings', { [name]: value });
+      const res = await api.put('/api/settings', {
+        campName: settings.campName,
+        churchName: settings.churchName,
+        campDate: settings.campDate,
+        campLocation: settings.campLocation,
+        campSignatory: settings.campSignatory,
+        waiverTemplate: settings.waiverTemplate,
+        solicitationTemplate: settings.solicitationTemplate,
+        logoUrl: settings.logoUrl
+      });
+      
+      // Update local state and store with the actual persisted data
+      setSettings(res.data);
+      await fetchGlobalSettings(true);
+      
+      const { toast } = await import('react-hot-toast');
+      toast.success('Branding & Templates saved successfully!');
     } catch (err) {
-      console.error('Failed to update branding', err);
+      console.error('Failed to save branding', err);
+      const { toast } = await import('react-hot-toast');
+      toast.error('Failed to save branding. Please try again.');
+    } finally {
+      setIsSavingBranding(false);
     }
   };
 
@@ -192,45 +249,45 @@ export default function Settings() {
       <div className="bg-white p-5 rounded-2xl shadow-sm border border-brand-beige">
         <h3 className="text-xl font-black text-brand-brown mb-1 leading-tight">{title}</h3>
         <p className="text-gray-400 text-[10px] font-bold uppercase tracking-wider mb-4 leading-tight">{description}</p>
-        
+
         <div className="space-y-2 mb-4">
           {items.map((item: string, idx: number) => (
             <div key={idx} className="flex justify-between items-center bg-gray-50 p-4 rounded-xl border border-gray-100 shadow-sm relative group/item">
               <div className="flex items-center gap-3">
                 {isChurchList && (
-                   <div className="relative">
-                      <button 
-                         onClick={() => setPickingColorFor(pickingColorFor === item ? null : item)}
-                         className={`w-6 h-6 rounded-full border-2 border-white shadow-sm ring-1 ring-black/5 hover:scale-110 active:scale-95 transition-all flex items-center justify-center ${getChurchVibrantColor(item, settings?.churchColors)}`}
-                         title="Change church color theme"
-                      >
-                        <ChevronRight size={10} className={`text-white/50 transition-transform ${pickingColorFor === item ? 'rotate-90' : ''}`} />
-                      </button>
+                  <div className="relative">
+                    <button
+                      onClick={() => setPickingColorFor(pickingColorFor === item ? null : item)}
+                      className={`w-6 h-6 rounded-full border-2 border-white shadow-sm ring-1 ring-black/5 hover:scale-110 active:scale-95 transition-all flex items-center justify-center ${getChurchVibrantColor(item, settings?.churchColors)}`}
+                      title="Change church color theme"
+                    >
+                      <ChevronRight size={10} className={`text-white/50 transition-transform ${pickingColorFor === item ? 'rotate-90' : ''}`} />
+                    </button>
 
-                      {pickingColorFor === item && (
-                        <>
-                          <div className="fixed inset-0 z-[100]" onClick={() => setPickingColorFor(null)}></div>
-                          <div className="absolute left-0 top-full mt-3 bg-white border border-gray-200 rounded-2xl shadow-xl z-[110] p-3 grid grid-cols-6 gap-2 w-56 animate-in fade-in zoom-in-95 duration-200">
-                             <div className="col-span-6 mb-1 px-1 border-b pb-1 flex justify-between items-center">
-                                <p className="text-[9px] font-black uppercase text-gray-400 tracking-widest">Select Theme</p>
-                                <button onClick={() => setPickingColorFor(null)} className="text-gray-300 hover:text-gray-500"><X size={12} /></button>
-                             </div>
-                             {LAKBAY_THEMES.map(theme => (
-                               <button 
-                                 key={theme.id}
-                                 onClick={() => handleUpdateChurchColor(item, theme.id)}
-                                 className={`w-7 h-7 rounded-lg border-2 border-white shadow-sm ring-1 ring-black/5 hover:scale-110 active:scale-90 transition-all ${theme.vibrant} ${settings?.churchColors?.[item] === theme.id ? 'ring-2 ring-brand-brown ring-offset-1' : ''}`}
-                                 title={theme.name}
-                               />
-                             ))}
+                    {pickingColorFor === item && (
+                      <>
+                        <div className="fixed inset-0 z-[100]" onClick={() => setPickingColorFor(null)}></div>
+                        <div className="absolute left-0 top-full mt-3 bg-white border border-gray-200 rounded-2xl shadow-xl z-[110] p-3 grid grid-cols-6 gap-2 w-56 animate-in fade-in zoom-in-95 duration-200">
+                          <div className="col-span-6 mb-1 px-1 border-b pb-1 flex justify-between items-center">
+                            <p className="text-[9px] font-black uppercase text-gray-400 tracking-widest">Select Theme</p>
+                            <button onClick={() => setPickingColorFor(null)} className="text-gray-300 hover:text-gray-500"><X size={12} /></button>
                           </div>
-                        </>
-                      )}
-                   </div>
+                          {LAKBAY_THEMES.map(theme => (
+                            <button
+                              key={theme.id}
+                              onClick={() => handleUpdateChurchColor(item, theme.id)}
+                              className={`w-7 h-7 rounded-lg border-2 border-white shadow-sm ring-1 ring-black/5 hover:scale-110 active:scale-90 transition-all ${theme.vibrant} ${settings?.churchColors?.[item] === theme.id ? 'ring-2 ring-brand-brown ring-offset-1' : ''}`}
+                              title={theme.name}
+                            />
+                          ))}
+                        </div>
+                      </>
+                    )}
+                  </div>
                 )}
                 <span className="font-bold text-gray-700 text-sm">{item}</span>
               </div>
-              <button 
+              <button
                 onClick={() => handleRemoveItem(field, idx)}
                 className="text-gray-300 hover:text-red-500 transition-colors p-2 bg-white rounded-lg shadow-sm border border-gray-100 active:bg-red-50"
               >
@@ -245,8 +302,8 @@ export default function Settings() {
 
         {isAdding ? (
           <div className="flex flex-col gap-2">
-            <input 
-              type="text" 
+            <input
+              type="text"
               autoFocus
               value={newItemText}
               onChange={e => setNewItemText(e.target.value)}
@@ -258,13 +315,13 @@ export default function Settings() {
               }}
             />
             <div className="flex gap-2">
-              <button 
+              <button
                 onClick={() => handleAddItem(field)}
                 className="flex-1 bg-brand-brown text-white py-3 rounded-xl font-black uppercase text-xs tracking-widest hover:bg-brand-light-brown active:scale-[0.98] transition-all"
               >
                 Save Item
               </button>
-              <button 
+              <button
                 onClick={() => { setAddingField(null); setNewItemText(''); }}
                 className="px-6 py-3 rounded-xl border border-gray-200 text-gray-500 font-bold text-xs uppercase tracking-widest hover:bg-gray-50 transition-all font-display"
               >
@@ -273,7 +330,7 @@ export default function Settings() {
             </div>
           </div>
         ) : (
-          <button 
+          <button
             onClick={() => { setAddingField(field); setNewItemText(''); }}
             className="w-full flex items-center justify-center gap-2 bg-brand-sand/30 text-brand-brown py-3 rounded-xl font-black uppercase text-xs tracking-widest border border-brand-sand/50 active:scale-[0.98] transition-all"
           >
@@ -290,116 +347,175 @@ export default function Settings() {
 
       {/* Camp Official Branding */}
       <div className="bg-white p-6 rounded-[2rem] shadow-xl shadow-brand-sand/20 border border-brand-beige mb-8 relative overflow-hidden group">
-         <div className="absolute top-0 right-0 p-8 opacity-5 group-hover:scale-110 transition-transform pointer-events-none">
-            <ImageIcon size={100} className="text-brand-brown" />
-         </div>
+        <div className="absolute top-0 right-0 p-8 opacity-5 group-hover:scale-110 transition-transform pointer-events-none">
+          <ImageIcon size={100} className="text-brand-brown" />
+        </div>
 
-         <div className="relative z-10">
-            <div className="flex items-center gap-3 mb-6">
-               <div className="p-3 bg-brand-brown text-white rounded-2xl shadow-lg">
-                  <Database size={24} />
-               </div>
-               <div>
-                  <h3 className="text-2xl font-display text-brand-brown">Camp Official Details</h3>
-                  <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Global Branding for Document Generation</p>
-               </div>
+        <div className="relative z-10">
+          <div className="flex items-center gap-3 mb-6">
+            <div className="p-3 bg-brand-brown text-white rounded-2xl shadow-lg">
+              <Database size={24} />
+            </div>
+            <div>
+              <h3 className="text-2xl font-display text-brand-brown">Camp Official Details</h3>
+              <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Global Branding for Document Generation</p>
+            </div>
+          </div>
+
+          {/* Official Logo Section */}
+          <div className="mb-6 p-4 bg-brand-cream/10 rounded-2xl border border-brand-sand/30">
+            <div className="flex flex-col sm:flex-row items-center gap-4">
+              <div className="w-20 h-20 rounded-2xl bg-white border-2 border-brand-sand/30 flex items-center justify-center overflow-hidden shrink-0 shadow-sm transition-transform hover:scale-105">
+                {settings?.logoUrl ? (
+                  <img src={settings.logoUrl} alt="Logo" className="w-16 h-16 object-contain" />
+                ) : (
+                  <ImageIcon size={32} className="text-brand-sand" />
+                )}
+              </div>
+              <div className="flex-1 space-y-2 text-center sm:text-left">
+                <p className="text-[10px] font-black text-brand-brown uppercase tracking-widest">Official Organization Logo</p>
+                <p className="text-[9px] text-gray-400 font-bold uppercase leading-tight italic">Visible on all generated waivers and solicitation letters.</p>
+                <div className="flex items-center justify-center sm:justify-start gap-2">
+                  <input
+                    type="file"
+                    ref={logoInputRef}
+                    className="hidden"
+                    accept="image/*"
+                    onChange={handleLogoUpload}
+                  />
+                  <button
+                    onClick={() => logoInputRef.current?.click()}
+                    className="text-[9px] font-black uppercase bg-brand-brown text-white px-4 py-2 rounded-lg hover:bg-brand-light-brown transition-all shadow-sm"
+                  >
+                    {settings?.logoUrl ? 'Update Logo' : 'Upload Logo'}
+                  </button>
+                  {settings?.logoUrl && (
+                    <button
+                      onClick={async () => {
+                        try {
+                          const res = await api.put('/api/settings', { logoUrl: null });
+                          setSettings(res.data);
+                          await fetchGlobalSettings(true);
+                        } catch (err) { console.error(err); }
+                      }}
+                      className="text-[9px] font-black uppercase bg-white border border-red-200 text-red-500 px-4 py-2 rounded-lg hover:bg-red-50 transition-all"
+                    >
+                      Remove
+                    </button>
+                  )}
+                </div>
+                {logoError && <p className="text-[9px] font-bold text-red-500 uppercase mt-1">{logoError}</p>}
+              </div>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+            <div className="space-y-1.5">
+              <label className="text-[10px] font-black text-brand-light-brown uppercase tracking-widest ml-1">Camp Name</label>
+              <input
+                name="campName"
+                value={settings?.campName || ''}
+                onChange={handleUpdateBranding}
+                placeholder="e.g. LAKBAY 2026"
+                className="w-full px-5 py-4 rounded-2xl bg-brand-cream/30 border border-brand-sand/30 focus:border-brand-brown focus:bg-white outline-none transition-all font-bold text-brand-brown placeholder:text-gray-300"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-[10px] font-black text-brand-light-brown uppercase tracking-widest ml-1">Organization / Church</label>
+              <input
+                name="churchName"
+                value={settings?.churchName || ''}
+                onChange={handleUpdateBranding}
+                placeholder="e.g. Jesus Alliance Mission"
+                className="w-full px-5 py-4 rounded-2xl bg-brand-cream/30 border border-brand-sand/30 focus:border-brand-brown focus:bg-white outline-none transition-all font-bold text-brand-brown placeholder:text-gray-300"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-[10px] font-black text-brand-light-brown uppercase tracking-widest ml-1">Camp Dates</label>
+              <input
+                name="campDate"
+                value={settings?.campDate || ''}
+                onChange={handleUpdateBranding}
+                placeholder="e.g. April 15-18, 2026"
+                className="w-full px-5 py-4 rounded-2xl bg-brand-cream/30 border border-brand-sand/30 focus:border-brand-brown focus:bg-white outline-none transition-all font-bold text-brand-brown placeholder:text-gray-300"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-[10px] font-black text-brand-light-brown uppercase tracking-widest ml-1">Camp Location / Venue</label>
+              <input
+                name="campLocation"
+                value={settings?.campLocation || ''}
+                onChange={handleUpdateBranding}
+                placeholder="e.g. Lipit-Tomeeng, San Fabian, Pangasinan"
+                className="w-full px-5 py-4 rounded-2xl bg-brand-cream/30 border border-brand-sand/30 focus:border-brand-brown focus:bg-white outline-none transition-all font-bold text-brand-brown placeholder:text-gray-300"
+              />
+            </div>
+            <div className="space-y-1.5 md:col-span-2">
+              <label className="text-[10px] font-black text-brand-light-brown uppercase tracking-widest ml-1">Camp Signatory / Coordinator</label>
+              <input
+                name="campSignatory"
+                value={settings?.campSignatory || ''}
+                onChange={handleUpdateBranding}
+                placeholder="Name of Camp Director or Authorized Person"
+                className="w-full px-5 py-4 rounded-2xl bg-brand-cream/30 border border-brand-sand/30 focus:border-brand-brown focus:bg-white outline-none transition-all font-bold text-brand-brown placeholder:text-gray-300"
+              />
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-               <div className="space-y-1.5 truncate">
-                  <label className="text-[10px] font-black text-brand-light-brown uppercase tracking-widest ml-1">Event Name</label>
-                  <input 
-                    name="campName"
-                    value={settings?.campName || ''}
-                    onChange={handleUpdateBranding}
-                    placeholder="e.g. LAKBAY 2026"
-                    className="w-full px-5 py-4 rounded-2xl bg-brand-cream/30 border border-brand-sand/30 focus:border-brand-brown focus:bg-white outline-none transition-all font-bold text-brand-brown placeholder:text-gray-300"
-                  />
-               </div>
-               <div className="space-y-1.5 truncate">
-                  <label className="text-[10px] font-black text-brand-light-brown uppercase tracking-widest ml-1">Organization / Church</label>
-                  <input 
-                    name="churchName"
-                    value={settings?.churchName || ''}
-                    onChange={handleUpdateBranding}
-                    placeholder="e.g. United Pentecostal Church"
-                    className="w-full px-5 py-4 rounded-2xl bg-brand-cream/30 border border-brand-sand/30 focus:border-brand-brown focus:bg-white outline-none transition-all font-bold text-brand-brown placeholder:text-gray-300"
-                  />
-               </div>
-               <div className="space-y-1.5 truncate">
-                  <label className="text-[10px] font-black text-brand-light-brown uppercase tracking-widest ml-1">Dates</label>
-                  <input 
-                    name="campDate"
-                    value={settings?.campDate || ''}
-                    onChange={handleUpdateBranding}
-                    placeholder="e.g. April 15-18, 2026"
-                    className="w-full px-5 py-4 rounded-2xl bg-brand-cream/30 border border-brand-sand/30 focus:border-brand-brown focus:bg-white outline-none transition-all font-bold text-brand-brown placeholder:text-gray-300"
-                  />
-               </div>
-               <div className="space-y-1.5 truncate">
-                  <label className="text-[10px] font-black text-brand-light-brown uppercase tracking-widest ml-1">Location / Venue</label>
-                  <input 
-                    name="campLocation"
-                    value={settings?.campLocation || ''}
-                    onChange={handleUpdateBranding}
-                    placeholder="e.g. Garden of Gethsemane, Bataan"
-                    className="w-full px-5 py-4 rounded-2xl bg-brand-cream/30 border border-brand-sand/30 focus:border-brand-brown focus:bg-white outline-none transition-all font-bold text-brand-brown placeholder:text-gray-300"
-                  />
-               </div>
-               <div className="space-y-1.5 md:col-span-2 truncate">
-                  <label className="text-[10px] font-black text-brand-light-brown uppercase tracking-widest ml-1">Official Signatory / Coordinator</label>
-                  <input 
-                    name="campSignatory"
-                    value={settings?.campSignatory || ''}
-                    onChange={handleUpdateBranding}
-                    placeholder="Name of Camp Director or Authorized Person"
-                    className="w-full px-5 py-4 rounded-2xl bg-brand-cream/30 border border-brand-sand/30 focus:border-brand-brown focus:bg-white outline-none transition-all font-bold text-brand-brown placeholder:text-gray-300"
-                  />
-               </div>
+            {/* Official Document Templates */}
+            <div className="md:col-span-2 mt-4 pt-6 border-t border-brand-sand/20 space-y-6">
+              <div className="flex items-center gap-2 mb-2">
+                <FileText size={16} className="text-brand-brown" />
+                <h4 className="text-xs font-black uppercase text-brand-brown tracking-[0.2em]">Official Document Templates</h4>
+              </div>
 
-               {/* Official Document Templates */}
-               <div className="md:col-span-2 mt-4 pt-6 border-t border-brand-sand/20 space-y-6">
-                  <div className="flex items-center gap-2 mb-2">
-                     <FileText size={16} className="text-brand-brown" />
-                     <h4 className="text-xs font-black uppercase text-brand-brown tracking-[0.2em]">Official Document Templates</h4>
+              <div className="grid grid-cols-1 gap-6">
+                <div className="space-y-2">
+                  <div className="flex justify-between items-end px-1">
+                    <label className="text-[10px] font-black text-brand-light-brown uppercase tracking-widest">Default Parent Consent Text</label>
+                    <span className="text-[8px] font-bold text-brand-brown/50 uppercase tracking-tighter">Use {"{{name}}"}, {"{{church}}"}</span>
                   </div>
-                  
-                  <div className="grid grid-cols-1 gap-6">
-                     <div className="space-y-2">
-                        <div className="flex justify-between items-end px-1">
-                           <label className="text-[10px] font-black text-brand-light-brown uppercase tracking-widest">Default Waiver Text</label>
-                           <span className="text-[8px] font-bold text-brand-brown/50 uppercase tracking-tighter">Use {"{{name}}"}, {"{{church}}"}</span>
-                        </div>
-                        <textarea 
-                          name="waiverTemplate"
-                          value={settings?.waiverTemplate || ''}
-                          onChange={(e: any) => handleUpdateBranding(e)}
-                          rows={4}
-                          placeholder="I, {{name}}, hereby voluntarily participate in..."
-                          className="w-full px-5 py-4 rounded-2xl bg-brand-cream/20 border border-brand-sand/20 focus:border-brand-brown focus:bg-white outline-none transition-all font-bold text-brand-brown placeholder:text-gray-300 text-sm leading-relaxed"
-                        />
-                     </div>
-                     
-                     <div className="space-y-2">
-                        <div className="flex justify-between items-end px-1">
-                           <label className="text-[10px] font-black text-brand-light-brown uppercase tracking-widest">Solicitation Letter Body</label>
-                           <span className="text-[8px] font-bold text-brand-brown/50 uppercase tracking-tighter">Use {"{{name}}"}, {"{{amount}}"}, {"{{camp_name}}"}</span>
-                        </div>
-                        <textarea 
-                          name="solicitationTemplate"
-                          value={settings?.solicitationTemplate || ''}
-                          onChange={(e: any) => handleUpdateBranding(e)}
-                          rows={6}
-                          placeholder="Greetings! We are writing to you in anticipation of {{camp_name}}..."
-                          className="w-full px-5 py-4 rounded-2xl bg-brand-cream/20 border border-brand-sand/20 focus:border-brand-brown focus:bg-white outline-none transition-all font-bold text-brand-brown placeholder:text-gray-300 text-sm leading-relaxed"
-                        />
-                     </div>
+                  <textarea
+                    name="waiverTemplate"
+                    value={settings?.waiverTemplate || ''}
+                    onChange={(e: any) => handleUpdateBranding(e)}
+                    rows={4}
+                    placeholder="I, _________________________, parent/legal guardian of {{name}}, hereby..."
+                    className="w-full px-5 py-4 rounded-2xl bg-brand-cream/20 border border-brand-sand/20 focus:border-brand-brown focus:bg-white outline-none transition-all font-bold text-brand-brown placeholder:text-gray-300 text-sm leading-relaxed"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <div className="flex justify-between items-end px-1">
+                    <label className="text-[10px] font-black text-brand-light-brown uppercase tracking-widest">Solicitation Letter Body</label>
+                    <span className="text-[8px] font-bold text-brand-brown/50 uppercase tracking-tighter">Use {"{{name}}"}, {"{{amount}}"}, {"{{camp_name}}"}</span>
                   </div>
-               </div>
+                  <textarea
+                    name="solicitationTemplate"
+                    value={settings?.solicitationTemplate || ''}
+                    onChange={(e: any) => handleUpdateBranding(e)}
+                    rows={6}
+                    placeholder="Greetings! We are writing to you in anticipation of {{camp_name}}..."
+                    className="w-full px-5 py-4 rounded-2xl bg-brand-cream/20 border border-brand-sand/20 focus:border-brand-brown focus:bg-white outline-none transition-all font-bold text-brand-brown placeholder:text-gray-300 text-sm leading-relaxed"
+                  />
+                </div>
+              </div>
             </div>
-         </div>
+
+            {/* Save Branding Button */}
+            <div className="md:col-span-2 flex justify-end mt-8">
+              <button 
+                onClick={handleSaveBranding}
+                disabled={isSavingBranding}
+                className="flex items-center gap-2 bg-brand-brown text-white px-8 py-4 rounded-2xl shadow-xl hover:bg-brand-light-brown font-black uppercase text-xs tracking-[0.2em] transition-all disabled:opacity-50 active:scale-[0.98]"
+              >
+                {isSavingBranding ? <Loader2 size={18} className="animate-spin" /> : <Save size={18} />}
+                Save Branding Details
+              </button>
+            </div>
+          </div>
+        </div>
       </div>
-      
+
       {/* List Configurations */}
       {settings && (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -433,14 +549,14 @@ export default function Settings() {
 
         <div className="flex flex-col md:flex-row gap-6 mt-6">
           <div className="flex-1">
-            <input 
-              type="file" 
-              accept="image/png, image/jpeg, image/webp" 
-              className="hidden" 
+            <input
+              type="file"
+              accept="image/png, image/jpeg, image/webp"
+              className="hidden"
               ref={photoInputRef}
               onChange={handlePhotoUpload}
             />
-            <button 
+            <button
               onClick={() => photoInputRef.current?.click()}
               className="flex items-center justify-center gap-2 bg-white text-brand-brown border-2 border-brand-beige w-full md:w-auto px-6 py-3 rounded-lg font-bold hover:bg-brand-cream transition-colors"
             >
@@ -448,7 +564,7 @@ export default function Settings() {
             </button>
             <p className="text-xs text-gray-400 mt-3">Accepts JPG, PNG, WEBP.</p>
           </div>
-          
+
           <div className="flex-1 border-2 border-dashed border-gray-200 rounded-xl flex items-center justify-center bg-gray-50 min-h-[200px] overflow-hidden">
             {settings?.shirtSizePhoto ? (
               <img src={settings.shirtSizePhoto} alt="Shirt Size Spec" className="max-h-[300px] object-contain" />
@@ -473,40 +589,40 @@ export default function Settings() {
             <p className="text-gray-500 text-sm mt-1">Export and import the full system state as JSON. Since this app runs completely offline in your browser, it is highly recommended to export a backup regularly.</p>
           </div>
         </div>
-        
+
         {importStatus.type && (
           <div className={`p-4 rounded-xl mb-6 flex items-start gap-3 ${importStatus.type === 'success' ? 'bg-green-50 text-green-800' : 'bg-red-50 text-red-800'}`}>
             <AlertTriangle size={20} className="mt-0.5 shrink-0" />
             <p className="font-medium">{importStatus.msg}</p>
           </div>
         )}
-        
+
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div className="border border-gray-100 bg-gray-50 p-6 rounded-xl relative overflow-hidden group hover:border-brand-sand transition-colors">
             <h4 className="font-bold text-gray-800 mb-2">Export Backup</h4>
             <p className="text-sm text-gray-500 mb-6 font-medium">Downloads a JSON snapshot containing all users, registrants, merch claims, expenses, and configuration exactly as they are currently.</p>
-            
-            <button 
+
+            <button
               onClick={handleExport}
               className="flex items-center justify-center gap-2 bg-brand-brown text-white w-full py-3 rounded-lg font-bold hover:bg-brand-light-brown transition-colors shadow-sm"
             >
               <Download size={18} /> Download JSON
             </button>
           </div>
-          
+
           <div className="border border-red-100 bg-red-50/30 p-6 rounded-xl relative overflow-hidden transition-colors">
             <h4 className="font-bold text-red-800 mb-2 flex items-center gap-2">Restore Backup <AlertTriangle size={16} /></h4>
             <p className="text-sm text-red-600/80 mb-6 font-medium">Uploading a JSON backup file will <strong className="text-red-700">permanently overwrite</strong> all current system data. This action cannot be undone.</p>
-            
-            <input 
-              type="file" 
-              accept=".json" 
-              className="hidden" 
+
+            <input
+              type="file"
+              accept=".json"
+              className="hidden"
               ref={fileInputRef}
               onChange={handleImport}
             />
-            
-            <button 
+
+            <button
               onClick={() => fileInputRef.current?.click()}
               className="flex items-center justify-center gap-2 bg-white text-red-600 border-2 border-red-200 w-full py-3 rounded-lg font-bold hover:bg-red-50 transition-colors"
             >
@@ -516,7 +632,7 @@ export default function Settings() {
         </div>
       </div>
 
-      <ConfirmModal 
+      <ConfirmModal
         isOpen={confirmModal.isOpen}
         title="Confirm Action"
         message={confirmModal.message}
