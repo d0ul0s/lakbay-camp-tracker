@@ -373,7 +373,7 @@ export default function TribeSorter() {
 
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
-      <header className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+      <header className="flex flex-col md:flex-row md:items-center justify-between gap-4 print:hidden">
         <div>
           <div className="flex items-center gap-4 mb-1">
             <h2 className="text-3xl md:text-4xl font-display text-brand-brown tracking-wide flex items-center gap-3">
@@ -427,7 +427,7 @@ export default function TribeSorter() {
       </header>
 
       {/* Main Tabs */}
-      <div className="flex items-center gap-1 p-1 bg-brand-sand/10 rounded-2xl w-full sm:w-fit mb-4">
+      <div className="flex items-center gap-1 p-1 bg-brand-sand/10 rounded-2xl w-full sm:w-fit mb-4 print:hidden">
         {[
           { id: 'grading', label: '1. Grade Participants', icon: <ClipboardList size={18} /> },
           { id: 'sorter', label: '2. Generate Tribes', icon: <Zap size={18} /> },
@@ -447,7 +447,7 @@ export default function TribeSorter() {
         ))}
       </div>
 
-      <div className="min-h-[600px]">
+      <div className="min-h-[600px] print:hidden">
         {isLoading ? (
           <div className="flex items-center justify-center p-24">
              <div className="flex flex-col items-center gap-4">
@@ -896,9 +896,6 @@ export default function TribeSorter() {
       {/* Hidden Print Area */}
       <style>{`
         @media print {
-          body * { visibility: hidden; }
-          #print-area, #print-area * { visibility: visible; }
-          #print-area { position: absolute; left: 0; top: 0; width: 100%; }
           .no-print { display: none !important; }
         }
       `}</style>

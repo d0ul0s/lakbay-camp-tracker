@@ -65,7 +65,7 @@ export default function DocumentGenerator() {
     const dateStr = format(new Date(), 'MMMM dd, yyyy');
 
     return (
-      <div className="bg-white p-12 md:p-16 min-h-[1056px] w-[816px] shadow-2xl mx-auto border border-gray-100 flex flex-col font-serif relative overflow-hidden print:shadow-none print:border-none print:m-0 print:w-full print:min-h-0 page-break-after-always">
+      <div className="bg-white p-12 md:p-16 min-h-[1055px] w-[816px] shadow-2xl mx-auto border border-gray-100 flex flex-col font-serif relative overflow-hidden print:shadow-none print:border-none print:m-0 print:w-full print:min-h-0 print:h-auto">
 
         {/* OFFICIAL HEADER */}
         <div className="text-center border-b-2 border-brand-brown pb-6 mb-8 shrink-0">
@@ -183,7 +183,7 @@ export default function DocumentGenerator() {
   };
 
   return (
-    <div className="min-h-screen">
+    <div className="min-h-screen print:min-h-0">
       {/* UI Mode (Display: not print) */}
       <div className="print:hidden space-y-6 max-w-7xl mx-auto pb-20 animate-in fade-in duration-500">
 
@@ -349,7 +349,7 @@ export default function DocumentGenerator() {
                       activeTab
                     )
                   ) : (
-                    <div className="bg-white p-16 min-h-[1056px] w-[816px] shadow-2xl mx-auto flex flex-col items-center justify-center text-center opacity-30">
+                    <div className="bg-white p-16 min-h-[1055px] w-[816px] shadow-2xl mx-auto flex flex-col items-center justify-center text-center opacity-30">
                       <Printer size={80} className="mb-6 text-brand-sand" />
                       <h3 className="text-3xl font-display text-brand-brown">Select Records</h3>
                       <p className="text-sm font-bold uppercase tracking-widest text-gray-400 mt-2">A preview will appear here</p>
@@ -364,28 +364,29 @@ export default function DocumentGenerator() {
       </div>
 
       {/* PRINT-ONLY CONTAINER (Invisible in UI) */}
-      <div className="hidden print:block absolute top-0 left-0 w-full font-serif">
+      <div className="hidden print:block w-full font-serif">
         {activeTab === 'blank' ? (
           renderDocument({}, 'blank')
         ) : (
-          Array.from(selectedIds).map(id => {
+          Array.from(selectedIds).map((id, index) => {
             const item = activeTab === 'waiver'
               ? registrants.find(r => (r.id || (r as any)._id) === id)
               : solicitations.find(s => (s.id || (s as any)._id) === id);
-            return renderDocument(item, activeTab);
+            return (
+              <div key={id} className={index > 0 ? "page-break-before-always" : ""}>
+                {renderDocument(item, activeTab)}
+              </div>
+            );
           })
         )}
       </div>
 
       <style>{`
         @media print {
-          body * { visibility: hidden; }
-          .print\\:block, .print\\:block * { visibility: visible; }
-          .print\\:block { position: absolute; left: 0; top: 0; width: 100%; }
           @page { size: portrait; margin: 0; }
         }
-        .page-break-after-always {
-          page-break-after: always;
+        .page-break-before-always {
+          page-break-before: always;
         }
       `}</style>
     </div>

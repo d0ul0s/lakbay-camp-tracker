@@ -120,6 +120,24 @@ interface AppState {
 
   hasBooted: boolean;
   hasSyncedLive: boolean;
+
+  // Background Export State
+  activeExport: {
+    ids: string[];
+    template: 'waiver' | 'solicitation';
+    progress: { current: number; total: number };
+    isProcessing: boolean;
+    fileName?: string;
+    isManual?: boolean;
+    manualData?: any;
+    startTime?: number | null;
+    estimatedRemainingMsg?: string | null;
+    separateFiles?: boolean;
+  } | null;
+  startExport: (config: { ids: string[]; template: 'waiver' | 'solicitation'; fileName: string; isManual?: boolean; manualData?: any; separateFiles?: boolean }) => void;
+  updateExportProgress: (current: number) => void;
+  updateExportETC: (msg: string | null) => void;
+  clearExport: () => void;
 }
 
 export const useAppStore = create<AppState>()((set) => {
@@ -152,6 +170,31 @@ export const useAppStore = create<AppState>()((set) => {
     hasBooted: !!initialCache,
     hasSyncedLive: false,
     pendingMutations: new Set<string>(),
+    activeExport: null,
+
+    startExport: (config) => set({ 
+      activeExport: { 
+        ...config, 
+        progress: { current: 0, total: config.ids.length || (Array.isArray(config.manualData) ? config.manualData.length : 1) }, 
+        isProcessing: true,
+        startTime: Date.now(),
+        estimatedRemainingMsg: null,
+        separateFiles: !!config.separateFiles
+      } 
+    }),
+    updateExportProgress: (current) => set(state => ({
+      activeExport: state.activeExport ? {
+        ...state.activeExport,
+        progress: { ...state.activeExport.progress, current }
+      } : null
+    })),
+    updateExportETC: (msg) => set(state => ({
+      activeExport: state.activeExport ? {
+        ...state.activeExport,
+        estimatedRemainingMsg: msg
+      } : null
+    })),
+    clearExport: () => set({ activeExport: null }),
 
     setLoading: (loading: boolean) => set({ isLoading: loading }),
     setGlobalError: (error: string | null) => set({ globalError: error }),

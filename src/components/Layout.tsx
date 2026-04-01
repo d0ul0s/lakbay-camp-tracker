@@ -4,9 +4,27 @@ import { LayoutDashboard, Users, ShoppingBag, Receipt, Settings, FileDown, LogOu
 import { useState, useEffect, useRef } from 'react';
 import { io } from 'socket.io-client';
 import { Toaster } from 'react-hot-toast';
+import BackgroundExportEngine from './BackgroundExportEngine';
+import { ShieldCheck, HeartHandshake as HeartIcon } from 'lucide-react';
 
 export default function Layout() {
-  const { currentUser, logout, isLoading, globalError, setGlobalError, refreshPermissions, hasSyncedLive, fetchBootData, syncRegistrant, syncExpense, syncSolicitation, syncAnnouncement, syncSettings } = useAppStore();
+  const { 
+    currentUser, 
+    logout, 
+    isLoading, 
+    globalError, 
+    setGlobalError, 
+    refreshPermissions, 
+    hasSyncedLive, 
+    fetchBootData, 
+    syncRegistrant, 
+    syncExpense, 
+    syncSolicitation, 
+    syncAnnouncement, 
+    syncSettings,
+    activeExport,
+    clearExport
+  } = useAppStore();
   const location = useLocation();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [isSocketConnected, setIsSocketConnected] = useState(false);
@@ -145,9 +163,9 @@ export default function Layout() {
   const moreNav = navigation.filter(item => !primaryNav.some(p => p.href === item.href));
 
   return (
-    <div className="h-[100dvh] w-full overflow-hidden bg-brand-cream flex">
+    <div className="h-[100dvh] w-full overflow-hidden bg-brand-cream flex print:h-auto print:overflow-visible print:bg-white print:block">
       {/* Sidebar Desktop/Tablet */}
-      <aside className="hidden md:flex flex-col md:w-20 xl:w-64 bg-brand-brown text-brand-beige shadow-xl z-20 transition-all duration-300">
+      <aside className="hidden md:flex flex-col md:w-20 xl:w-64 bg-brand-brown text-brand-beige shadow-xl z-20 transition-all duration-300 print:hidden">
         <div className="p-4 xl:p-6 flex flex-col items-center xl:items-start relative group">
           <div className="mb-2">
             <h1 className="hidden xl:block text-3xl xl:text-4xl font-display tracking-[0.2em] text-white mt-1">LAKBAY</h1>
@@ -200,8 +218,8 @@ export default function Layout() {
       </aside>
 
       {/* Mobile main column — NO overflow-hidden here to avoid iOS clipping fixed modals */}
-      <div className="flex-1 flex flex-col min-w-0">
-        <header className="md:hidden bg-brand-brown text-brand-beige p-4 flex items-center justify-between shadow-md z-30 shrink-0">
+      <div className="flex-1 flex flex-col min-w-0 print:block print:overflow-visible">
+        <header className="md:hidden bg-brand-brown text-brand-beige p-4 flex items-center justify-between shadow-md z-30 shrink-0 print:hidden">
           <div className="flex items-center gap-3">
             <img src="/logo.svg" alt="Logo" className="h-10 w-10 object-contain drop-shadow-sm" />
             <div className="flex flex-col justify-center mt-1">
@@ -257,14 +275,14 @@ export default function Layout() {
         )}
 
         {/* Main scrollable content — flex-1 so it fills the space between header and nav */}
-        <main className="flex-1 overflow-y-auto p-4 md:p-8 pb-28 md:pb-8">
-          <div className="max-w-screen-2xl mx-auto w-full">
+        <main className="flex-1 overflow-y-auto p-4 md:p-8 pb-28 md:pb-8 print:p-0 print:overflow-visible text-black">
+          <div className="max-w-screen-2xl mx-auto w-full print:max-w-none print:m-0">
             <Outlet />
           </div>
         </main>
 
         {/* Mobile Bottom Nav — natural flex sibling (NOT fixed) for reliable iOS taps */}
-        <nav className="md:hidden bg-white border-t border-brand-beige flex justify-around items-stretch px-1 safe-area-bottom z-[35] shadow-[0_-4px_10px_rgba(0,0,0,0.05)] shrink-0">
+        <nav className="md:hidden bg-white border-t border-brand-beige flex justify-around items-stretch px-1 safe-area-bottom z-[35] shadow-[0_-4px_10px_rgba(0,0,0,0.05)] shrink-0 print:hidden">
           {primaryNav.map((item) => {
             const isActive = location.pathname === item.href;
             const Icon = item.icon;
@@ -323,6 +341,63 @@ export default function Layout() {
       )}
 
       <Toaster position="top-right" />
+      
+      {/* Background Export Engine (Headless) */}
+      <BackgroundExportEngine />
+
+      {/* Progress Dock (Floating & Compact) */}
+      {activeExport?.isProcessing && (
+        <div className="fixed bottom-6 right-6 z-[60] animate-in slide-in-from-bottom-10 duration-500">
+          <div className="bg-brand-brown/95 backdrop-blur-md border border-white/10 rounded-2xl p-3 shadow-2xl w-[260px] ring-1 ring-black/10 overflow-hidden relative group">
+            {/* Background Glow */}
+            <div className="absolute -top-12 -left-12 w-24 h-24 bg-brand-sand/10 blur-[40px] rounded-full pointer-events-none" />
+            
+            <div className="relative z-10 flex items-center gap-3">
+              <div className="w-8 h-8 rounded-xl bg-brand-sand/20 flex items-center justify-center text-brand-sand animate-pulse shrink-0">
+                {activeExport.template === 'waiver' ? <ShieldCheck size={16} /> : <HeartIcon size={16} />}
+              </div>
+              
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center justify-between gap-2">
+                  <p className="text-white font-display text-[11px] uppercase tracking-tighter truncate leading-none">
+                    {activeExport.template === 'waiver' ? 'Consents' : 'Letters'} • {activeExport.progress.current}/{activeExport.progress.total}
+                  </p>
+                  <div className="text-right shrink-0 flex items-center gap-3">
+                    <div>
+                      <span className="text-brand-sand font-display text-xs leading-none block">
+                        {Math.round((activeExport.progress.current / activeExport.progress.total) * 100)}%
+                      </span>
+                      {activeExport.estimatedRemainingMsg && (
+                        <span className="text-white/40 text-[8px] font-black uppercase tracking-widest mt-1 block">
+                          {activeExport.estimatedRemainingMsg}
+                        </span>
+                      )}
+                    </div>
+                    <button 
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        clearExport();
+                      }}
+                      className="p-1.5 rounded-full hover:bg-white/10 transition-colors pointer-events-auto"
+                      title="Cancel Export"
+                    >
+                      <X className="w-4 h-4 text-white/40 hover:text-white" />
+                    </button>
+                  </div>
+                </div>
+                
+                {/* Slim Progress Bar */}
+                <div className="h-1 w-full bg-white/10 rounded-full overflow-hidden mt-2">
+                  <div 
+                    className="h-full bg-brand-sand transition-all duration-700 ease-out shadow-[0_0_8px_rgba(210,180,140,0.5)]"
+                    style={{ width: `${(activeExport.progress.current / activeExport.progress.total) * 100}%` }}
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

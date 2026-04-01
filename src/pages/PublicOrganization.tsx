@@ -147,8 +147,8 @@ export default function PublicOrganization() {
   }
 
   return (
-    <div className="min-h-screen bg-brand-cream font-sans selection:bg-brand-brown selection:text-white relative">
-      <div className="fixed inset-0 pointer-events-none overflow-hidden opacity-20">
+    <div className="min-h-screen print:min-h-0 bg-brand-cream font-sans selection:bg-brand-brown selection:text-white relative">
+      <div className="fixed inset-0 pointer-events-none overflow-hidden opacity-20 no-print">
         <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] rounded-full bg-brand-sand blur-[120px]"></div>
         <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] rounded-full bg-brand-brown/10 blur-[120px]"></div>
       </div>
@@ -429,7 +429,7 @@ export default function PublicOrganization() {
           .no-print { display: none !important; }
           #print-root { display: block !important; visibility: visible !important; position: static !important; width: 100% !important; margin: 0 !important; padding: 0 !important; }
           #print-root * { visibility: visible !important; color: black !important; border-color: black !important; }
-          .print-page-break { break-after: page; page-break-after: always; margin-bottom: 0 !important; border-bottom: none !important; }
+          .print-page-break { break-before: page; page-break-before: always; margin-top: 0 !important; border-top: none !important; }
         }
       `}</style>
       
@@ -437,7 +437,7 @@ export default function PublicOrganization() {
         {activeTab === 'groups' ? (
           <div className="flex flex-col text-black">
              {groups.map((tribe, tribeIdx) => (
-                <div key={tribe._id} className="print-page-break border-2 border-black p-8 relative min-h-[27.7cm] flex flex-col">
+                <div key={tribe._id} className={`${tribeIdx > 0 ? 'print-page-break' : ''} border-2 border-black p-8 relative min-h-[27.5cm] flex flex-col`}>
                    {/* Per-Page Header */}
                    <div className="bg-black text-white p-6 flex flex-col items-center justify-center text-center mb-10">
                       <h1 className="text-4xl font-bold tracking-[0.2em] uppercase leading-none mb-2">LAKBAY CAMP 2026</h1>

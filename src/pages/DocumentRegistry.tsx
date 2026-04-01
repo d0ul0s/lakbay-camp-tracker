@@ -8,12 +8,33 @@ import {
   Loader2,
   Image,
   ShieldCheck,
+  Download,
+  Plus,
+  XCircle,
+  AlertCircle,
+  Info,
+  HelpCircle,
+  AlertTriangle
 } from 'lucide-react';
 import { useAppStore } from '../store';
 import api from '../api/axios';
 
+// Loaded via local script tag in index.html for hardware-independent reliability
+declare const html2pdf: any;
+
 
 type DocTemplate = 'waiver' | 'solicitation';
+type PopupType = 'alert' | 'confirm' | 'warning' | 'error';
+
+interface PopupConfig {
+  title: string;
+  message: string;
+  type: PopupType;
+  onConfirm?: () => void;
+  onCancel?: () => void;
+  confirmText?: string;
+  cancelText?: string;
+}
 
 const getDefaultSolicitation = () => {
   return `Greetings of peace in Jesus Christ name!
@@ -28,16 +49,28 @@ Respectfully yours,`;
 };
 
 export default function DocumentRegistry() {
-  const { registrants, solicitations, appSettings, fetchGlobalSettings, currentUser } = useAppStore();
+  const {
+    registrants,
+    solicitations,
+    appSettings,
+    fetchGlobalSettings,
+    currentUser,
+    startExport,
+    activeExport
+  } = useAppStore();
+
   const [activeTab, setActiveTab] = useState<DocTemplate>('waiver');
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [searchQuery, setSearchQuery] = useState('');
   const [manualSponsorName, setManualSponsorName] = useState('');
   const [manualSignatoryName, setManualSignatoryName] = useState('');
-  const [showClearConfirm, setShowClearConfirm] = useState(false);
+  const [popup, setPopup] = useState<PopupConfig | null>(null);
   const [isManualExporting, setIsManualExporting] = useState(false);
+  const [isPrintingSelected, setIsPrintingSelected] = useState(false);
+  const [separateFiles, setSeparateFiles] = useState(false);
+  const [manualRecipients, setManualRecipients] = useState<string[]>([]);
   const [detectedYL, setDetectedYL] = useState<string>('');
-  const printRef = useRef<HTMLDivElement>(null);
+
   const manualPrintRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -122,11 +155,11 @@ export default function DocumentRegistry() {
   const filteredData = useMemo(() => {
     const q = searchQuery.toLowerCase();
     if (activeTab === 'waiver') {
-      let list = registrants;
+      let list = registrants.filter(r => (r.church || '').toUpperCase().trim() !== 'JAM');
       if (currentUser?.role === 'coordinator' && currentUser?.church) {
         list = list.filter(r => r.church === currentUser.church);
       }
-      return list.filter(r => r.fullName.toLowerCase().includes(q) || r.church.toLowerCase().includes(q));
+      return list.filter(r => r.fullName.toLowerCase().includes(q) || (r.church || '').toLowerCase().includes(q));
     } else if (activeTab === 'solicitation') {
       return solicitations.filter(s => s.sourceName.toLowerCase().includes(q));
     }
@@ -148,8 +181,99 @@ export default function DocumentRegistry() {
     }
   };
 
-  const handlePrint = () => {
-    window.print();
+  const handlePrint = async () => {
+    // Check for unsaved input
+    if (manualSponsorName.trim() && manualRecipients.length > 0) {
+      setPopup({
+        title: 'Unsaved Recipient',
+        message: `"${manualSponsorName.trim()}" is still in the input field but hasn't been added to your list yet. Print the others anyway?`,
+        type: 'confirm',
+        confirmText: 'Print Anyway',
+        onConfirm: () => {
+          setPopup(null);
+          executePrint();
+        }
+      });
+      return;
+    }
+
+    executePrint();
+  };
+
+  const executePrint = () => {
+    setIsPrintingSelected(true);
+    // Buffer for full document render in the hidden staging area
+    setTimeout(() => {
+      window.print();
+      setIsPrintingSelected(false);
+    }, 600);
+  };
+
+  const handleDownloadPDF = async () => {
+    // Check for unsaved input
+    if (manualSponsorName.trim() && manualRecipients.length > 0) {
+      setPopup({
+        title: 'Unsaved Recipient',
+        message: `"${manualSponsorName.trim()}" is still in the input field but hasn't been added to your list yet. Process the others anyway?`,
+        type: 'confirm',
+        confirmText: 'Process Anyway',
+        onConfirm: () => {
+          setPopup(null);
+          executeDownloadPDF();
+        }
+      });
+      return;
+    }
+
+    executeDownloadPDF();
+  };
+
+  const executeDownloadPDF = async () => {
+    // In solicitation tab, we allow blank prints
+    if (activeTab === 'waiver' && selectedIds.size === 0 && !manualSponsorName) return;
+
+    if (typeof html2pdf === 'undefined') {
+      setPopup({
+        title: 'Engine Loading',
+        message: 'PDF Engine is still loading. Please wait a few seconds.',
+        type: 'warning'
+      });
+      return;
+    }
+
+    const idsToExport = Array.from(selectedIds);
+    const isManualBatch = activeTab === 'solicitation' && manualRecipients.length > 0;
+    const isSingleManual = activeTab === 'solicitation' && selectedIds.size === 0;
+    const isManual = isManualBatch || isSingleManual;
+
+    let fileName = `LAKBAY_BATCH_${selectedIds.size || manualRecipients.length || 1}_DOCS_${new Date().getTime()}.pdf`;
+
+    const manualData = isManualBatch
+      ? manualRecipients.map(name => ({ sourceName: name, manualSignatory: manualSignatoryName }))
+      : (isSingleManual ? { sourceName: manualSponsorName, manualSignatory: manualSignatoryName } : undefined);
+
+    if (isManual && !isManualBatch) {
+      const cleanName = manualSponsorName.replace(/[^a-zA-Z0-9]/g, '_');
+      fileName = `${cleanName}_Solicitation_Letter.pdf`;
+    } else if (selectedIds.size === 1) {
+      const id = idsToExport[0];
+      const item = activeTab === 'waiver'
+        ? registrants.find(r => (r.id || (r as any)._id) === id)
+        : solicitations.find(s => (s.id || (s as any)._id) === id);
+      const rawName = (item as any)?.fullName || (item as any)?.sourceName || 'Export';
+      const cleanName = rawName.replace(/[^a-zA-Z0-9]/g, '_');
+      const suffix = activeTab === 'waiver' ? 'Parent_Consent' : 'Solicitation_Letter';
+      fileName = `${cleanName}_${suffix}.pdf`;
+    }
+
+    startExport({
+      ids: idsToExport,
+      template: activeTab,
+      fileName,
+      isManual,
+      separateFiles,
+      manualData
+    });
   };
 
   const renderDocument = (item: any, type: DocTemplate) => {
@@ -165,13 +289,13 @@ I understand that this event involves various physical activities, spiritual ses
       : (appSettings?.solicitationTemplate || getDefaultSolicitation());
 
     return (
-      <div key={item?.id || item?._id} className="bg-white shadow-none mx-auto border border-gray-100 flex flex-col page-break-after-always overflow-hidden w-[816px] h-[1056px] p-16 printable-document">
+      <div key={item?.id || item?._id} className="bg-white shadow-none mx-auto border border-gray-100 flex flex-col overflow-hidden w-[816px] h-[1055px] p-16 printable-document">
 
         {/* HEADER */}
         <div style={{ borderColor: '#8B4513' }} className="border-b-2 pb-8 mb-10 shrink-0 flex items-center justify-between">
           <div className="flex items-center gap-4">
             {branding.logoUrl ? (
-              <img src={branding.logoUrl} alt="Logo" className="w-16 h-16 object-contain" />
+              <img src={branding.logoUrl} alt="Logo" className="h-16 w-auto max-w-[120px] object-contain" />
             ) : (
               <div style={{ backgroundColor: '#8B4513' }} className="w-14 h-14 flex items-center justify-center font-display text-white text-3xl">J</div>
             )}
@@ -208,17 +332,15 @@ I understand that this event involves various physical activities, spiritual ses
           )}
 
           {type === 'solicitation' && (
-            <div style={{ borderColor: 'rgba(210, 180, 140, 0.1)' }} className="flex justify-between items-end mb-8 font-serif text-[13px] border-b pb-4 min-h-[60px]">
-              <div className="space-y-1">
-                {(item?.fullName || item?.sourceName) ? (
-                  <>
-                    <p style={{ color: '#8B4513' }} className="font-black uppercase tracking-widest text-[9px]">RECIPIENT:</p>
-                    <p className="text-xl font-bold uppercase text-gray-800">{replaceTags('{{name}}', item)}</p>
-                  </>
-                ) : (
-                  <div className="h-full" />
-                )}
-              </div>
+              <div style={{ borderColor: 'rgba(210, 180, 140, 0.1)' }} className="flex justify-between items-end mb-8 font-serif text-[13px] border-b pb-4 min-h-[60px]">
+                <div className="space-y-1">
+                  {(item?.fullName || item?.sourceName) && (
+                    <>
+                      <p style={{ color: '#8B4513' }} className="font-black uppercase tracking-widest text-[9px]">RECIPIENT:</p>
+                      <p className="text-xl font-bold uppercase text-gray-800">{replaceTags('{{name}}', item)}</p>
+                    </>
+                  )}
+                </div>
               <div className="text-right space-y-1">
                 <p style={{ color: '#8B4513' }} className="font-black uppercase tracking-widest text-[9px]">DATE ISSUED:</p>
                 <p className="text-lg font-bold uppercase text-gray-800">
@@ -284,7 +406,7 @@ I understand that this event involves various physical activities, spiritual ses
 
   return (
     <>
-      <div className="min-h-screen">
+      <div className="min-h-screen print:min-h-0">
         <div className="print:hidden space-y-4 max-w-4xl mx-auto pb-10 px-4 animate-in fade-in duration-500">
 
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 py-2 border-b border-brand-sand/20">
@@ -317,20 +439,75 @@ I understand that this event involves various physical activities, spiritual ses
                 <div className="p-4 space-y-3 animate-in slide-in-from-top-2 duration-300">
 
                   {/* Recipient + Signatory row */}
-                  <div className="flex flex-col sm:flex-row gap-3">
-                    <div className="flex-1">
-                      <label className="text-[9px] font-black text-brand-brown/50 uppercase tracking-widest mb-1 flex items-center gap-1">
-                        <Users size={10} /> Recipient
+                  <div className="flex flex-col sm:flex-row gap-4">
+                    <div className="flex-1 space-y-2">
+                      <label className="text-[9px] font-black text-brand-brown/50 uppercase tracking-widest flex items-center gap-1">
+                        <Users size={10} /> Recipient Name
                       </label>
-                      <input
-                        id="manual_sponsor_name"
-                        type="text"
-                        value={manualSponsorName}
-                        onChange={e => setManualSponsorName(e.target.value)}
-                        placeholder="e.g. ABC Corporation"
-                        className="w-full px-3 py-2.5 border-2 border-brand-sand/20 rounded-xl focus:border-brand-brown outline-none font-bold text-gray-700 bg-white transition-all placeholder:text-gray-200 text-sm"
-                      />
+                      <div className="flex gap-2">
+                        <input
+                          id="manual_sponsor_name"
+                          type="text"
+                          value={manualSponsorName}
+                          onChange={e => setManualSponsorName(e.target.value)}
+                          onKeyDown={e => {
+                            if (e.key === 'Enter') {
+                              e.preventDefault();
+                              const name = manualSponsorName.trim();
+                              if (!name) {
+                                setPopup({ title: 'Input Required', message: 'Please enter a name first.', type: 'warning' });
+                                return;
+                              }
+                              if (manualRecipients.includes(name)) {
+                                setPopup({ title: 'Duplicate Name', message: 'This name is already in your list.', type: 'warning' });
+                                return;
+                              }
+                              setManualRecipients([...manualRecipients, name]);
+                              setManualSponsorName('');
+                            }
+                          }}
+                          placeholder="e.g. ABC Corporation"
+                          className="flex-1 px-3 py-2.5 border-2 border-brand-sand/20 rounded-xl focus:border-brand-brown outline-none font-bold text-gray-700 bg-white transition-all placeholder:text-gray-200 text-sm"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const name = manualSponsorName.trim();
+                            if (!name) {
+                              alert("Please enter a name first.");
+                              return;
+                            }
+                            if (manualRecipients.includes(name)) {
+                              alert("This name is already in your list.");
+                              return;
+                            }
+                            setManualRecipients([...manualRecipients, name]);
+                            setManualSponsorName('');
+                          }}
+                          className="bg-brand-brown text-white p-2.5 rounded-xl hover:bg-brand-light-brown transition-all shadow-md shrink-0"
+                        >
+                          <Plus size={18} />
+                        </button>
+                      </div>
+
+                      {/* RECIPIENT LIST */}
+                      {manualRecipients.length > 0 && (
+                        <div className="flex flex-wrap gap-2 pt-1 animate-in fade-in slide-in-from-top-1 duration-300">
+                          {manualRecipients.map(name => (
+                            <div key={name} className="flex items-center gap-1 bg-brand-brown text-white px-2.5 py-1 rounded-lg text-[9px] font-black uppercase tracking-widest shadow-sm border border-white/10 group">
+                              {name}
+                              <button
+                                onClick={() => setManualRecipients(manualRecipients.filter(n => n !== name))}
+                                className="ml-1 text-white/50 hover:text-white transition-colors"
+                              >
+                                <XCircle size={12} className="fill-current" />
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
                     </div>
+
                     <div className="flex-1">
                       <label className="text-[9px] font-black text-brand-brown/50 uppercase tracking-widest mb-1 flex items-center gap-1">
                         <Check size={10} /> Signatory
@@ -376,7 +553,26 @@ I understand that this event involves various physical activities, spiritual ses
                           }} />
                         </label>
                         {currentUser?.eSignatureUrl && (
-                          <button onClick={() => setShowClearConfirm(true)} className="text-[8px] font-black uppercase tracking-widest text-red-400 hover:text-red-500 transition-colors text-left">
+                          <button 
+                            onClick={() => setPopup({
+                              title: 'Clear Signature?',
+                              message: 'This will permanently remove your e-signature from your profile.',
+                              type: 'confirm',
+                              confirmText: 'Yes, Clear',
+                              onConfirm: async () => {
+                                try {
+                                  const res = await api.put('/api/auth/profile', { eSignatureUrl: '' });
+                                  if (res.data.user) {
+                                    const updated = { ...currentUser, ...res.data.user };
+                                    useAppStore.setState({ currentUser: updated });
+                                    sessionStorage.setItem('lakbay_auth', JSON.stringify(updated));
+                                  }
+                                  setPopup(null);
+                                } catch (err) { console.error("Remove failed", err); }
+                              }
+                            })} 
+                            className="text-[8px] font-black uppercase tracking-widest text-red-400 hover:text-red-500 transition-colors text-left"
+                          >
                             Clear
                           </button>
                         )}
@@ -389,14 +585,34 @@ I understand that this event involves various physical activities, spiritual ses
                       )}
                     </div>
 
-                    <div className="relative group/tip w-full sm:w-auto shrink-0">
+                    <div className="relative group/tip w-full sm:w-auto shrink-0 flex items-center gap-3">
+                      <label className="flex items-center gap-2 cursor-pointer group bg-brand-cream/5 px-2 py-1.5 rounded-lg border border-brand-sand/30">
+                        <input
+                          type="checkbox"
+                          checked={separateFiles}
+                          onChange={e => setSeparateFiles(e.target.checked)}
+                          className="w-3.5 h-3.5 rounded border-2 border-brand-sand/50 text-brand-brown focus:ring-brand-brown transition-all cursor-pointer"
+                        />
+                        <span className="text-[8px] font-black text-brand-brown/60 uppercase tracking-widest group-hover:text-brand-brown transition-colors">1 File per person</span>
+                      </label>
                       <button
-                        onClick={handleManualPrint}
-                        disabled={isManualExporting}
-                        className="w-full sm:w-auto bg-brand-brown text-white px-5 py-2.5 rounded-xl shadow-lg hover:bg-brand-light-brown active:scale-[0.98] disabled:opacity-50 transition-all flex items-center justify-center gap-2 font-black uppercase text-[10px] tracking-[0.2em]"
+                        onClick={handleDownloadPDF}
+                        disabled={activeExport?.isProcessing}
+                        className="flex-1 sm:flex-none border-2 border-brand-brown/20 text-brand-brown px-4 py-2.5 rounded-xl hover:bg-brand-brown/5 transition-all flex items-center justify-center gap-2 font-black uppercase text-[10px] tracking-widest disabled:opacity-50"
+                      >
+                        {activeExport?.isProcessing ? <Loader2 size={16} className="animate-spin" /> : <Download size={16} />}
+                        PDF
+                      </button>
+                      <button
+                        onClick={() => {
+                          if (manualRecipients.length > 0) handlePrint();
+                          else handleManualPrint();
+                        }}
+                        disabled={isManualExporting || activeExport?.isProcessing}
+                        className="flex-1 sm:flex-none bg-brand-brown text-white px-5 py-2.5 rounded-xl shadow-lg hover:bg-brand-light-brown active:scale-[0.98] disabled:opacity-50 transition-all flex items-center justify-center gap-2 font-black uppercase text-[10px] tracking-[0.2em]"
                       >
                         {isManualExporting ? <Loader2 size={16} className="animate-spin" /> : <Printer size={16} />}
-                        Print Letter
+                        Print
                       </button>
                     </div>
                   </div>
@@ -465,9 +681,26 @@ I understand that this event involves various physical activities, spiritual ses
                       <p className="text-[9px] font-black text-brand-brown/40 uppercase tracking-widest leading-none">Batch Queue</p>
                       <p className="text-[10px] font-black text-brand-brown uppercase">{selectedIds.size > 0 ? 'Ready to Print' : 'Select campers above'}</p>
                     </div>
+                    <label className="flex items-center gap-2 cursor-pointer group bg-brand-cream/5 px-2 py-1.5 rounded-lg border border-brand-sand/30 shrink-0">
+                      <input
+                        type="checkbox"
+                        checked={separateFiles}
+                        onChange={e => setSeparateFiles(e.target.checked)}
+                        className="w-3.5 h-3.5 rounded border-2 border-brand-sand/50 text-brand-brown focus:ring-brand-brown transition-all cursor-pointer"
+                      />
+                      <span className="text-[8px] font-black text-brand-brown/60 uppercase tracking-widest group-hover:text-brand-brown transition-colors whitespace-nowrap">1 File each</span>
+                    </label>
+                    <button
+                      onClick={handleDownloadPDF}
+                      disabled={activeExport?.isProcessing}
+                      className="flex items-center justify-center gap-2 border-2 border-brand-brown/20 text-brand-brown px-4 py-2.5 rounded-xl hover:bg-brand-brown/5 transition-all font-black uppercase text-[10px] tracking-widest disabled:opacity-50 shrink-0"
+                    >
+                      {activeExport?.isProcessing ? <Loader2 className="animate-spin" size={16} /> : <Download size={16} />}
+                      PDF
+                    </button>
                     <button
                       onClick={handlePrint}
-                      disabled={selectedIds.size === 0}
+                      disabled={activeExport?.isProcessing}
                       className="flex items-center justify-center gap-2 bg-brand-brown text-white px-5 py-2.5 rounded-xl shadow-lg hover:bg-brand-light-brown active:scale-[0.98] transition-all font-black uppercase text-[10px] tracking-[0.2em] disabled:opacity-40 shrink-0"
                     >
                       <Printer size={16} />
@@ -479,97 +712,95 @@ I understand that this event involves various physical activities, spiritual ses
             </div>
           </div>
         </div>
+
+        {/* OFF-SCREEN STAGING AREA - Outside print:hidden but inside min-h-screen */}
+        {(activeTab === 'solicitation' && isManualExporting) && (
+          <div
+            ref={manualPrintRef}
+            className="bg-white font-serif text-gray-800 w-[816px] print:block hidden"
+          >
+            {renderDocument({
+              sourceName: manualSponsorName,
+              amount: 0,
+              manualSignatory: manualSignatoryName
+            }, 'solicitation')}
+          </div>
+        )}
+
+        {/* NATIVE BATCH PRINT STAGING - Only visible to the printer */}
+        {isPrintingSelected && (
+          <div className="bg-white font-serif w-[816px] print:block hidden">
+            {selectedIds.size > 0 ? (
+              Array.from(selectedIds).map((id, index) => {
+                const item = activeTab === 'waiver'
+                  ? registrants.find(r => (r.id || (r as any)._id) === id)
+                  : solicitations.find(s => (s.id || (s as any)._id) === id);
+                return (
+                  <div key={id} className={index > 0 ? "page-break-before-always" : ""}>
+                    {renderDocument(item, activeTab)}
+                  </div>
+                );
+              })
+            ) : (
+              (manualRecipients.length > 0 ? manualRecipients : [manualSponsorName]).map((name, index) => (
+                <div key={`${name}-${index}`} className={index > 0 ? "page-break-before-always" : ""}>
+                  {renderDocument({ sourceName: name, manualSignatory: manualSignatoryName }, 'solicitation')}
+                </div>
+              ))
+            )}
+          </div>
+        )}
       </div>
 
-      {/* BATCH PRINT AREA - Rendered off-screen when items are selected for both Print & Export */}
-      {selectedIds.size > 0 && (
-        <div
-          ref={printRef}
-          style={{
-            position: 'fixed',
-            top: '0',
-            left: '-9999px',
-            width: '210mm',
-            opacity: '1',
-            pointerEvents: 'none',
-            zIndex: '-1000'
-          }}
-          className={`print-area font-serif bg-white ${isManualExporting ? 'print:hidden' : ''}`}
-        >
-          {Array.from(selectedIds).map((id, index) => {
-            const item = activeTab === 'waiver'
-              ? registrants.find(r => (r.id || (r as any)._id) === id)
-              : solicitations.find(s => (s.id || (s as any)._id) === id);
-            return (
-              <div key={id} className={index > 0 ? "page-break-after-always" : ""}>
-                {renderDocument(item, activeTab)}
-              </div>
-            );
-          })}
-        </div>
-      )}
-      {/* MANUAL HIDDEN PRINT AREA - Only rendered when manually exporting/printing to avoid batch conflicts */}
-      {(activeTab === 'solicitation' && isManualExporting) && (
-        <div
-          ref={manualPrintRef}
-          style={{
-            position: 'fixed',
-            top: '0',
-            left: '-9999px',
-            width: '210mm',
-            opacity: '1',
-            pointerEvents: 'none',
-            zIndex: '-1000'
-          }}
-          className="print-area font-serif text-gray-800 bg-white"
-        >
-          {renderDocument({
-            sourceName: manualSponsorName,
-            amount: 0,
-            manualSignatory: manualSignatoryName
-          }, 'solicitation')}
-        </div>
-      )}
-
-      {showClearConfirm && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+      {popup && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
           <div
-            className="absolute inset-0 bg-brand-brown/40 backdrop-blur-sm animate-in fade-in duration-300"
-            onClick={() => setShowClearConfirm(false)}
+            className="absolute inset-0 bg-brand-brown/60 backdrop-blur-md animate-in fade-in duration-300"
+            onClick={() => !popup.onConfirm && setPopup(null)}
           />
-          <div className="relative bg-white rounded-[2rem] shadow-2xl border-2 border-brand-sand/30 p-8 max-w-sm w-full animate-in zoom-in-95 duration-300">
-            <div className="w-16 h-16 bg-red-50 rounded-2xl flex items-center justify-center text-red-500 mb-6 mx-auto">
-              <span className="text-2xl font-bold">!</span>
+          <div className="relative bg-white rounded-[2.5rem] shadow-2xl border-2 border-brand-sand/30 p-10 max-w-sm w-full animate-in zoom-in-95 duration-300 overflow-hidden">
+            {/* ICON DECOR */}
+            <div className={`w-20 h-20 rounded-3xl flex items-center justify-center mb-6 mx-auto ${
+              popup.type === 'confirm' ? 'bg-brand-brown/10 text-brand-brown' :
+              popup.type === 'warning' ? 'bg-amber-50 text-amber-500' :
+              popup.type === 'error' ? 'bg-red-50 text-red-500' :
+              'bg-blue-50 text-blue-500'
+            }`}>
+              {popup.type === 'confirm' && <HelpCircle size={40} />}
+              {popup.type === 'warning' && <AlertTriangle size={40} />}
+              {popup.type === 'error' && <AlertCircle size={40} />}
+              {popup.type === 'alert' && <Info size={40} />}
             </div>
-            <h4 className="text-xl font-display text-brand-brown text-center mb-2">Clear Signature?</h4>
-            <p className="text-[11px] font-bold text-gray-400 uppercase tracking-widest text-center mb-8 leading-relaxed">
-              This will permanently remove your e-signature from your profile.
+
+            <h4 className="text-2xl font-display text-brand-brown text-center mb-3">{popup.title}</h4>
+            <p className="text-[12px] font-bold text-gray-500 uppercase tracking-widest text-center mb-10 leading-relaxed px-2">
+              {popup.message}
             </p>
-            <div className="flex gap-3">
+
+            <div className="flex gap-4">
+              {(popup.type === 'confirm' || popup.onCancel) && (
+                <button
+                  onClick={() => {
+                    if (popup.onCancel) popup.onCancel();
+                    setPopup(null);
+                  }}
+                  className="flex-1 px-4 py-4 border-2 border-brand-sand/20 rounded-2xl text-[10px] font-black uppercase tracking-widest text-gray-400 hover:bg-brand-cream/50 hover:text-brand-brown transition-all"
+                >
+                  {popup.cancelText || 'Cancel'}
+                </button>
+              )}
               <button
-                onClick={() => setShowClearConfirm(false)}
-                className="flex-1 px-4 py-4 border-2 border-brand-sand/20 rounded-xl text-[10px] font-black uppercase tracking-widest text-gray-400 hover:bg-brand-cream/50 transition-all"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={async () => {
-                  try {
-                    const res = await api.put('/api/auth/profile', { eSignatureUrl: '' });
-                    if (res.data.user) {
-                      // @ts-ignore
-                      const updated = { ...currentUser, ...res.data.user };
-                      useAppStore.setState({ currentUser: updated });
-                      sessionStorage.setItem('lakbay_auth', JSON.stringify(updated));
-                    }
-                    setShowClearConfirm(false);
-                  } catch (err) {
-                    console.error("Remove failed", err);
-                  }
+                onClick={() => {
+                  if (popup.onConfirm) popup.onConfirm();
+                  else setPopup(null);
                 }}
-                className="flex-1 px-4 py-4 bg-red-500 text-white rounded-xl text-[10px] font-black uppercase tracking-widest shadow-lg shadow-red-500/20 hover:bg-red-600 transition-all"
+                className={`flex-1 px-4 py-4 rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-lg transition-all active:scale-95 ${
+                  popup.type === 'confirm' ? 'bg-brand-brown text-white shadow-brand-brown/20' :
+                  popup.type === 'error' ? 'bg-red-500 text-white shadow-red-500/20' :
+                  'bg-brand-brown text-white shadow-brand-brown/20'
+                }`}
               >
-                Yes, Clear
+                {popup.confirmText || 'OK'}
               </button>
             </div>
           </div>
@@ -578,23 +809,10 @@ I understand that this event involves various physical activities, spiritual ses
 
       <style>{`
         @media print {
-          body { visibility: hidden !important; }
-          .print-area, .print-area * { 
-            visibility: visible !important; 
-          }
-          .print-area { 
-            position: absolute !important; 
-            left: 0 !important; 
-            top: 0 !important; 
-            width: 100% !important; 
-            display: block !important;
-            opacity: 1 !important;
-            z-index: 9999 !important;
-          }
           @page { size: auto; margin: 0mm; }
         }
-        .page-break-after-always {
-          page-break-after: always;
+        .page-break-before-always {
+          page-break-before: always;
         }
       `}</style>
     </>

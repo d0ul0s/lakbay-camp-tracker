@@ -111,14 +111,14 @@ export default function Reports() {
 
   return (
     <div className="space-y-4 md:space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between print:hidden">
         <h2 className="text-2xl md:text-3xl font-display text-brand-brown tracking-wide">Reports & Export</h2>
         <div className="hidden md:flex items-center gap-2 px-4 py-2 bg-brand-sand/10 rounded-2xl text-[10px] font-black uppercase tracking-widest text-brand-brown border border-brand-sand/20">
            Physical Auditing Enabled
         </div>
       </div>
       
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 print:hidden">
         {/* Registrants Card */}
         <div className="bg-white p-4 md:p-6 rounded-3xl shadow-sm border border-brand-beige flex flex-col items-center text-center">
           <div className="p-4 bg-brand-cream text-brand-brown rounded-3xl mb-4">
@@ -193,9 +193,7 @@ export default function Reports() {
       {/* Dynamic Hidden Print Area */}
       <style>{`
         @media print {
-          body * { visibility: hidden; }
-          #print-area, #print-area * { visibility: visible; }
-          #print-area { position: absolute; left: 0; top: 0; width: 100%; color: black !important; }
+          #print-area { width: 100%; color: black !important; }
           table { width: 100%; border-collapse: collapse; margin-top: 20px; font-size: 11px; }
           th, td { border: 1px solid #ddd; padding: 6px; text-align: left; }
           th { background-color: #f5f5f5 !important; font-weight: bold; }
