@@ -60,13 +60,11 @@ export default function PublicOrganization() {
   const [activeTab, setActiveTab] = useState<'departments' | 'leaders' | 'groups'>('departments');
 
   const fetchData = async () => {
-    // Only set loading if we have NO data yet (First mount)
     if (leaders.length === 0 && groups.length === 0) {
       setIsLoading(true);
     }
 
     try {
-      // Use parallel fetching for speed
       const results = await Promise.allSettled([
         api.get('/api/org/leaders'),
         api.get('/api/org/groups'),
@@ -77,7 +75,6 @@ export default function PublicOrganization() {
       if (results[1].status === 'fulfilled') setGroups(results[1].value.data);
       if (results[2].status === 'fulfilled') setRegistrants(results[2].value.data);
 
-      // Speed-of-Success: If anything returns 200, the server is awake.
       if (results.some(r => r.status === 'fulfilled')) {
         setServerAwake(true);
       }
@@ -132,7 +129,6 @@ export default function PublicOrganization() {
     ? appSettings.churches.filter((c: string) => c !== 'JAM')
     : Array.from(new Set(youthLeaders.filter(yl => yl.churchRef && yl.churchRef !== 'JAM').map(yl => yl.churchRef as string))).sort();
 
-  // IMPORTANT: If we already have leaders or groups, do NOT show the full-screen loader.
   const hasSomeData = leaders.length > 0 || groups.length > 0;
 
   if (isLoading && !isServerAwake && !hasSomeData) {
@@ -152,13 +148,12 @@ export default function PublicOrganization() {
 
   return (
     <div className="min-h-screen bg-brand-cream font-sans selection:bg-brand-brown selection:text-white relative">
-      {/* Background Decor */}
       <div className="fixed inset-0 pointer-events-none overflow-hidden opacity-20">
         <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] rounded-full bg-brand-sand blur-[120px]"></div>
         <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] rounded-full bg-brand-brown/10 blur-[120px]"></div>
       </div>
 
-      <header className="bg-brand-brown text-white py-3 px-6 md:px-10 shadow-lg sticky top-0 z-50 flex items-center justify-between mb-8 overflow-hidden">
+      <header className="bg-brand-brown text-white py-3 px-6 md:px-10 shadow-lg sticky top-0 z-50 flex items-center justify-between mb-8 overflow-hidden no-print">
         <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-10 pointer-events-none"></div>
         <div className="flex items-center gap-3 md:gap-4 font-display tracking-widest leading-none relative z-10 cursor-default">
           <img src="/logo.svg" alt="LAKBAY" className="h-8 w-8 md:h-10 md:w-10 filter drop-shadow-md" />
@@ -169,7 +164,7 @@ export default function PublicOrganization() {
         </Link>
       </header>
 
-      <main className="max-w-7xl mx-auto px-4 md:px-8 pb-32 space-y-8 relative z-10">
+      <main className="max-w-7xl mx-auto px-4 md:px-8 pb-32 space-y-8 relative z-10 no-print">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
           <div>
             <h2 className="text-4xl md:text-6xl font-display text-brand-brown tracking-tighter mb-2">
@@ -190,7 +185,6 @@ export default function PublicOrganization() {
 
         <CampCountdown />
 
-        {/* Tab Navigation */}
         <div className="flex items-center gap-1 p-1 bg-brand-sand/10 backdrop-blur-sm rounded-2xl w-full sm:w-fit border border-brand-sand/10">
           {[
             { id: 'departments', label: 'Departments', icon: <Shield size={16} /> },
@@ -301,7 +295,6 @@ export default function PublicOrganization() {
           {/* TRIBES VIEW */}
           {activeTab === 'groups' && (
             <div className="animate-in fade-in slide-in-from-bottom-2 duration-500">
-               {/* Search/Filter Legend */}
                <div className="flex flex-wrap gap-2 mb-8 p-4 bg-white/40 backdrop-blur-md rounded-3xl border border-white/50 shadow-xl shadow-brand-brown/[0.02]">
                   <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest mr-2 self-center flex items-center gap-2"><Info size={14} className="text-brand-sand" /> Church Legend:</span>
                   {effectiveChurches.map(church => (
@@ -321,7 +314,6 @@ export default function PublicOrganization() {
                     </h4>
 
                     <div className="space-y-4">
-                      {/* Key Roles */}
                       <div className="grid grid-cols-1 gap-2">
                         {g.leader && (
                           <div className="flex items-center gap-3 p-2 bg-gradient-to-r from-brand-sand/5 to-transparent rounded-2xl border border-brand-sand/10">
@@ -343,7 +335,6 @@ export default function PublicOrganization() {
                         )}
                       </div>
 
-                      {/* Tactical Roles */}
                       <div className="grid grid-cols-2 gap-3">
                         <div className="flex items-center gap-2 p-2 bg-blue-50/30 rounded-2xl border border-blue-50">
                           <Target size={14} className="text-blue-400 shrink-0" />
@@ -361,7 +352,6 @@ export default function PublicOrganization() {
                         </div>
                       </div>
 
-                      {/* Members Section */}
                       <div className="pt-4 border-t border-gray-50 mt-2">
                         {(() => {
                           const registered = g.members.filter(m => registrants.some(r => (r.fullName || '').toLowerCase().trim() === m.toLowerCase().trim()));
@@ -406,7 +396,6 @@ export default function PublicOrganization() {
                 ))}
                </div>
 
-               {/* Ungrouped Participants (Self-Finding Panel) */}
                {ungrouped.length > 0 && (
                   <div className="mt-20 bg-white/60 backdrop-blur-md rounded-[3rem] p-8 border border-white/80 shadow-2xl">
                      <div className="flex items-center gap-4 mb-8">
@@ -436,42 +425,139 @@ export default function PublicOrganization() {
 
       <style>{`
         @media print {
-          @page { margin: 1cm; }
-          body > *:not(#print-root) { display: none !important; }
+          @page { size: A4; margin: 1cm; }
+          .no-print { display: none !important; }
           #print-root { display: block !important; visibility: visible !important; position: static !important; width: 100% !important; margin: 0 !important; padding: 0 !important; }
-          #print-root * { visibility: visible !important; }
+          #print-root * { visibility: visible !important; color: black !important; border-color: black !important; }
+          .print-page-break { break-after: page; page-break-after: always; margin-bottom: 0 !important; border-bottom: none !important; }
         }
       `}</style>
       
-      <div id="print-root" className="hidden print:block p-10 bg-white">
-        <div className="border-b-4 border-gray-900 pb-4 mb-10">
-           <h1 className="text-4xl font-display font-black tracking-widest">LAKBAY CAMP 2026</h1>
-           <p className="text-sm font-bold uppercase tracking-widest text-gray-500">Official Roster • {new Date().toLocaleDateString()}</p>
-        </div>
-        
+      <div id="print-root" className="hidden print:block p-0 bg-white font-serif">
         {activeTab === 'groups' ? (
-          <div className="grid grid-cols-2 gap-10">
-             {groups.map(tribe => (
-               <div key={tribe._id} className="break-inside-avoid border-t-2 border-gray-800 pt-4">
-                 <h2 className="text-2xl font-black mb-4 uppercase">{tribe.name}</h2>
-                 <p className="text-sm mb-1"><strong>Leader:</strong> {tribe.leader}</p>
-                 <p className="text-sm mb-4"><strong>Assistant:</strong> {tribe.assistantLeader}</p>
-                 <div className="text-[10px] space-y-1">
-                   {tribe.members.map((m, i) => <div key={i}>• {m}</div>)}
-                 </div>
-               </div>
+          <div className="flex flex-col text-black">
+             {groups.map((tribe, tribeIdx) => (
+                <div key={tribe._id} className="print-page-break border-2 border-black p-8 relative min-h-[27.7cm] flex flex-col">
+                   {/* Per-Page Header */}
+                   <div className="bg-black text-white p-6 flex flex-col items-center justify-center text-center mb-10">
+                      <h1 className="text-4xl font-bold tracking-[0.2em] uppercase leading-none mb-2">LAKBAY CAMP 2026</h1>
+                      <p className="text-[10px] font-black tracking-[0.5em] uppercase border-t border-white/20 pt-2 opacity-80">
+                         Official Organizational Roster • Generated {new Date().toLocaleDateString()}
+                      </p>
+                   </div>
+                   
+                   {/* Tribe ID Tag */}
+                   <div className="absolute top-[160px] right-8 bg-black text-white px-4 py-1 text-[10px] font-bold uppercase tracking-widest">
+                      UNIT {tribeIdx + 1}
+                   </div>
+
+                   <h2 className="text-3xl font-bold mb-6 border-b-4 border-black pb-2 uppercase tracking-tighter">
+                      TRIBE: <span className="font-black italic">{tribe.name}</span>
+                   </h2>
+                   
+                   {/* Executive Core Grid */}
+                   <div className="grid grid-cols-2 gap-4 mb-8">
+                      <div className="border border-black p-3 bg-gray-50 flex flex-col">
+                         <span className="text-[9px] font-bold uppercase tracking-widest text-black/40 mb-1 leading-none">Command / Leader</span>
+                         <span className="text-lg font-black">{tribe.leader || 'UNASSIGNED'}</span>
+                      </div>
+                      <div className="border border-black p-3 flex flex-col">
+                         <span className="text-[9px] font-bold uppercase tracking-widest text-black/40 mb-1 leading-none">Co-Command / Assistant</span>
+                         <span className="text-lg font-black">{tribe.assistantLeader || 'UNASSIGNED'}</span>
+                      </div>
+                      <div className="border border-black p-3 flex flex-col">
+                         <span className="text-[9px] font-bold uppercase tracking-widest text-black/40 mb-1 leading-none">Intelligence / Point Keeper</span>
+                         <span className="text-base font-bold">{tribe.pointKeeper || '---'}</span>
+                      </div>
+                      <div className="border border-black p-3 flex flex-col">
+                         <span className="text-[9px] font-bold uppercase tracking-widest text-black/40 mb-1 leading-none">Vanguard / Flag Bearer</span>
+                         <span className="text-base font-bold">{tribe.flagBearer || '---'}</span>
+                      </div>
+                   </div>
+
+                   {/* Tactics / Grab Masters */}
+                   <div className="mb-8 border-t border-gray-100 pt-4">
+                      <h3 className="text-xs font-black uppercase tracking-widest mb-3 flex items-center gap-2">
+                         <div className="w-1.5 h-1.5 bg-black rounded-full"></div>
+                         Facilitators & Logistics
+                      </h3>
+                      <div className="flex flex-wrap gap-x-6 gap-y-2">
+                         {[...(tribe.facilitators || []), ...(tribe.grabMasters || [])].filter(Boolean).map((f, i) => (
+                           <div key={i} className="flex items-center gap-2 text-sm font-bold min-w-[200px] border-b border-gray-100 pb-1 italic">
+                              <span className="opacity-30">[{i + 1}]</span> {f}
+                           </div>
+                         ))}
+                      </div>
+                   </div>
+
+                   {/* Roster Table */}
+                   <div>
+                      <h3 className="text-xs font-black uppercase tracking-widest mb-3 flex items-center gap-2">
+                         <div className="w-1.5 h-1.5 bg-black rounded-full"></div>
+                         Unit Personnel Roster
+                      </h3>
+                      <div className="grid grid-cols-2 gap-x-8 gap-y-1">
+                         {tribe.members.map((m, i) => {
+                            const reg = registrants.find(r => r.fullName.toLowerCase().trim() === m.toLowerCase().trim());
+                            return (
+                               <div key={i} className="flex justify-between border-b border-gray-200 py-1 text-xs">
+                                  <div className="flex items-center gap-2">
+                                     <span className="text-[10px] opacity-30 font-bold">{i + 1}.</span>
+                                     <span className="font-bold">{m}</span>
+                                  </div>
+                                  <span className="text-[9px] font-black uppercase opacity-60 italic">{reg?.church || 'GUEST'}</span>
+                               </div>
+                            );
+                         })}
+                      </div>
+                   </div>
+                </div>
              ))}
           </div>
         ) : (
-          <div className="columns-2">
-            {leaders.map(l => (
-              <div key={l._id} className="py-2 border-b border-gray-100 flex justify-between">
-                <span className="font-bold">{l.name}</span>
-                <span className="text-xs italic">{getCategories(l).join(', ')}</span>
-              </div>
-            ))}
+          <div className="flex flex-col text-black px-10">
+            {/* Dossier Header (Single for Departments) */}
+            <div className="bg-black text-white p-6 flex flex-col items-center justify-center text-center mb-10">
+               <h1 className="text-4xl font-bold tracking-[0.2em] uppercase leading-none mb-2">LAKBAY CAMP 2026</h1>
+               <p className="text-[10px] font-black tracking-[0.5em] uppercase border-t border-white/20 pt-2 opacity-80">
+                  Official Organizational Roster • Generated {new Date().toLocaleDateString()}
+               </p>
+            </div>
+
+            <div className="space-y-12">
+              {/* Personnel Listing Table */}
+              {Array.from(new Set(leaders.flatMap(s => getCategories(s))))
+                .filter(cat => activeTab === 'leaders' ? cat === 'Youth Leader' : cat !== 'Youth Leader')
+                .sort((a, b) => a === 'Camp Head' ? -1 : b === 'Camp Head' ? 1 : a.localeCompare(b))
+                .map(category => (
+                  <div key={category} className="break-inside-avoid">
+                     <h2 className="bg-black text-white px-4 py-2 text-sm font-black uppercase tracking-widest mb-4 inline-block self-start">
+                        DEPARTMENT: {category}
+                     </h2>
+                     <div className="grid grid-cols-2 gap-x-12 gap-y-2 border-t-4 border-black pt-4">
+                        {leaders.filter(s => getCategories(s).includes(category)).map((s, idx) => (
+                          <div key={s._id || s.id} className="flex justify-between items-baseline border-b border-gray-100 py-1.5">
+                             <div className="flex items-center gap-3">
+                                <span className="text-[10px] opacity-30 font-bold">{idx + 1}.</span>
+                                <span className="text-sm font-bold">{s.name}</span>
+                             </div>
+                             <div className="text-right">
+                                <p className="text-[9px] font-black uppercase italic opacity-60 leading-none mb-1">{s.roleTitle || 'Personnel'}</p>
+                                {s.churchRef && s.churchRef !== 'JAM' && <p className="text-[7px] font-bold opacity-40 uppercase tracking-tighter">{s.churchRef}</p>}
+                             </div>
+                          </div>
+                        ))}
+                     </div>
+                  </div>
+                ))}
+            </div>
           </div>
         )}
+
+        <div className="mt-20 border-t-2 border-black pt-6 flex justify-between items-end opacity-20">
+           <div className="text-[10px] font-black tracking-widest uppercase">LAKBAY COMMAND • OFFICIAL OUTPUT</div>
+           <div className="text-[10px] font-bold uppercase tracking-tighter italic">AUTHENTICATED CAMP DOCUMENT</div>
+        </div>
       </div>
     </div>
   );
