@@ -62,6 +62,7 @@ export default function DocumentRegistry() {
   const [activeTab, setActiveTab] = useState<DocTemplate>('waiver');
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [searchQuery, setSearchQuery] = useState('');
+  const [showAll, setShowAll] = useState(false);
   const [manualSponsorName, setManualSponsorName] = useState('');
   const [manualSignatoryName, setManualSignatoryName] = useState('');
   const [popup, setPopup] = useState<PopupConfig | null>(null);
@@ -523,97 +524,107 @@ I understand that this event involves various physical activities, spiritual ses
                     </div>
                   </div>
 
-                  {/* E-Signature + Print row */}
-                  <div className="flex flex-col sm:flex-row items-center gap-3 pt-2 border-t border-brand-sand/10">
-                    <div className="flex items-center gap-2 flex-1 w-full min-w-0">
-                      <div className="w-20 h-10 bg-brand-cream/10 border border-brand-sand/20 rounded-lg overflow-hidden flex items-center justify-center shrink-0">
-                        {currentUser?.eSignatureUrl ? (
-                          <img src={currentUser.eSignatureUrl} alt="E-Signature" className="max-w-full max-h-full object-contain" />
-                        ) : (
-                          <Image size={14} className="text-gray-300" />
-                        )}
-                      </div>
-                      <div className="flex flex-col gap-1 min-w-0">
-                        <label className="flex items-center justify-center px-3 py-1.5 bg-brand-brown/5 border border-brand-sand/30 text-brand-brown rounded-lg cursor-pointer hover:bg-brand-brown/10 transition-all text-[9px] font-black uppercase tracking-widest whitespace-nowrap">
-                          {currentUser?.eSignatureUrl ? 'Change' : 'Upload Signature'}
-                          <input type="file" className="hidden" accept="image/*" onChange={async (e) => {
-                            const file = e.target.files?.[0];
-                            if (!file) return;
-                            const reader = new FileReader();
-                            reader.onloadend = async () => {
-                              const base64 = reader.result as string;
-                              try {
-                                const res = await api.put('/api/auth/profile', { eSignatureUrl: base64 });
-                                if (res.data.user) {
-                                  useAppStore.setState({ currentUser: { ...currentUser, ...res.data.user } });
-                                }
-                              } catch (err) { console.error(err); }
-                            };
-                            reader.readAsDataURL(file);
-                          }} />
-                        </label>
-                        {currentUser?.eSignatureUrl && (
-                          <button 
-                            onClick={() => setPopup({
-                              title: 'Clear Signature?',
-                              message: 'This will permanently remove your e-signature from your profile.',
-                              type: 'confirm',
-                              confirmText: 'Yes, Clear',
-                              onConfirm: async () => {
+                  {/* E-Signature + Actions Footer */}
+                  <div className="flex flex-col gap-4 pt-4 border-t border-brand-sand/10">
+                    {/* Top Row: Signature info */}
+                    <div className="flex items-center justify-between w-full">
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div className="w-16 h-10 bg-brand-cream/10 border border-brand-sand/20 rounded-lg overflow-hidden flex items-center justify-center shrink-0">
+                          {currentUser?.eSignatureUrl ? (
+                            <img src={currentUser.eSignatureUrl} alt="E-Signature" className="max-w-full max-h-full object-contain" />
+                          ) : (
+                            <Image size={14} className="text-gray-300" />
+                          )}
+                        </div>
+                        <div className="flex flex-col gap-0.5 min-w-0">
+                          <label className="flex items-center justify-center px-3 py-1 bg-brand-brown/5 border border-brand-sand/30 text-brand-brown rounded-lg cursor-pointer hover:bg-brand-brown/10 transition-all text-[8px] font-black uppercase tracking-widest whitespace-nowrap">
+                            {currentUser?.eSignatureUrl ? 'Change' : 'Upload Signature'}
+                            <input type="file" className="hidden" accept="image/*" onChange={async (e) => {
+                              const file = e.target.files?.[0];
+                              if (!file) return;
+                              const reader = new FileReader();
+                              reader.onloadend = async () => {
+                                const base64 = reader.result as string;
                                 try {
-                                  const res = await api.put('/api/auth/profile', { eSignatureUrl: '' });
+                                  const res = await api.put('/api/auth/profile', { eSignatureUrl: base64 });
                                   if (res.data.user) {
-                                    const updated = { ...currentUser, ...res.data.user };
-                                    useAppStore.setState({ currentUser: updated });
-                                    sessionStorage.setItem('lakbay_auth', JSON.stringify(updated));
+                                    useAppStore.setState({ currentUser: { ...currentUser, ...res.data.user } });
                                   }
-                                  setPopup(null);
-                                } catch (err) { console.error("Remove failed", err); }
-                              }
-                            })} 
-                            className="text-[8px] font-black uppercase tracking-widest text-red-400 hover:text-red-500 transition-colors text-left"
-                          >
-                            Clear
-                          </button>
-                        )}
+                                } catch (err) { console.error(err); }
+                              };
+                              reader.readAsDataURL(file);
+                            }} />
+                          </label>
+                          {currentUser?.eSignatureUrl && (
+                            <button 
+                              onClick={() => setPopup({
+                                title: 'Clear Signature?',
+                                message: 'This will permanently remove your e-signature from your profile.',
+                                type: 'confirm',
+                                confirmText: 'Yes, Clear',
+                                onConfirm: async () => {
+                                  try {
+                                    const res = await api.put('/api/auth/profile', { eSignatureUrl: '' });
+                                    if (res.data.user) {
+                                      const updated = { ...currentUser, ...res.data.user };
+                                      useAppStore.setState({ currentUser: updated });
+                                      sessionStorage.setItem('lakbay_auth', JSON.stringify(updated));
+                                    }
+                                    setPopup(null);
+                                  } catch (err) { console.error("Remove failed", err); }
+                                }
+                              })} 
+                              className="text-[7px] font-black uppercase tracking-widest text-red-400 hover:text-red-500 transition-colors text-left"
+                            >
+                              Clear Signature
+                            </button>
+                          )}
+                        </div>
                       </div>
+
                       {currentUser?.eSignatureUrl && (
-                        <div className="flex items-center gap-1 ml-1 shrink-0">
+                        <div className="flex items-center gap-1.5 px-2 py-1 bg-green-50 rounded-full shrink-0">
                           <div className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse" />
-                          <span className="text-[8px] font-black text-green-500 uppercase tracking-widest hidden sm:block">Signed</span>
+                          <span className="text-[8px] font-black text-green-600 uppercase tracking-widest">Signed</span>
                         </div>
                       )}
                     </div>
 
-                    <div className="relative group/tip w-full sm:w-auto shrink-0 flex items-center gap-3">
-                      <label className="flex items-center gap-2 cursor-pointer group bg-brand-cream/5 px-2 py-1.5 rounded-lg border border-brand-sand/30">
-                        <input
-                          type="checkbox"
-                          checked={separateFiles}
-                          onChange={e => setSeparateFiles(e.target.checked)}
-                          className="w-3.5 h-3.5 rounded border-2 border-brand-sand/50 text-brand-brown focus:ring-brand-brown transition-all cursor-pointer"
-                        />
-                        <span className="text-[8px] font-black text-brand-brown/60 uppercase tracking-widest group-hover:text-brand-brown transition-colors">1 File per person</span>
-                      </label>
-                      <button
-                        onClick={handleDownloadPDF}
-                        disabled={activeExport?.isProcessing}
-                        className="flex-1 sm:flex-none border-2 border-brand-brown/20 text-brand-brown px-4 py-2.5 rounded-xl hover:bg-brand-brown/5 transition-all flex items-center justify-center gap-2 font-black uppercase text-[10px] tracking-widest disabled:opacity-50"
-                      >
-                        {activeExport?.isProcessing ? <Loader2 size={16} className="animate-spin" /> : <Download size={16} />}
-                        PDF
-                      </button>
-                      <button
-                        onClick={() => {
-                          if (manualRecipients.length > 0) handlePrint();
-                          else handleManualPrint();
-                        }}
-                        disabled={isManualExporting || activeExport?.isProcessing}
-                        className="flex-1 sm:flex-none bg-brand-brown text-white px-5 py-2.5 rounded-xl shadow-lg hover:bg-brand-light-brown active:scale-[0.98] disabled:opacity-50 transition-all flex items-center justify-center gap-2 font-black uppercase text-[10px] tracking-[0.2em]"
-                      >
-                        {isManualExporting ? <Loader2 size={16} className="animate-spin" /> : <Printer size={16} />}
-                        Print
-                      </button>
+                    {/* Bottom Row: Actions */}
+                    <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+                      <div className="flex-1">
+                        <label className="flex items-center gap-2 cursor-pointer group bg-brand-cream/5 px-2.5 py-2 rounded-xl border border-brand-sand/30 w-full sm:w-auto">
+                          <input
+                            type="checkbox"
+                            checked={separateFiles}
+                            onChange={e => setSeparateFiles(e.target.checked)}
+                            className="w-3.5 h-3.5 rounded border-2 border-brand-sand/50 text-brand-brown focus:ring-brand-brown transition-all cursor-pointer"
+                          />
+                          <span className="text-[8px] font-black text-brand-brown/60 uppercase tracking-widest group-hover:text-brand-brown transition-colors">1 File per person</span>
+                        </label>
+                      </div>
+                      
+                      <div className="flex gap-2">
+                        <button
+                          onClick={handleDownloadPDF}
+                          disabled={activeExport?.isProcessing}
+                          className="flex-1 sm:flex-none border-2 border-brand-brown/20 text-brand-brown px-4 py-2.5 rounded-xl hover:bg-brand-brown/5 transition-all flex items-center justify-center gap-2 font-black uppercase text-[10px] tracking-widest disabled:opacity-50"
+                        >
+                          {activeExport?.isProcessing ? <Loader2 size={16} className="animate-spin" /> : <Download size={16} />}
+                          PDF
+                        </button>
+                        <button
+                          onClick={() => {
+                            if (manualRecipients.length > 0) handlePrint();
+                            else handleManualPrint();
+                          }}
+                          disabled={isManualExporting || activeExport?.isProcessing}
+                          className="flex-1 sm:flex-none bg-brand-brown text-white px-5 py-2.5 rounded-xl shadow-lg hover:bg-brand-light-brown active:scale-[0.98] disabled:opacity-50 transition-all flex items-center justify-center gap-2 font-black uppercase text-[10px] tracking-[0.2em]"
+                        >
+                          {isManualExporting ? <Loader2 size={16} className="animate-spin" /> : <Printer size={16} />}
+                          Print
+                        </button>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -646,26 +657,39 @@ I understand that this event involves various physical activities, spiritual ses
                     </div>
                   </div>
 
-                  <div className="max-h-[240px] overflow-y-auto p-3 custom-scrollbar bg-white/50">
-                    {filteredData.length > 0 ? filteredData.map((item: any) => {
-                      const id = item.id || item._id;
-                      const isSelected = selectedIds.has(id);
-                      return (
-                        <div
-                          key={id}
-                          onClick={() => toggleSelect(id)}
-                          className={`px-3 py-2 rounded-xl mb-1.5 cursor-pointer transition-all flex items-center justify-between border-2 ${isSelected ? 'bg-brand-brown text-white border-brand-brown shadow-md -translate-y-0.5' : 'bg-white border-brand-cream/40 hover:border-brand-sand text-gray-700'}`}
-                        >
-                          <div className="min-w-0">
-                            <h4 className="font-display uppercase tracking-tight truncate text-sm leading-none">{item.fullName}</h4>
-                            <p className="text-[9px] font-bold opacity-50 uppercase truncate tracking-widest mt-0.5">{item.church}</p>
-                          </div>
-                          <div className={`w-5 h-5 rounded-md flex items-center justify-center border-2 transition-all shrink-0 ml-3 ${isSelected ? 'bg-white text-brand-brown border-white' : 'border-brand-sand/30 bg-brand-cream/10'}`}>
-                            {isSelected && <Check size={12} className="stroke-[4]" />}
-                          </div>
-                        </div>
-                      );
-                    }) : (
+                  <div className="max-h-[320px] overflow-y-auto p-3 custom-scrollbar bg-white/50">
+                    {filteredData.length > 0 ? (
+                      <>
+                        {filteredData.slice(0, showAll ? undefined : 5).map((item: any) => {
+                          const id = item.id || item._id;
+                          const isSelected = selectedIds.has(id);
+                          return (
+                            <div
+                              key={id}
+                              onClick={() => toggleSelect(id)}
+                              className={`px-3 py-2 rounded-xl mb-1.5 cursor-pointer transition-all flex items-center justify-between border-2 ${isSelected ? 'bg-brand-brown text-white border-brand-brown shadow-md -translate-y-0.5' : 'bg-white border-brand-cream/40 hover:border-brand-sand text-gray-700'}`}
+                            >
+                              <div className="min-w-0">
+                                <h4 className="font-display uppercase tracking-tight truncate text-sm leading-none">{item.fullName}</h4>
+                                <p className="text-[9px] font-bold opacity-50 uppercase truncate tracking-widest mt-0.5">{item.church}</p>
+                              </div>
+                              <div className={`w-5 h-5 rounded-md flex items-center justify-center border-2 transition-all shrink-0 ml-3 ${isSelected ? 'bg-white text-brand-brown border-white' : 'border-brand-sand/30 bg-brand-cream/10'}`}>
+                                {isSelected && <Check size={12} className="stroke-[4]" />}
+                              </div>
+                            </div>
+                          );
+                        })}
+
+                        {filteredData.length > 5 && (
+                          <button
+                            onClick={() => setShowAll(!showAll)}
+                            className="w-full py-3 border-2 border-dashed border-brand-sand/20 rounded-xl text-[9px] font-black uppercase tracking-widest text-brand-brown/40 hover:border-brand-brown/30 hover:text-brand-brown/60 transition-all flex items-center justify-center gap-2 group mb-1"
+                          >
+                            {showAll ? 'Show Fewer Records' : `Show all ${filteredData.length} records`}
+                          </button>
+                        )}
+                      </>
+                    ) : (
                       <div className="text-center py-8 opacity-20">
                         <Search size={36} className="mx-auto mb-3" />
                         <p className="font-display text-lg uppercase italic">No Matches Found</p>
@@ -673,39 +697,52 @@ I understand that this event involves various physical activities, spiritual ses
                     )}
                   </div>
 
-                  <div className="px-3 py-2.5 bg-brand-cream/10 border-t border-brand-sand/30 flex items-center gap-3">
-                    <div className="w-9 h-9 rounded-xl bg-brand-brown text-white flex items-center justify-center font-display text-base shadow shrink-0">
-                      {selectedIds.size}
+                  {/* Batch Action Footer */}
+                  <div className="px-3 py-4 bg-brand-cream/10 border-t border-brand-sand/30 flex flex-col gap-4">
+                    {/* Top Row: Info & Toggle */}
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div className="w-9 h-9 rounded-xl bg-brand-brown text-white flex items-center justify-center font-display text-base shadow shrink-0">
+                          {selectedIds.size}
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-[9px] font-black text-brand-brown/40 uppercase tracking-widest leading-none">Batch Queue</p>
+                          <p className="text-[10px] font-black text-brand-brown uppercase truncate">
+                            {selectedIds.size > 0 ? 'Ready to Export' : 'Select items below'}
+                          </p>
+                        </div>
+                      </div>
+
+                      <label className="flex items-center gap-2 cursor-pointer group bg-brand-cream/5 px-2.5 py-1.5 rounded-lg border border-brand-sand/30 shrink-0">
+                        <input
+                          type="checkbox"
+                          checked={separateFiles}
+                          onChange={e => setSeparateFiles(e.target.checked)}
+                          className="w-3.5 h-3.5 rounded border-2 border-brand-sand/50 text-brand-brown focus:ring-brand-brown transition-all cursor-pointer"
+                        />
+                        <span className="text-[8px] font-black text-brand-brown/60 uppercase tracking-widest group-hover:text-brand-brown transition-colors">1 File each</span>
+                      </label>
                     </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-[9px] font-black text-brand-brown/40 uppercase tracking-widest leading-none">Batch Queue</p>
-                      <p className="text-[10px] font-black text-brand-brown uppercase">{selectedIds.size > 0 ? 'Ready to Print' : 'Select campers above'}</p>
+
+                    {/* Bottom Row: Actions */}
+                    <div className="flex gap-2">
+                      <button
+                        onClick={handleDownloadPDF}
+                        disabled={selectedIds.size === 0 || activeExport?.isProcessing}
+                        className="flex-1 border-2 border-brand-brown/20 text-brand-brown px-4 py-2.5 rounded-xl hover:bg-brand-brown/5 transition-all font-black uppercase text-[10px] tracking-widest disabled:opacity-50 flex items-center justify-center gap-2"
+                      >
+                        {activeExport?.isProcessing ? <Loader2 className="animate-spin" size={16} /> : <Download size={16} />}
+                        PDF
+                      </button>
+                      <button
+                        onClick={handlePrint}
+                        disabled={selectedIds.size === 0 || activeExport?.isProcessing}
+                        className="flex-1 bg-brand-brown text-white px-5 py-2.5 rounded-xl shadow-lg hover:bg-brand-light-brown active:scale-[0.98] transition-all font-black uppercase text-[10px] tracking-[0.2em] disabled:opacity-40 flex items-center justify-center gap-2"
+                      >
+                        <Printer size={16} />
+                        Print
+                      </button>
                     </div>
-                    <label className="flex items-center gap-2 cursor-pointer group bg-brand-cream/5 px-2 py-1.5 rounded-lg border border-brand-sand/30 shrink-0">
-                      <input
-                        type="checkbox"
-                        checked={separateFiles}
-                        onChange={e => setSeparateFiles(e.target.checked)}
-                        className="w-3.5 h-3.5 rounded border-2 border-brand-sand/50 text-brand-brown focus:ring-brand-brown transition-all cursor-pointer"
-                      />
-                      <span className="text-[8px] font-black text-brand-brown/60 uppercase tracking-widest group-hover:text-brand-brown transition-colors whitespace-nowrap">1 File each</span>
-                    </label>
-                    <button
-                      onClick={handleDownloadPDF}
-                      disabled={activeExport?.isProcessing}
-                      className="flex items-center justify-center gap-2 border-2 border-brand-brown/20 text-brand-brown px-4 py-2.5 rounded-xl hover:bg-brand-brown/5 transition-all font-black uppercase text-[10px] tracking-widest disabled:opacity-50 shrink-0"
-                    >
-                      {activeExport?.isProcessing ? <Loader2 className="animate-spin" size={16} /> : <Download size={16} />}
-                      PDF
-                    </button>
-                    <button
-                      onClick={handlePrint}
-                      disabled={activeExport?.isProcessing}
-                      className="flex items-center justify-center gap-2 bg-brand-brown text-white px-5 py-2.5 rounded-xl shadow-lg hover:bg-brand-light-brown active:scale-[0.98] transition-all font-black uppercase text-[10px] tracking-[0.2em] disabled:opacity-40 shrink-0"
-                    >
-                      <Printer size={16} />
-                      Print
-                    </button>
                   </div>
                 </>
               )}
