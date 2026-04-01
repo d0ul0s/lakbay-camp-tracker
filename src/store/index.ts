@@ -148,7 +148,7 @@ export const useAppStore = create<AppState>()((set) => {
     users: [],
     isLoading: false,
     globalError: null,
-    isServerAwake: sessionStorage.getItem('lakbay_server_awake') === 'true',
+    isServerAwake: localStorage.getItem('lakbay_server_awake') === 'true',
     hasBooted: !!initialCache,
     hasSyncedLive: false,
     pendingMutations: new Set<string>(),
@@ -156,7 +156,7 @@ export const useAppStore = create<AppState>()((set) => {
     setLoading: (loading: boolean) => set({ isLoading: loading }),
     setGlobalError: (error: string | null) => set({ globalError: error }),
     setServerAwake: (awake: boolean) => {
-      sessionStorage.setItem('lakbay_server_awake', awake ? 'true' : 'false');
+      localStorage.setItem('lakbay_server_awake', awake ? 'true' : 'false');
       set({ isServerAwake: awake });
     },
 

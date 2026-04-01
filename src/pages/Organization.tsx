@@ -1238,14 +1238,12 @@ export default function Organization() {
         isDestructive={confirmState.isDestructive}
       />
 
-      {/* Hidden Print Styling and Content */}
       <style>{`
         @media print {
-          body * { visibility: hidden; }
-          #print-root, #print-root * { visibility: visible; }
-          #print-root { position: absolute; left: 0; top: 0; width: 100%; color: black !important; background: white !important; }
-          .no-print { display: none !important; }
           @page { margin: 1cm; }
+          body > *:not(#print-root) { display: none !important; }
+          #print-root { display: block !important; visibility: visible !important; position: static !important; width: 100% !important; margin: 0 !important; padding: 0 !important; }
+          #print-root * { visibility: visible !important; }
         }
       `}</style>
       

@@ -42,62 +42,60 @@ export default function CampCountdown() {
     : { days: 0, hours: 0, minutes: 0, seconds: 0 };
 
   return (
-    <div className="w-full animate-in fade-in zoom-in-95 duration-700">
-      <div className={`relative overflow-hidden rounded-[32px] p-6 md:p-10 border shadow-sm transition-all ${
+    <div className="w-full animate-in fade-in slide-in-from-top-4 duration-700">
+      <div className={`relative overflow-hidden rounded-2xl md:rounded-full px-4 py-2.5 md:py-3 border shadow-lg transition-all ${
         phase === 'live' 
-          ? 'bg-gradient-to-br from-brand-brown to-[#4d3227] border-brand-brown text-white shadow-xl shadow-brand-brown/20' 
-          : 'bg-white border-brand-sand/20'
+          ? 'bg-brand-brown border-brand-brown text-white ring-2 ring-brand-sand/20' 
+          : 'bg-white/80 backdrop-blur-md border-white/50'
       }`}>
-        {/* Background Decorative Element */}
-        <div className={`absolute top-0 right-0 -mr-16 -mt-16 w-64 h-64 rounded-full blur-[100px] opacity-10 pointer-events-none transition-colors ${
-          phase === 'live' ? 'bg-brand-sand' : 'bg-brand-brown'
-        }`} />
+        {/* Subtle Pulse Decor */}
+        {phase === 'live' && (
+            <div className="absolute inset-0 bg-brand-sand/5 animate-pulse pointer-events-none"></div>
+        )}
 
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-8 relative z-10">
-          <div className="space-y-3">
-            <div className="flex items-center gap-3">
-              <div className={`p-2.5 rounded-2xl ${
-                phase === 'live' ? 'bg-white/10 text-brand-sand' : 'bg-brand-sand/10 text-brand-brown'
-              }`}>
-                {phase === 'countdown' && <Timer size={24} />}
-                {phase === 'live' && <Zap size={24} className="animate-pulse" />}
-                {phase === 'post' && <Trophy size={24} />}
-              </div>
-              <h3 className={`text-[10px] md:text-sm font-black uppercase tracking-[0.3em] ${
-                phase === 'live' ? 'text-brand-sand' : 'text-brand-brown/50'
-              }`}>
-                {phase === 'countdown' && "LAKBAY CAMP Begins In"}
-                {phase === 'live' && "LAKBAY CAMP IS NOW LIVE!"}
-                {phase === 'post' && "Time Since LAKBAY CAMP Concluded"}
-              </h3>
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 relative z-10">
+          {/* Status Badge */}
+          <div className="flex items-center gap-2.5">
+            <div className={`flex items-center justify-center shrink-0 w-7 h-7 rounded-lg ${
+              phase === 'live' ? 'bg-white/10 text-brand-sand' : 'bg-brand-sand/10 text-brand-brown'
+            }`}>
+              {phase === 'countdown' && <Timer size={14} />}
+              {phase === 'live' && <Zap size={14} className="animate-pulse" />}
+              {phase === 'post' && <Trophy size={14} />}
             </div>
-            <p className={`text-xl md:text-2xl font-bold leading-tight max-w-md ${phase === 'live' ? 'text-white' : 'text-brand-brown'}`}>
-              {phase === 'countdown' && "Preparing for an unforgettable experience."}
-              {phase === 'live' && "The fire has been lit. The camp is here."}
-              {phase === 'post' && "The legacy continues. Keeping the fire burning."}
-            </p>
+            <div className="min-w-0">
+               <h3 className={`text-[9px] font-black uppercase tracking-[0.2em] leading-none ${
+                 phase === 'live' ? 'text-brand-sand' : 'text-brand-brown/40'
+               }`}>
+                 {phase === 'countdown' && "LAKBAY Begins In"}
+                 {phase === 'live' && "LAKBAY IS LIVE!"}
+                 {phase === 'post' && "Legacy Continued"}
+               </h3>
+               {/* Compact description (Single line only) */}
+               <p className={`text-[10px] font-bold truncate mt-0.5 ${phase === 'live' ? 'text-white/80' : 'text-brand-brown/70'}`}>
+                 {phase === 'countdown' && "The countdown to fire."}
+                 {phase === 'live' && "The flame is lit."}
+                 {phase === 'post' && "Keeping the fire burning."}
+               </p>
+            </div>
           </div>
 
-          {/* Timer Display */}
-          <div className="flex items-center gap-2 md:gap-4 overflow-x-auto pb-2 md:pb-0 scrollbar-hide">
+          {/* Compact Ticker Timer */}
+          <div className="flex items-center gap-1.5 sm:gap-2.5">
             {[
-              { label: 'Days', value: time.days },
-              { label: 'Hrs', value: time.hours },
-              { label: 'Min', value: time.minutes },
-              { label: 'Sec', value: time.seconds }
+              { label: 'd', value: time.days },
+              { label: 'h', value: time.hours },
+              { label: 'm', value: time.minutes },
+              { label: 's', value: time.seconds }
             ].map((part, idx) => (
-              <div key={idx} className="flex flex-col items-center">
-                <div className={`rounded-[24px] w-14 h-14 md:w-20 md:h-20 flex items-center justify-center shadow-inner ${
-                  phase === 'live' ? 'bg-white/10 border border-white/5' : 'bg-brand-sand/5 border border-brand-sand/10'
+              <div key={idx} className="flex items-baseline gap-0.5">
+                <span className={`text-lg md:text-xl font-display tabular-nums leading-none tracking-tighter ${
+                  phase === 'live' ? 'text-white' : 'text-brand-brown'
                 }`}>
-                  <span className={`text-2xl md:text-4xl font-display tabular-nums leading-none tracking-tighter ${
-                    phase === 'live' ? 'text-white' : 'text-brand-brown'
-                  }`}>
-                    {part.value.toString().padStart(2, '0')}
-                  </span>
-                </div>
-                <span className={`text-[9px] font-black uppercase tracking-widest mt-3 ${
-                  phase === 'live' ? 'text-white/40' : 'text-gray-400'
+                  {part.value.toString().padStart(2, '0')}
+                </span>
+                <span className={`text-[8px] font-black uppercase tracking-tighter self-end mb-0.5 ${
+                  phase === 'live' ? 'text-white/40' : 'text-brand-brown/20'
                 }`}>{part.label}</span>
               </div>
             ))}

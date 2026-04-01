@@ -475,17 +475,17 @@ Every contribution goes directly towards subsidized registration fees and qualit
            )}
 
            {/* REGISTRY LIST (Ultra-Compact Peak) */}
-           <div className="bg-white rounded-[2.5rem] border-2 border-brand-sand shadow-2xl overflow-hidden flex flex-col">
+           <div className="bg-white rounded-3xl md:rounded-[2.5rem] border-2 border-brand-sand shadow-2xl overflow-hidden flex flex-col">
               
               {/* QUICK MANUAL ENTRY (Solicitation Only) */}
               {activeTab === 'solicitation' && (
-                <div className="p-8 border-b border-gray-100 bg-brand-cream/5 animate-in slide-in-from-top-2 duration-500">
-                   <div className="flex items-center justify-between mb-4 px-1">
-                      <div className="space-y-1">
+                <div className="p-4 md:p-8 border-b border-gray-100 bg-brand-cream/5 animate-in slide-in-from-top-2 duration-500">
+                   <div className="flex items-center justify-between mb-3 md:mb-4 px-1">
+                      <div className="space-y-0.5 md:space-y-1">
                          <span className="text-[10px] font-black text-brand-brown/60 uppercase tracking-[0.25em]">Quick Manual Entry</span>
-                         <h3 className="text-xl font-display text-brand-brown tracking-tight">On-the-Fly Letter Generation</h3>
+                         <h3 className="text-lg md:text-xl font-display text-brand-brown tracking-tight">On-the-Fly Outreach</h3>
                       </div>
-                      <div className="text-right">
+                      <div className="text-right hidden md:block">
                          <span className="text-[9px] font-black text-brand-brown/40 uppercase tracking-widest bg-brand-cream/30 px-2 py-0.5 rounded-md italic">Outreach Mode</span>
                       </div>
                    </div>
@@ -494,26 +494,26 @@ Every contribution goes directly towards subsidized registration fees and qualit
                          type="text" 
                          value={manualSponsorName}
                          onChange={e => setManualSponsorName(e.target.value)}
-                         placeholder="Name of Person or Organization..."
-                         className="flex-1 px-5 py-4 bg-white rounded-2xl border-2 border-brand-sand/40 focus:border-brand-brown focus:outline-none font-bold text-gray-800 text-sm shadow-sm transition-all"
+                         placeholder="Name or Org..."
+                         className="flex-1 px-4 md:px-5 py-3 md:py-4 bg-white rounded-xl md:rounded-2xl border-2 border-brand-sand/40 focus:border-brand-brown focus:outline-none font-bold text-gray-800 text-xs md:text-sm shadow-sm transition-all min-w-0"
                       />
                       <button 
                         onClick={handleManualExport}
                         disabled={!manualSponsorName.trim() || isManualExporting}
-                        className="bg-brand-brown text-white px-5 py-4 rounded-2xl shadow-xl hover:bg-brand-light-brown disabled:opacity-50 transition-all flex items-center justify-center min-w-[48px]"
+                        className="bg-brand-brown text-white p-3 md:px-5 md:py-4 rounded-xl md:rounded-2xl shadow-xl hover:bg-brand-light-brown disabled:opacity-50 transition-all flex items-center justify-center"
                       >
-                         {isManualExporting ? <Loader2 size={16} className="animate-spin" /> : <FileDown size={18} />}
+                         {isManualExporting ? <Loader2 size={18} className="animate-spin" /> : <FileDown size={18} />}
                       </button>
                       <button 
                         onClick={handleManualPrint}
                         disabled={!manualSponsorName.trim() || isManualExporting}
-                        className="bg-white border-2 border-brand-brown text-brand-brown px-5 py-4 rounded-2xl shadow-md hover:bg-brand-cream disabled:opacity-50 transition-all flex items-center justify-center min-w-[48px]"
+                        className="bg-white border-2 border-brand-brown text-brand-brown p-3 md:px-5 md:py-4 rounded-xl md:rounded-2xl shadow-md hover:bg-brand-cream disabled:opacity-50 transition-all flex items-center justify-center min-w-[44px] md:min-w-[48px]"
                       >
                          <Printer size={18} />
                       </button>
                    </div>
-                   <p className="mt-4 text-[10px] font-bold text-gray-400 uppercase tracking-widest text-center italic opacity-60">
-                      * This bypasses the record list and generates an instant, branded letter for outreach.
+                   <p className="mt-3 md:mt-4 text-[9px] md:text-[10px] font-bold text-gray-400 uppercase tracking-widest text-center italic opacity-60">
+                      * This generates an instant, branded letter without a permanent record.
                    </p>
                 </div>
               )}
