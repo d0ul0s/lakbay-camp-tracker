@@ -304,7 +304,7 @@ I understand that this event involves various physical activities, spiritual ses
                 onClick={() => { setActiveTab('solicitation'); setSelectedIds(new Set()); setSearchQuery(''); }}
                 className={`flex items-center gap-1.5 px-4 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === 'solicitation' ? 'bg-brand-brown text-white shadow-sm' : 'text-gray-400 hover:text-brand-brown'}`}
               >
-                <HeartHandshake size={13} /> Letters
+                <HeartHandshake size={13} /> Solicitation Letter
               </button>
             </div>
           </div>
