@@ -12,10 +12,9 @@ import {
 } from 'lucide-react';
 import { useAppStore } from '../store';
 import api from '../api/axios';
-import _html2pdf from 'html2pdf.js';
 
-// Handle potential module bundling variations
-const html2pdf = _html2pdf;
+// Loaded via local script tag in index.html for hardware-independent reliability
+declare const html2pdf: any;
 
 type DocTemplate = 'waiver' | 'solicitation';
 
@@ -94,16 +93,23 @@ export default function DocumentRegistry() {
   };
 
   const handleManualExport = async () => {
-    if (!manualPrintRef.current) return;
     setIsManualExporting(true);
+    
     try {
-      // 1. Give React a moment to sync DOM with current state (name/signature)
-      await new Promise(resolve => setTimeout(resolve, 200));
+      if (typeof html2pdf === 'undefined') {
+        alert("PDF Engine is still loading. Please wait a few seconds or use the Print button.");
+        return;
+      }
 
+      // Wait for React to render the manualPrintRef
+      await new Promise(resolve => setTimeout(resolve, 600));
+      
       const element = manualPrintRef.current;
-      const rawName = manualSponsorName || 'BLANK_RECIPIENT';
-      const safeName = rawName.toUpperCase().replace(/[^A-Z0-9]/g, '_');
+      if (!element) throw new Error('Manual document staging area could not be found.');
 
+      const rawName = manualSponsorName || 'RECIPIENT';
+      const safeName = rawName.toUpperCase().replace(/[^A-Z0-9]/g, '_');
+      
       const opt = {
         margin: 0,
         filename: `LAKBAY_SOLICITATION_${safeName}_${new Date().getTime()}.pdf`,
@@ -112,30 +118,56 @@ export default function DocumentRegistry() {
         jsPDF: { unit: 'in', format: 'a4', orientation: 'portrait' as const }
       };
 
-      // @ts-ignore
-      const exporter = typeof html2pdf === 'function' ? html2pdf : (html2pdf as any).default;
-      
-      if (exporter) {
-        await exporter().from(element).set(opt).save();
-      } else {
-        throw new Error('PDF Engine not found.');
-      }
-
+      await html2pdf().from(element).set(opt).save();
       setManualSponsorName('');
-    } catch (err) {
+    } catch (err: any) {
       console.error('Manual Export Failed:', err);
-      alert("PDF Generation Failed. Please try again or use the Print button.");
+      alert(`Manual Export Failed: ${err.message || 'Unknown Error'}. Please try the Print button.`);
     } finally {
       setIsManualExporting(false);
     }
   };
 
-  const handleManualPrint = () => {
-    if (!manualPrintRef.current) return;
-    // Brief delay to ensure any recent state changes (like signature) are in DOM
+  const handleManualPrint = async () => {
+    setIsManualExporting(true);
+    // Wait for render
     setTimeout(() => {
       window.print();
-    }, 250);
+      setIsManualExporting(false);
+    }, 600);
+  };
+
+  const handleDownloadPDF = async () => {
+    if (selectedIds.size === 0) return;
+    setIsExporting(true);
+
+    try {
+      if (typeof html2pdf === 'undefined') {
+        alert("PDF Engine is still loading. Please wait a few seconds or use the Print button.");
+        return;
+      }
+
+      // 1. Wait for batch area to render off-screen
+      await new Promise(resolve => setTimeout(resolve, 800));
+      
+      const element = printRef.current;
+      if (!element) throw new Error('Document staging area could not be found.');
+
+      const opt = {
+        margin: 0,
+        filename: `LAKBAY_BATCH_${activeTab.toUpperCase()}_${new Date().getTime()}.pdf`,
+        image: { type: 'jpeg' as const, quality: 0.98 },
+        html2canvas: { scale: 3, useCORS: true, letterRendering: true, logging: false, scrollX: 0, scrollY: 0 },
+        jsPDF: { unit: 'in', format: 'a4', orientation: 'portrait' as const }
+      };
+
+      await html2pdf().from(element).set(opt).save();
+    } catch (err: any) {
+      console.error('Batch Export Failed:', err);
+      alert(`Export Failed: ${err.message || 'Unknown Error'}. Please try selecting fewer items or use the Print button.`);
+    } finally {
+      setIsExporting(false);
+    }
   };
 
   const replaceTags = (text: string, item: any) => {
@@ -193,49 +225,6 @@ export default function DocumentRegistry() {
     window.print();
   };
 
-  const handleDownloadPDF = async () => {
-    if (selectedIds.size === 0 || !printRef.current) return;
-    setIsExporting(true);
-
-    try {
-      const element = printRef.current;
-      const ids = Array.from(selectedIds);
-
-      let fileName = 'LAKBAY_Batch_Export.pdf';
-
-      if (ids.length === 1) {
-        const item: any = activeTab === 'waiver'
-          ? registrants.find(r => (r.id || (r as any)._id) === ids[0])
-          : solicitations.find(s => (s.id || (s as any)._id) === ids[0]);
-
-        const rawName = activeTab === 'waiver' ? item?.fullName : item?.sourceName;
-        const safeName = (rawName || 'Document').toUpperCase().replace(/[^A-Z0-9]/g, '_');
-        fileName = `LAKBAY_${safeName}-${activeTab === 'waiver' ? 'WAIVER' : 'LETTER'}.pdf`;
-      }
-
-      const opt = {
-        margin: 0,
-        filename: fileName,
-        image: { type: 'jpeg' as const, quality: 0.98 },
-        html2canvas: { scale: 3, useCORS: true, letterRendering: true, logging: false, scrollX: 0, scrollY: 0 },
-        jsPDF: { unit: 'in', format: 'a4', orientation: 'portrait' as const }
-      };
-
-      // @ts-ignore
-      const exporter = typeof html2pdf === 'function' ? html2pdf : (html2pdf as any).default;
-      
-      if (exporter) {
-        await exporter().from(element).set(opt).save();
-      } else {
-        throw new Error('PDF Engine not found.');
-      }
-    } catch (err) {
-      console.error('PDF Generation Failed:', err);
-    } finally {
-      setIsExporting(false);
-    }
-  };
-
   const renderDocument = (item: any, type: DocTemplate) => {
     const content = type === 'waiver'
       ? (appSettings?.waiverTemplate || `I, _________________________, the parent/legal guardian of {{name}}, a member of {{church}}, hereby give my full consent for my child to participate in the {{camp_name}} at {{camp_location}}.
@@ -249,21 +238,21 @@ I understand that this event involves various physical activities, spiritual ses
       : (appSettings?.solicitationTemplate || getDefaultSolicitation());
 
     return (
-      <div key={item?.id || item?._id} className="bg-white shadow-none mx-auto border border-gray-100 flex flex-col page-break-after-always overflow-hidden w-[816px] h-[1056px] p-16">
+      <div key={item?.id || item?._id} className="bg-white shadow-none mx-auto border border-gray-100 flex flex-col page-break-after-always overflow-hidden w-[816px] h-[1056px] p-16 printable-document">
 
         {/* HEADER */}
-        <div className="border-b-2 border-brand-brown pb-8 mb-10 shrink-0 flex items-center justify-between">
+        <div style={{ borderColor: '#8B4513' }} className="border-b-2 pb-8 mb-10 shrink-0 flex items-center justify-between">
           <div className="flex items-center gap-4">
             {branding.logoUrl ? (
               <img src={branding.logoUrl} alt="Logo" className="w-16 h-16 object-contain" />
             ) : (
-              <div className="bg-brand-brown w-14 h-14 flex items-center justify-center font-display text-white text-3xl">J</div>
+              <div style={{ backgroundColor: '#8B4513' }} className="w-14 h-14 flex items-center justify-center font-display text-white text-3xl">J</div>
             )}
             <div>
-              <h1 className="font-display text-brand-brown tracking-tighter text-4xl mb-1">
+              <h1 style={{ color: '#8B4513' }} className="font-display tracking-tighter text-4xl mb-1">
                 JESUS ALLIANCE MISSION
               </h1>
-              <p className="font-sans font-black uppercase text-gray-400 tracking-[0.25em] text-[11px]">
+              <p style={{ color: '#9CA3AF' }} className="font-sans font-black uppercase tracking-[0.25em] text-[11px]">
                 LIPIT-TOMEENG, SAN FABIAN, PANGASINAN
               </p>
             </div>
@@ -272,17 +261,31 @@ I understand that this event involves various physical activities, spiritual ses
 
         <div className="flex-1 min-h-0 relative">
           {type === 'waiver' && (
-            <h2 className="font-display text-brand-brown text-center uppercase tracking-[0.3em] border-b border-brand-sand/20 text-3xl mb-6 pb-6">
-              Official Parent Consent
-            </h2>
+            <>
+              <div style={{ borderColor: 'rgba(210, 180, 140, 0.1)' }} className="flex justify-between items-end mb-6 font-serif text-[13px] border-b pb-4 min-h-[60px]">
+                <div className="space-y-1">
+                  <p style={{ color: '#8B4513' }} className="font-black uppercase tracking-widest text-[9px]">PARTICIPANT:</p>
+                  <p className="text-xl font-bold uppercase text-gray-800">{item?.fullName || '________________'}</p>
+                </div>
+                <div className="text-right space-y-1">
+                  <p style={{ color: '#8B4513' }} className="font-black uppercase tracking-widest text-[9px]">DATE ISSUED:</p>
+                  <p className="text-lg font-bold uppercase text-gray-800">
+                    {new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
+                  </p>
+                </div>
+              </div>
+              <h2 style={{ color: '#8B4513', borderColor: 'rgba(210, 180, 140, 0.2)' }} className="font-display text-center uppercase tracking-[0.3em] border-b text-3xl mb-6 pb-6">
+                Official Parent Consent
+              </h2>
+            </>
           )}
 
           {type === 'solicitation' && (
-            <div className="flex justify-between items-end mb-8 font-serif text-[13px] border-b border-brand-sand/10 pb-4 min-h-[60px]">
+            <div style={{ borderColor: 'rgba(210, 180, 140, 0.1)' }} className="flex justify-between items-end mb-8 font-serif text-[13px] border-b pb-4 min-h-[60px]">
               <div className="space-y-1">
                 {(item?.fullName || item?.sourceName) ? (
                   <>
-                    <p className="font-black text-brand-brown uppercase tracking-widest text-[9px]">RECIPIENT:</p>
+                    <p style={{ color: '#8B4513' }} className="font-black uppercase tracking-widest text-[9px]">RECIPIENT:</p>
                     <p className="text-xl font-bold uppercase text-gray-800">{replaceTags('{{name}}', item)}</p>
                   </>
                 ) : (
@@ -290,7 +293,7 @@ I understand that this event involves various physical activities, spiritual ses
                 )}
               </div>
               <div className="text-right space-y-1">
-                <p className="font-black text-brand-brown uppercase tracking-widest text-[9px]">DATE ISSUED:</p>
+                <p style={{ color: '#8B4513' }} className="font-black uppercase tracking-widest text-[9px]">DATE ISSUED:</p>
                 <p className="text-lg font-bold uppercase text-gray-800">
                   {new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
                 </p>
@@ -298,7 +301,7 @@ I understand that this event involves various physical activities, spiritual ses
             </div>
           )}
 
-          <div className="font-serif text-gray-800 text-justify leading-relaxed whitespace-pre-wrap text-base">
+          <div style={{ color: '#4B5563' }} className="font-sans text-sm leading-relaxed whitespace-pre-wrap">
             {replaceTags(content, item)}
           </div>
 
@@ -316,13 +319,12 @@ I understand that this event involves various physical activities, spiritual ses
                   </div>
                 )}
 
-                <div className="border-b-2 border-brand-brown pb-1 text-xl font-display text-brand-brown relative z-10 text-left">
+                <div style={{ borderColor: '#8B4513', color: '#8B4513' }} className="border-b-2 pb-1 text-xl font-display relative z-10 text-left">
                   {item?.manualSignatory || branding.campSignatory}
                 </div>
                 <div className="mt-2 space-y-0.5">
-                  <p className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-400">Youth Leader Representative</p>
-                  <p className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-400">{branding.churchName}</p>
-                  <p className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-500 font-mono">Contact: +63 962 526 9054</p>
+                  <p style={{ color: '#9CA3AF' }} className="text-[10px] font-black uppercase tracking-[0.2em]">Youth Leader Representative</p>
+                  <p style={{ color: '#9CA3AF' }} className="text-[10px] font-black uppercase tracking-[0.2em]">{branding.churchName}</p>
                 </div>
               </div>
             </div>
@@ -338,12 +340,21 @@ I understand that this event involves various physical activities, spiritual ses
                 <p className="font-sans font-black uppercase tracking-[0.2em] text-gray-400 text-[8px] mt-1">Registered Delegate</p>
               </div>
 
-              <div className="w-full">
-                <p className="font-serif italic text-gray-600 mb-4 text-sm">Parent/Guardian Signature:</p>
-                <div className="border-b-2 border-brand-brown pb-1 min-w-[280px] h-12">
-                  {/* Space for parent signature */}
+              <div className="flex gap-8 w-full">
+                <div className="flex-1">
+                  <p className="font-serif italic text-gray-600 mb-4 text-sm">Parent/Guardian Signature:</p>
+                  <div className="border-b-2 border-brand-brown pb-1 h-12">
+                    {/* Space for parent signature */}
+                  </div>
+                  <p className="font-sans font-black uppercase tracking-[0.2em] text-brand-brown text-[9px] mt-2">Parent / Legal Guardian Name & Signature</p>
                 </div>
-                <p className="font-sans font-black uppercase tracking-[0.2em] text-brand-brown text-[9px] mt-2">Parent / Legal Guardian Name & Signature</p>
+                <div className="w-40">
+                  <p className="font-serif italic text-gray-600 mb-4 text-sm">Date Signed:</p>
+                  <div className="border-b-2 border-brand-brown pb-1 h-12">
+                    {/* Space for date signature */}
+                  </div>
+                  <p className="font-sans font-black uppercase tracking-[0.2em] text-gray-400 text-[9px] mt-2">MM / DD / YYYY</p>
+                </div>
               </div>
             </div>
           )}
@@ -388,7 +399,7 @@ I understand that this event involves various physical activities, spiritual ses
                 <div className="p-4 md:p-6 border-b border-gray-100 bg-brand-cream/5 animate-in slide-in-from-top-2 duration-500">
                   <div className="flex items-center justify-between mb-4 md:mb-6 px-1">
                     <div className="space-y-0.5 md:space-y-1">
-                      <span className="text-[10px] font-black text-brand-brown/60 uppercase tracking-[0.25em]">Executive Document Suite</span>
+                      <span className="text-[10px] font-black text-brand-brown/60 uppercase tracking-[0.25em] ">Executive Document Suite</span>
                       <h3 className="text-xl md:text-2xl font-display text-brand-brown tracking-tighter leading-none">Official Document Hub</h3>
                     </div>
                     <div className="text-right hidden md:block">
@@ -513,30 +524,31 @@ I understand that this event involves various physical activities, spiritual ses
                       </div>
                     </div>
                   </div>
-
                   <div className="flex flex-col md:flex-row gap-3 items-center justify-between pt-4 border-t border-brand-sand/10 px-1">
                     <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest italic opacity-60">
                       * Generates an official solicitation letter.
                     </p>
-                    <div className="flex gap-2 w-full md:w-auto">
-                      <button
-                        onClick={handleManualExport}
-                        disabled={isManualExporting}
-                        className="flex-1 md:flex-none md:min-w-[140px] bg-brand-brown text-white px-6 py-3 rounded-xl shadow-xl hover:bg-brand-light-brown hover:-translate-y-0.5 active:translate-y-0 disabled:opacity-50 transition-all flex items-center justify-center gap-2 group"
-                      >
-                        {isManualExporting ? <Loader2 size={16} className="animate-spin" /> : (
-                          <>
-                            <FileDown size={16} />
-                            <span className="text-[10px] font-black uppercase tracking-widest">Export PDF</span>
-                          </>
-                        )}
-                      </button>
+                    <div className="flex gap-2 w-full">
+                      <div className="flex-1">
+                        <button
+                          onClick={handleManualExport}
+                          disabled={isManualExporting}
+                          className="w-full bg-brand-brown text-white px-6 py-4 rounded-xl shadow-xl hover:bg-brand-light-brown active:scale-[0.98] disabled:opacity-50 transition-all flex items-center justify-center gap-3 font-black uppercase text-xs tracking-[0.25em]"
+                        >
+                          {isManualExporting ? <Loader2 size={20} className="animate-spin" /> : (
+                            <>
+                              <FileDown size={20} />
+                              <span>Download PDF</span>
+                            </>
+                          )}
+                        </button>
+                      </div>
                       <button
                         onClick={handleManualPrint}
                         disabled={isManualExporting}
-                        className="bg-white border-2 border-brand-brown text-brand-brown px-4 py-3 rounded-xl shadow-md hover:bg-brand-cream hover:-translate-y-0.5 active:translate-y-0 disabled:opacity-50 transition-all flex items-center justify-center"
+                        className="bg-white border-2 border-brand-brown text-brand-brown px-5 py-4 rounded-xl shadow-md hover:bg-brand-cream active:scale-95 transition-all flex items-center justify-center disabled:opacity-30"
                       >
-                        <Printer size={16} />
+                        <Printer size={20} />
                       </button>
                     </div>
                   </div>
@@ -602,7 +614,7 @@ I understand that this event involves various physical activities, spiritual ses
                   </div>
 
                   <div className="p-6 bg-brand-cream/20 border-t-2 border-brand-sand/50 flex flex-col gap-4">
-                    <div className="flex items-center justify-between">
+                    <div className="flex items-center justify-between px-2">
                       <div className="flex items-center gap-3">
                         <div className="w-12 h-12 rounded-2xl bg-brand-brown text-white flex items-center justify-center font-display text-xl shadow-lg">
                           {selectedIds.size}
@@ -612,25 +624,31 @@ I understand that this event involves various physical activities, spiritual ses
                           <span className="text-xs font-black text-brand-brown uppercase">Batch Queue</span>
                         </div>
                       </div>
-                      <div className="flex gap-2">
-                        <button
-                          onClick={handlePrint}
-                          disabled={selectedIds.size === 0 || isExporting}
-                          className="flex items-center gap-2 bg-white border-2 border-brand-brown text-brand-brown px-6 py-3 rounded-2xl shadow-sm hover:bg-brand-cream transition-all font-black uppercase text-[11px] tracking-widest disabled:opacity-30"
-                        >
-                          <Printer size={18} />
-                        </button>
+                      <div className="text-right">
+                        <p className="text-[9px] font-black text-brand-brown/40 uppercase tracking-widest leading-none">Status</p>
+                        <p className="text-[10px] font-black text-brand-brown uppercase mt-1">{selectedIds.size > 0 ? 'Ready to Print' : 'Waiting...'}</p>
                       </div>
                     </div>
 
-                    <button
-                      onClick={handleDownloadPDF}
-                      disabled={selectedIds.size === 0 || isExporting}
-                      className="w-full flex items-center justify-center gap-3 bg-brand-brown text-white py-4 rounded-2xl shadow-xl hover:bg-brand-light-brown active:scale-[0.98] transition-all font-black uppercase text-xs tracking-[0.25em] disabled:opacity-50"
-                    >
-                      {isExporting ? <Loader2 className="animate-spin" size={20} /> : <FileDown size={20} />}
-                      {isExporting ? 'PREPARING BATCH...' : 'DOWNLOAD PDFs'}
-                    </button>
+                    <div className="space-y-3">
+                      <button
+                        onClick={handleDownloadPDF}
+                        disabled={selectedIds.size === 0 || isExporting}
+                        className="w-full flex items-center justify-center gap-3 bg-brand-brown text-white py-4 rounded-2xl shadow-xl hover:bg-brand-light-brown active:scale-[0.98] transition-all font-black uppercase text-xs tracking-[0.25em] disabled:opacity-50"
+                      >
+                        {isExporting ? <Loader2 className="animate-spin" size={20} /> : <FileDown size={20} />}
+                        {isExporting ? 'GENERATING PDF...' : `DOWNLOAD ${selectedIds.size === 1 ? 'PDF' : 'BATCH PDF'}`}
+                      </button>
+                      
+                      <button
+                        onClick={handlePrint}
+                        disabled={selectedIds.size === 0 || isExporting}
+                        className="w-full flex items-center justify-center gap-3 bg-white border-2 border-brand-brown text-brand-brown py-3 rounded-2xl shadow-md hover:bg-brand-cream active:scale-[0.98] transition-all font-black uppercase text-[10px] tracking-widest disabled:opacity-50"
+                      >
+                        {isExporting ? <Loader2 className="animate-spin" size={16} /> : <Printer size={16} />}
+                        {isExporting ? 'PREPARING...' : `PRINT BATCH`}
+                      </button>
+                    </div>
                   </div>
                 </>
               )}
@@ -639,12 +657,20 @@ I understand that this event involves various physical activities, spiritual ses
         </div>
       </div>
 
-      {/* BATCH PRINT AREA */}
-      {(selectedIds.size > 0) && (
+      {/* BATCH PRINT AREA - Rendered off-screen when items are selected for both Print & Export */}
+      {selectedIds.size > 0 && (
         <div
           ref={printRef}
-          style={{ position: 'absolute', left: '-9999px', top: '0', width: '210mm' }}
-          className="print-area font-serif bg-white"
+          style={{
+            position: 'fixed',
+            top: '0',
+            left: '-9999px',
+            width: '210mm',
+            opacity: '1',
+            pointerEvents: 'none',
+            zIndex: '-1000'
+          }}
+          className={`print-area font-serif bg-white ${isManualExporting ? 'print:hidden' : ''}`}
         >
           {Array.from(selectedIds).map((id, index) => {
             const item = activeTab === 'waiver'
@@ -658,12 +684,19 @@ I understand that this event involves various physical activities, spiritual ses
           })}
         </div>
       )}
-
-      {/* MANUAL HIDDEN PRINT AREA */}
-      {activeTab === 'solicitation' && (
+      {/* MANUAL HIDDEN PRINT AREA - Only rendered when manually exporting/printing to avoid batch conflicts */}
+      {(activeTab === 'solicitation' && isManualExporting) && (
         <div
           ref={manualPrintRef}
-          style={{ position: 'absolute', left: '-9999px', top: '0', width: '210mm' }}
+          style={{
+            position: 'fixed',
+            top: '0',
+            left: '-9999px',
+            width: '210mm',
+            opacity: '1',
+            pointerEvents: 'none',
+            zIndex: '-1000'
+          }}
           className="print-area font-serif text-gray-800 bg-white"
         >
           {renderDocument({
@@ -674,7 +707,6 @@ I understand that this event involves various physical activities, spiritual ses
         </div>
       )}
 
-      {/* CUSTOM CONFIRMATION POP-UP */}
       {showClearConfirm && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
           <div
@@ -744,5 +776,3 @@ I understand that this event involves various physical activities, spiritual ses
     </>
   );
 }
-
-

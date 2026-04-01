@@ -61,6 +61,24 @@
   }
 }
 
+.print-area, .printable-document, .print-area * {
+  --color-brand-brown: #8B4513 !important;
+  color: #000000 !important;
+  border-color: #8B4513 !important;
+  background-color: #ffffff !important;
+  outline: none !important;
+  text-shadow: none !important;
+  box-shadow: none !important;
+  animation: none !important;
+  transition: none !important;
+  opacity: 1 !important;
+  visibility: visible !important;
+}
+
+.print-area .bg-white, .printable-document.bg-white {
+  background-color: #ffffff !important;
+}
+
 @layer components {
   .mobile-card {
     @apply bg-white p-2.5 rounded-xl shadow-sm border border-brand-beige active:scale-[0.98] transition-transform;
