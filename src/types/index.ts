@@ -154,3 +154,26 @@ export interface PointLog {
   verifiedAt?: string;
   createdAt: string;
 }
+export interface Song {
+  id?: string;
+  _id?: string;
+  title: string;
+  artist?: string;
+  key?: string;
+  lyricsUrl?: string;
+  notes?: string;
+  order: number;
+}
+
+export interface WorshipSession {
+  id: string;
+  _id?: string;
+  title: string;
+  sessionDate?: string;
+  description?: string;
+  songs: Song[];
+  isActive: boolean;
+  order: number;
+  createdAt: string;
+  updatedAt: string;
+}

@@ -6,7 +6,8 @@ import {
   Megaphone, 
   AlertTriangle, 
   ChevronRight, 
-  Activity
+  Activity,
+  Music
 } from 'lucide-react';
 import api from '../api/axios';
 import { useAppStore } from '../store';
@@ -147,11 +148,22 @@ export default function Login() {
                 
                 <button 
                   type="button" 
+                  onClick={() => navigate('/worship')} 
+                  className="flex flex-col items-center justify-center gap-2 bg-brand-sand text-brand-brown hover:bg-brand-sand/80 font-bold p-4 rounded-2xl transition-all duration-300 text-[10px] shadow-lg group active:scale-95 text-center uppercase tracking-widest"
+                >
+                  <Music size={16} className="group-hover:scale-110 transition-transform" /> 
+                  P&W Lineup
+                </button>
+             </div>
+
+             <div className="grid grid-cols-1 gap-3">
+                <button 
+                  type="button" 
                   onClick={() => navigate('/public-org')} 
-                  className="flex flex-col items-center justify-center gap-2 bg-brand-sand/20 border border-brand-sand/50 text-brand-brown hover:bg-brand-sand/40 font-bold p-4 rounded-2xl transition-all duration-300 text-[10px] shadow-sm group active:scale-95 text-center uppercase tracking-widest"
+                  className="flex items-center justify-center gap-3 bg-brand-sand/20 border border-brand-sand/50 text-brand-brown hover:bg-brand-sand/40 font-bold p-4 rounded-2xl transition-all duration-300 text-[10px] shadow-sm group active:scale-95 text-center uppercase tracking-widest w-full"
                 >
                   <Map size={16} className="text-brand-brown group-hover:scale-110 transition-transform" /> 
-                  Organization
+                  Camp Organization
                 </button>
              </div>
 

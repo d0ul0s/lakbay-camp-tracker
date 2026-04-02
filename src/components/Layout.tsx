@@ -1,6 +1,6 @@
 import { Outlet, Link, useLocation } from 'react-router-dom';
 import { useAppStore } from '../store';
-import { LayoutDashboard, Users, ShoppingBag, Receipt, Settings, FileDown, LogOut, Menu, UserCog, HeartHandshake, Loader2, AlertCircle, Activity, X, Map, Trophy, Megaphone } from 'lucide-react';
+import { LayoutDashboard, Users, ShoppingBag, Receipt, Settings, FileDown, LogOut, Menu, UserCog, HeartHandshake, Loader2, AlertCircle, Activity, X, Map, Trophy, Megaphone, Music } from 'lucide-react';
 import { useState, useEffect, useRef } from 'react';
 import { io } from 'socket.io-client';
 import { Toaster } from 'react-hot-toast';
@@ -21,6 +21,7 @@ export default function Layout() {
     syncExpense, 
     syncSolicitation, 
     syncAnnouncement, 
+    syncWorship,
     syncSettings,
     activeExport,
     clearExport
@@ -79,6 +80,7 @@ export default function Layout() {
         case 'expenses': syncExpense(action, data); break;
         case 'solicitations': syncSolicitation(action, data); break;
         case 'announcements': syncAnnouncement(action, data); break;
+        case 'worship': syncWorship(action, data); break;
         case 'settings': syncSettings(data); break;
       }
     });
@@ -145,6 +147,7 @@ export default function Layout() {
   
   if (isAdmin || currentUser?.role?.toLowerCase().trim() === 'coordinator') {
     navigation.push({ name: 'Docs & Printing', href: '/docs', icon: FileDown });
+    navigation.push({ name: 'Worship Lineup', href: '/worship/manage', icon: Music });
   }
 
   if (isAdmin) {

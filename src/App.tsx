@@ -16,6 +16,8 @@ import ErrorBoundary from './components/ErrorBoundary';
 import PublicAnnouncements from './pages/PublicAnnouncements';
 import PublicPulse from './pages/PublicPulse';
 import ManageAnnouncements from './pages/ManageAnnouncements';
+import Worship from './pages/Worship';
+import ManageWorship from './pages/ManageWorship';
 import MerchClaims from './pages/MerchClaims';
 import ActivityLogs from './pages/ActivityLogs';
 import Reports from './pages/Reports';
@@ -46,6 +48,11 @@ const router = createBrowserRouter([
     errorElement: <ErrorBoundary />
   },
   {
+    path: "/worship",
+    element: <Worship />,
+    errorElement: <ErrorBoundary />
+  },
+  {
     element: <ProtectedRoute />,
     errorElement: <ErrorBoundary />,
     children: [
@@ -66,6 +73,7 @@ const router = createBrowserRouter([
           { path: "/users", element: <Users /> },
           { path: "/tribe-sorter", element: <TribeSorter /> },
           { path: "/announcements/manage", element: <ManageAnnouncements /> },
+          { path: "/worship/manage", element: <ManageWorship /> },
         ]
       }
     ]

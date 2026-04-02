@@ -2,15 +2,11 @@ import { useState, useMemo, useEffect, useRef } from 'react';
 import {
   Printer,
   Search,
-  Users,
   HeartHandshake,
   Check,
   Loader2,
   Image,
   ShieldCheck,
-  Download,
-  Plus,
-  XCircle,
   AlertCircle,
   Info,
   HelpCircle,
@@ -54,22 +50,17 @@ export default function DocumentRegistry() {
     solicitations,
     appSettings,
     fetchGlobalSettings,
-    currentUser,
-    startExport,
-    activeExport
+    currentUser
   } = useAppStore();
 
   const [activeTab, setActiveTab] = useState<DocTemplate>('waiver');
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [searchQuery, setSearchQuery] = useState('');
   const [showAll, setShowAll] = useState(false);
-  const [manualSponsorName, setManualSponsorName] = useState('');
   const [manualSignatoryName, setManualSignatoryName] = useState('');
   const [popup, setPopup] = useState<PopupConfig | null>(null);
   const [isManualExporting, setIsManualExporting] = useState(false);
   const [isPrintingSelected, setIsPrintingSelected] = useState(false);
-  const [separateFiles, setSeparateFiles] = useState(false);
-  const [manualRecipients, setManualRecipients] = useState<string[]>([]);
   const [detectedYL, setDetectedYL] = useState<string>('');
 
   const manualPrintRef = useRef<HTMLDivElement>(null);
@@ -182,23 +173,8 @@ export default function DocumentRegistry() {
       setSelectedIds(new Set(filteredData.map(d => d.id || (d as any)._id)));
     }
   };
-
+  
   const handlePrint = async () => {
-    // Check for unsaved input
-    if (manualSponsorName.trim() && manualRecipients.length > 0) {
-      setPopup({
-        title: 'Unsaved Recipient',
-        message: `"${manualSponsorName.trim()}" is still in the input field but hasn't been added to your list yet. Print the others anyway?`,
-        type: 'confirm',
-        confirmText: 'Print Anyway',
-        onConfirm: () => {
-          setPopup(null);
-          executePrint();
-        }
-      });
-      return;
-    }
-
     executePrint();
   };
 
@@ -212,73 +188,8 @@ export default function DocumentRegistry() {
     }, 2000);
   };
 
-  const handleDownloadPDF = async () => {
-    // Check for unsaved input
-    if (manualSponsorName.trim() && manualRecipients.length > 0) {
-      setPopup({
-        title: 'Unsaved Recipient',
-        message: `"${manualSponsorName.trim()}" is still in the input field but hasn't been added to your list yet. Process the others anyway?`,
-        type: 'confirm',
-        confirmText: 'Process Anyway',
-        onConfirm: () => {
-          setPopup(null);
-          executeDownloadPDF();
-        }
-      });
-      return;
-    }
-
-    executeDownloadPDF();
-  };
-
-  const executeDownloadPDF = async () => {
-    // In solicitation tab, we allow blank prints
-    if (activeTab === 'waiver' && selectedIds.size === 0 && !manualSponsorName) return;
-
-    if (typeof html2pdf === 'undefined') {
-      setPopup({
-        title: 'Engine Loading',
-        message: 'PDF Engine is still loading. Please wait a few seconds.',
-        type: 'warning'
-      });
-      return;
-    }
-
-    const idsToExport = Array.from(selectedIds);
-    const isManualBatch = activeTab === 'solicitation' && manualRecipients.length > 0;
-    const isSingleManual = activeTab === 'solicitation' && selectedIds.size === 0;
-    const isManual = isManualBatch || isSingleManual;
-
-    let fileName = `LAKBAY_BATCH_${selectedIds.size || manualRecipients.length || 1}_DOCS_${new Date().getTime()}.pdf`;
-
-    const manualData = isManualBatch
-      ? manualRecipients.map(name => ({ sourceName: name, manualSignatory: manualSignatoryName }))
-      : (isSingleManual ? { sourceName: manualSponsorName, manualSignatory: manualSignatoryName } : undefined);
-
-    if (isManual && !isManualBatch) {
-      const cleanName = manualSponsorName.replace(/[^a-zA-Z0-9]/g, '_');
-      fileName = `${cleanName}_Solicitation_Letter.pdf`;
-    } else if (selectedIds.size === 1) {
-      const id = idsToExport[0];
-      const item = activeTab === 'waiver'
-        ? registrants.find(r => (r.id || (r as any)._id) === id)
-        : solicitations.find(s => (s.id || (s as any)._id) === id);
-      const rawName = (item as any)?.fullName || (item as any)?.sourceName || 'Export';
-      const cleanName = rawName.replace(/[^a-zA-Z0-9]/g, '_');
-      const suffix = activeTab === 'waiver' ? 'Parent_Consent' : 'Solicitation_Letter';
-      fileName = `${cleanName}_${suffix}.pdf`;
-    }
-
-    startExport({
-      ids: idsToExport,
-      template: activeTab,
-      fileName,
-      isManual,
-      separateFiles,
-      manualData
-    });
-  };
-
+  // FINAL APPROVED DOCUMENT TEMPLATE (Clean & Classic - 210mm x 297mm)
+  // No structural changes allowed without explicit user request.
   const renderDocument = (item: any, type: DocTemplate) => {
     const content = type === 'waiver'
       ? (appSettings?.waiverTemplate || `I, _________________________, the parent/legal guardian of {{name}}, a member of {{church}}, hereby give my full consent for my child to participate in the {{camp_name}} on {{camp_date}} at {{camp_location}}.
@@ -292,117 +203,112 @@ I understand that this event involves various physical activities, spiritual ses
       : (appSettings?.solicitationTemplate || getDefaultSolicitation());
 
     return (
-      <div key={item?.id || item?._id} className="bg-white shadow-none mx-auto border border-gray-100 flex flex-col overflow-hidden w-[794px] h-[1122px] p-16 printable-document">
+      <div key={item?.id || item?._id} className="bg-white shadow-none mx-auto border border-gray-100 flex flex-col justify-between overflow-hidden w-[210mm] h-[297mm] p-[15mm] printable-document relative">
+        
+        {/* CENTERED INSTITUTIONAL HEADER */}
+        <div className="flex flex-col items-center text-center shrink-0">
+          {branding.logoUrl ? (
+            <img src={branding.logoUrl} alt="Logo" crossOrigin="anonymous" className="h-20 w-auto max-w-[160px] object-contain mb-4" />
+          ) : (
+            <div style={{ backgroundColor: '#8B4513' }} className="w-16 h-16 flex items-center justify-center font-display text-white text-4xl rounded-full mb-4">L</div>
+          )}
+          <h1 style={{ color: '#111827' }} className="font-serif font-bold text-3xl tracking-tight uppercase mb-1">
+            {branding.churchName}
+          </h1>
+          <p style={{ color: '#6B7280' }} className="font-sans font-medium uppercase tracking-[0.3em] text-[10px]">
+            {branding.campLocation}
+          </p>
+          <div className="w-24 h-1 bg-brand-brown mt-6"></div>
+        </div>
 
-        {/* HEADER */}
-        <div style={{ borderColor: '#8B4513' }} className="border-b-2 pb-8 mb-10 shrink-0 flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            {branding.logoUrl ? (
-              <img src={branding.logoUrl} alt="Logo" crossOrigin="anonymous" className="h-16 w-auto max-w-[120px] object-contain" />
-            ) : (
-              <div style={{ backgroundColor: '#8B4513' }} className="w-14 h-14 flex items-center justify-center font-display text-white text-3xl">J</div>
-            )}
-            <div>
-              <h1 style={{ color: '#8B4513' }} className="font-display tracking-tighter text-4xl mb-1">
-                JESUS ALLIANCE MISSION
-              </h1>
-              <p style={{ color: '#9CA3AF' }} className="font-sans font-black uppercase tracking-[0.25em] text-[11px]">
-                LIPIT-TOMEENG, SAN FABIAN, PANGASINAN
-              </p>
+        <div className="flex-1 min-h-0">
+          {/* STANDARD METADATA LINES - Only for Consent Forms */}
+          {type === 'waiver' && (
+            <div className="space-y-4 mb-8 border-b border-gray-100 pb-10">
+              <div className="flex justify-between items-baseline gap-4">
+                <span className="font-sans font-black uppercase tracking-widest text-[10px] text-gray-400 shrink-0">
+                  Participant Name:
+                </span>
+                <div className="flex-1 border-b border-dotted border-gray-300 pb-1 text-right">
+                  <span className="text-xl font-bold text-gray-900 uppercase">
+                    {item?.fullName || '________________'}
+                  </span>
+                </div>
+              </div>
+              
+              <div className="flex justify-between items-baseline gap-4">
+                <span className="font-sans font-black uppercase tracking-widest text-[10px] text-gray-400 shrink-0">Date Issued:</span>
+                <div className="w-64 border-b border-dotted border-gray-300 pb-1 text-right">
+                  <span className="text-lg font-bold text-gray-900 uppercase">
+                    {new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
+                  </span>
+                </div>
+              </div>
             </div>
+          )}
+
+          {/* DOCUMENT BODY */}
+          <div className="mb-12">
+            <h2 style={{ color: '#111827' }} className="font-serif font-bold text-2xl uppercase tracking-tight text-center mb-6 underline underline-offset-8 decoration-2 decoration-brand-sand">
+              {type === 'waiver' ? 'Parent / Legal Guardian Consent' : 'Solicitation Letter'}
+            </h2>
+            
+            <div style={{ color: '#1F2937' }} className="font-serif text-base leading-relaxed whitespace-pre-wrap text-justify">
+              {replaceTags(content, item)}
+            </div>
+          </div>
+
+          {/* TRADITIONAL SIGNATURE BLOCK */}
+          <div className="mt-12">
+            {type === 'solicitation' ? (
+              <div className="max-w-[320px]">
+                <p className="font-serif italic text-gray-500 mb-12 text-sm leading-none">Sincerely yours,</p>
+                <div className="relative">
+                  {/* E-Signature Image */}
+                  {(item?.eSignatureUrl || currentUser?.eSignatureUrl) && (
+                    <div className="absolute top-[-4.5rem] left-4 h-24 pointer-events-none z-0">
+                      <img
+                        src={item?.eSignatureUrl || currentUser?.eSignatureUrl}
+                        alt="Signature"
+                        crossOrigin="anonymous"
+                        className="h-full w-auto object-contain mix-blend-multiply filter contrast-125 grayscale"
+                      />
+                    </div>
+                  )}
+                  <div className="border-b-2 border-gray-900 pb-2 relative z-10">
+                    <p className="text-2xl font-bold text-gray-900 leading-none">
+                      {item?.manualSignatory || branding.campSignatory}
+                    </p>
+                  </div>
+                </div>
+                <p className="font-sans font-black uppercase tracking-[0.2em] text-[9px] text-gray-400 mt-3">
+                  Youth Leader • {branding.churchName}
+                </p>
+              </div>
+            ) : (
+              <div className="flex gap-16">
+                <div className="flex-1">
+                  <p className="font-serif italic text-gray-500 mb-14 text-sm leading-none">Authorization Signature:</p>
+                  <div className="border-b-2 border-gray-900 h-1"></div>
+                  <div className="mt-4">
+                    <p className="font-sans font-black uppercase tracking-[0.2em] text-gray-900 text-[10px]">Parent / Legal Guardian Name & Signature</p>
+                    <p className="text-[8px] font-medium text-gray-400 uppercase tracking-widest mt-1">Official Consent for {branding.campName}</p>
+                  </div>
+                </div>
+                <div className="w-56">
+                  <p className="font-serif italic text-gray-500 mb-14 text-sm leading-none">Date Signed:</p>
+                  <div className="border-b-2 border-gray-900 h-1"></div>
+                  <p className="font-sans font-black uppercase tracking-[0.2em] text-gray-400 text-[10px] mt-4 text-center">MM / DD / YYYY</p>
+                </div>
+              </div>
+            )}
           </div>
         </div>
 
-        <div className="flex-1 min-h-0 relative">
-          {type === 'waiver' && (
-            <>
-              <div style={{ borderColor: 'rgba(210, 180, 140, 0.1)' }} className="flex justify-between items-end mb-6 font-serif text-[13px] border-b pb-4 min-h-[60px]">
-                <div className="space-y-1">
-                  <p style={{ color: '#8B4513' }} className="font-black uppercase tracking-widest text-[9px]">PARTICIPANT:</p>
-                  <p className="text-xl font-bold uppercase text-gray-800">{item?.fullName || '________________'}</p>
-                </div>
-                <div className="text-right space-y-1">
-                  <p style={{ color: '#8B4513' }} className="font-black uppercase tracking-widest text-[9px]">DATE ISSUED:</p>
-                  <p className="text-lg font-bold uppercase text-gray-800">
-                    {new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
-                  </p>
-                </div>
-              </div>
-              <h2 style={{ color: '#8B4513', borderColor: 'rgba(210, 180, 140, 0.2)' }} className="font-display text-center uppercase tracking-[0.3em] border-b text-3xl mb-6 pb-6">
-                Official Parent Consent
-              </h2>
-            </>
-          )}
-
-          {type === 'solicitation' && (
-              <div style={{ borderColor: 'rgba(210, 180, 140, 0.1)' }} className="flex justify-between items-end mb-8 font-serif text-[13px] border-b pb-4 min-h-[60px]">
-                <div className="space-y-1">
-                  {(item?.fullName || item?.sourceName) && (
-                    <>
-                      <p style={{ color: '#8B4513' }} className="font-black uppercase tracking-widest text-[9px]">RECIPIENT:</p>
-                      <p className="text-xl font-bold uppercase text-gray-800">{replaceTags('{{name}}', item)}</p>
-                    </>
-                  )}
-                </div>
-              <div className="text-right space-y-1">
-                <p style={{ color: '#8B4513' }} className="font-black uppercase tracking-widest text-[9px]">DATE ISSUED:</p>
-                <p className="text-lg font-bold uppercase text-gray-800">
-                  {new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
-                </p>
-              </div>
-            </div>
-          )}
-
-          <div style={{ color: '#4B5563' }} className="font-sans text-sm leading-relaxed whitespace-pre-wrap">
-            {replaceTags(content, item)}
-          </div>
-
-          {type === 'solicitation' && (
-            <div className="flex flex-col items-start mt-12 px-4">
-              <div className="w-full max-w-[320px]">
-                {/* E-Signature Image (Placed above) */}
-                {(item?.eSignatureUrl || currentUser?.eSignatureUrl) && (
-                  <div className="h-14 flex items-center justify-start ml-6 mb-[-1rem] relative z-20 overflow-visible">
-                    <img
-                      src={item?.eSignatureUrl || currentUser?.eSignatureUrl}
-                      alt="Signature"
-                      crossOrigin="anonymous"
-                      className="h-full w-auto object-contain mix-blend-multiply opacity-95 filter contrast-125"
-                    />
-                  </div>
-                )}
-
-                <div style={{ borderColor: '#8B4513', color: '#8B4513' }} className="border-b-2 pb-1 text-xl font-display relative z-10 text-left">
-                  {item?.manualSignatory || branding.campSignatory}
-                </div>
-                <div className="mt-2 space-y-0.5">
-                  <p style={{ color: '#9CA3AF' }} className="text-[10px] font-black uppercase tracking-[0.2em]">Youth Leader Representative</p>
-                  <p style={{ color: '#9CA3AF' }} className="text-[10px] font-black uppercase tracking-[0.2em]">{branding.churchName}</p>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {type === 'waiver' && (
-            <div className="flex flex-col items-start mt-12 gap-8 w-full max-w-sm">
-              <div className="flex gap-8 w-full">
-                <div className="flex-1">
-                  <p className="font-serif italic text-gray-600 mb-4 text-sm">Parent/Guardian Signature:</p>
-                  <div className="border-b-2 border-brand-brown pb-1 h-12">
-                    {/* Space for parent signature */}
-                  </div>
-                  <p className="font-sans font-black uppercase tracking-[0.2em] text-brand-brown text-[9px] mt-2">Parent / Legal Guardian Name & Signature</p>
-                </div>
-                <div className="w-40">
-                  <p className="font-serif italic text-gray-600 mb-4 text-sm">Date Signed:</p>
-                  <div className="border-b-2 border-brand-brown pb-1 h-12">
-                    {/* Space for date signature */}
-                  </div>
-                  <p className="font-sans font-black uppercase tracking-[0.2em] text-gray-400 text-[9px] mt-2">MM / DD / YYYY</p>
-                </div>
-              </div>
-            </div>
-          )}
+        {/* INSTITUTIONAL FOOTER */}
+        <div className="pt-8 border-t border-gray-100 flex items-center justify-between text-[9px] font-bold text-gray-300 uppercase tracking-widest opacity-60">
+           <p>{branding.campName} Official Documentation</p>
+           <p>{branding.campDate}</p>
         </div>
       </div>
     );
@@ -442,87 +348,18 @@ I understand that this event involves various physical activities, spiritual ses
               {activeTab === 'solicitation' && (
                 <div className="p-4 space-y-3 animate-in slide-in-from-top-2 duration-300">
 
-                  {/* Recipient + Signatory row */}
-                  <div className="flex flex-col sm:flex-row gap-4">
-                    <div className="flex-1 space-y-2">
-                      <label className="text-[9px] font-black text-brand-brown/50 uppercase tracking-widest flex items-center gap-1">
-                        <Users size={10} /> Recipient Name
-                      </label>
-                      <div className="flex gap-2">
-                        <input
-                          id="manual_sponsor_name"
-                          type="text"
-                          value={manualSponsorName}
-                          onChange={e => setManualSponsorName(e.target.value)}
-                          onKeyDown={e => {
-                            if (e.key === 'Enter') {
-                              e.preventDefault();
-                              const name = manualSponsorName.trim();
-                              if (!name) {
-                                setPopup({ title: 'Input Required', message: 'Please enter a name first.', type: 'warning' });
-                                return;
-                              }
-                              if (manualRecipients.includes(name)) {
-                                setPopup({ title: 'Duplicate Name', message: 'This name is already in your list.', type: 'warning' });
-                                return;
-                              }
-                              setManualRecipients([...manualRecipients, name]);
-                              setManualSponsorName('');
-                            }
-                          }}
-                          placeholder="e.g. ABC Corporation"
-                          className="flex-1 px-3 py-2.5 border-2 border-brand-sand/20 rounded-xl focus:border-brand-brown outline-none font-bold text-gray-700 bg-white transition-all placeholder:text-gray-200 text-sm"
-                        />
-                        <button
-                          type="button"
-                          onClick={() => {
-                            const name = manualSponsorName.trim();
-                            if (!name) {
-                              alert("Please enter a name first.");
-                              return;
-                            }
-                            if (manualRecipients.includes(name)) {
-                              alert("This name is already in your list.");
-                              return;
-                            }
-                            setManualRecipients([...manualRecipients, name]);
-                            setManualSponsorName('');
-                          }}
-                          className="bg-brand-brown text-white p-2.5 rounded-xl hover:bg-brand-light-brown transition-all shadow-md shrink-0"
-                        >
-                          <Plus size={18} />
-                        </button>
-                      </div>
-
-                      {/* RECIPIENT LIST */}
-                      {manualRecipients.length > 0 && (
-                        <div className="flex flex-wrap gap-2 pt-1 animate-in fade-in slide-in-from-top-1 duration-300">
-                          {manualRecipients.map(name => (
-                            <div key={name} className="flex items-center gap-1 bg-brand-brown text-white px-2.5 py-1 rounded-lg text-[9px] font-black uppercase tracking-widest shadow-sm border border-white/10 group">
-                              {name}
-                              <button
-                                onClick={() => setManualRecipients(manualRecipients.filter(n => n !== name))}
-                                className="ml-1 text-white/50 hover:text-white transition-colors"
-                              >
-                                <XCircle size={12} className="fill-current" />
-                              </button>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-
+                  <div className="flex flex-col sm:flex-row gap-6">
                     <div className="flex-1">
-                      <label className="text-[9px] font-black text-brand-brown/50 uppercase tracking-widest mb-1 flex items-center gap-1">
-                        <Check size={10} /> Signatory
+                      <label className="text-[9px] font-black text-brand-brown/50 uppercase tracking-widest mb-1.5 flex items-center gap-1">
+                        <Check size={10} /> Authorized Signatory
                       </label>
                       <input
                         id="manual_signatory_name"
                         type="text"
                         value={manualSignatoryName}
                         onChange={e => setManualSignatoryName(e.target.value)}
-                        placeholder="Name of Signatory..."
-                        className="w-full px-3 py-2.5 border-2 border-brand-sand/20 rounded-xl focus:border-brand-brown outline-none font-bold text-gray-700 bg-white transition-all placeholder:text-gray-200 text-sm"
+                        placeholder="Name of Signatory (e.g. Camp Director)"
+                        className="w-full px-4 py-3 border-2 border-brand-sand/20 rounded-xl focus:border-brand-brown outline-none font-bold text-gray-700 bg-white transition-all placeholder:text-gray-200 text-sm shadow-sm"
                       />
                     </div>
                   </div>
@@ -593,51 +430,23 @@ I understand that this event involves various physical activities, spiritual ses
                       )}
                     </div>
 
-                    {/* Bottom Row: Actions */}
-                    <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
-                      <div className="flex-1">
-                        <label className="flex items-center gap-2 cursor-pointer group bg-brand-cream/5 px-2.5 py-2 rounded-xl border border-brand-sand/30 w-full sm:w-auto">
-                          <input
-                            type="checkbox"
-                            checked={separateFiles}
-                            onChange={e => setSeparateFiles(e.target.checked)}
-                            className="w-3.5 h-3.5 rounded border-2 border-brand-sand/50 text-brand-brown focus:ring-brand-brown transition-all cursor-pointer"
-                          />
-                          <span className="text-[8px] font-black text-brand-brown/60 uppercase tracking-widest group-hover:text-brand-brown transition-colors">1 File per person</span>
-                        </label>
-                      </div>
-                      
-                      <div className="flex gap-2">
-                        <button
-                          onClick={handleDownloadPDF}
-                          disabled={activeExport?.isProcessing}
-                          className="flex-1 sm:flex-none border-2 border-brand-brown/20 text-brand-brown px-4 py-2.5 rounded-xl hover:bg-brand-brown/5 transition-all flex items-center justify-center gap-2 font-black uppercase text-[10px] tracking-widest disabled:opacity-50"
-                        >
-                          {activeExport?.isProcessing ? <Loader2 size={16} className="animate-spin" /> : <Download size={16} />}
-                          PDF
-                        </button>
-                        <button
-                          onClick={() => {
-                            if (manualRecipients.length > 0) handlePrint();
-                            else handleManualPrint();
-                          }}
-                          disabled={isManualExporting || activeExport?.isProcessing || isPrintingSelected}
-                          className="flex-1 sm:flex-none bg-brand-brown text-white px-5 py-2.5 rounded-xl shadow-lg hover:bg-brand-light-brown active:scale-[0.98] disabled:opacity-50 transition-all flex items-center justify-center gap-2 font-black uppercase text-[10px] tracking-[0.2em]"
-                        >
-                          {isManualExporting || isPrintingSelected ? (
-                            <>
-                              <Loader2 size={16} className="animate-spin" />
-                              Prep...
-                            </>
-                          ) : (
-                            <>
-                              <Printer size={16} />
-                              Print
-                            </>
-                          )}
-                        </button>
-                      </div>
-                    </div>
+                    <button
+                      onClick={handleManualPrint}
+                      disabled={isManualExporting || isPrintingSelected}
+                      className="w-full bg-brand-brown text-white px-6 py-3 rounded-2xl shadow-xl hover:bg-brand-light-brown active:scale-[0.98] disabled:opacity-50 transition-all flex items-center justify-center gap-3 font-black uppercase text-[11px] tracking-[0.25em]"
+                    >
+                      {isManualExporting || isPrintingSelected ? (
+                        <>
+                          <Loader2 size={18} className="animate-spin" />
+                          Calibrating Hardware...
+                        </>
+                      ) : (
+                        <>
+                          <Printer size={18} />
+                          Print Solicitation Letter
+                        </>
+                      )}
+                    </button>
                   </div>
                 </div>
               )}
@@ -724,31 +533,12 @@ I understand that this event involves various physical activities, spiritual ses
                           </p>
                         </div>
                       </div>
-
-                      <label className="flex items-center gap-2 cursor-pointer group bg-brand-cream/5 px-2.5 py-1.5 rounded-lg border border-brand-sand/30 shrink-0">
-                        <input
-                          type="checkbox"
-                          checked={separateFiles}
-                          onChange={e => setSeparateFiles(e.target.checked)}
-                          className="w-3.5 h-3.5 rounded border-2 border-brand-sand/50 text-brand-brown focus:ring-brand-brown transition-all cursor-pointer"
-                        />
-                        <span className="text-[8px] font-black text-brand-brown/60 uppercase tracking-widest group-hover:text-brand-brown transition-colors">1 File each</span>
-                      </label>
                     </div>
 
                     {/* Bottom Row: Actions */}
-                    <div className="flex gap-2">
-                      <button
-                        onClick={handleDownloadPDF}
-                        disabled={selectedIds.size === 0 || activeExport?.isProcessing}
-                        className="flex-1 border-2 border-brand-brown/20 text-brand-brown px-4 py-2.5 rounded-xl hover:bg-brand-brown/5 transition-all font-black uppercase text-[10px] tracking-widest disabled:opacity-50 flex items-center justify-center gap-2"
-                      >
-                        {activeExport?.isProcessing ? <Loader2 className="animate-spin" size={16} /> : <Download size={16} />}
-                        PDF
-                      </button>
                       <button
                         onClick={handlePrint}
-                        disabled={selectedIds.size === 0 || activeExport?.isProcessing || isPrintingSelected}
+                        disabled={selectedIds.size === 0 || isPrintingSelected}
                         className="flex-1 bg-brand-brown text-white px-5 py-2.5 rounded-xl shadow-lg hover:bg-brand-light-brown active:scale-[0.98] transition-all font-black uppercase text-[10px] tracking-[0.2em] disabled:opacity-40 flex items-center justify-center gap-2"
                       >
                         {isPrintingSelected ? (
@@ -763,7 +553,6 @@ I understand that this event involves various physical activities, spiritual ses
                           </>
                         )}
                       </button>
-                    </div>
                   </div>
                 </>
               )}
@@ -771,14 +560,14 @@ I understand that this event involves various physical activities, spiritual ses
           </div>
         </div>
 
-        {/* OFF-SCREEN STAGING AREA - Outside print:hidden but inside min-h-screen */}
+        {/* OFF-SCREEN STAGING AREA - Single Document Print */}
         {(activeTab === 'solicitation' && isManualExporting) && (
           <div
             ref={manualPrintRef}
             className="bg-white font-serif text-gray-800 w-[794px] fixed top-[-9999px] left-[-9999px] print:static print:block"
           >
             {renderDocument({
-              sourceName: manualSponsorName,
+              sourceName: '________________',
               amount: 0,
               manualSignatory: manualSignatoryName
             }, 'solicitation')}
@@ -800,11 +589,10 @@ I understand that this event involves various physical activities, spiritual ses
                 );
               })
             ) : (
-              (manualRecipients.length > 0 ? manualRecipients : [manualSponsorName]).map((name, index) => (
-                <div key={`${name}-${index}`} className={index > 0 ? "page-break-before-always" : ""}>
-                  {renderDocument({ sourceName: name, manualSignatory: manualSignatoryName }, 'solicitation')}
-                </div>
-              ))
+              // Single Template Print fallback
+              <div key="manual-template" className="page-break-before-always">
+                {renderDocument({ manualSignatory: manualSignatoryName }, 'solicitation')}
+              </div>
             )}
           </div>
         )}
@@ -867,7 +655,8 @@ I understand that this event involves various physical activities, spiritual ses
 
       <style>{`
         @media print {
-          @page { size: auto; margin: 0mm; }
+          @page { size: 210mm 297mm; margin: 0mm; }
+          body { margin: 0; padding: 0; }
         }
         .page-break-before-always {
           page-break-before: always;

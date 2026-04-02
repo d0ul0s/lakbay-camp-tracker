@@ -94,6 +94,7 @@ interface AppState {
   announcements: Announcement[];
   fetchAnnouncements: (silent?: boolean) => Promise<void>;
   syncAnnouncement: (action: string, data: any) => void;
+  syncWorship: (action: string, data: any) => void;
 
   pointLogs: PointLog[];
   fetchPointLogs: (silent?: boolean) => Promise<void>;
@@ -353,6 +354,11 @@ export const useAppStore = create<AppState>()((set) => {
 
       updateCache(state, { announcements: next });
       return { announcements: next };
+    }),
+
+    syncWorship: (_action, _data) => set(state => {
+      // Refresh logic or full sync could be implemented here if worship was in global state.
+      return state; 
     }),
 
     fetchPointLogs: async (silent = false) => {

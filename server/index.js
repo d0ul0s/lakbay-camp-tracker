@@ -113,6 +113,7 @@ app.use('/api/activity-logs', auth, require('./routes/activityLogs'));
 app.use('/api/points', auth, require('./routes/points'));
 app.use('/api/org', require('./routes/org'));
 app.use('/api/announcements', require('./routes/announcements'));
+app.use('/api/worship', require('./routes/worship'));
 app.use('/api/tribe-proposals', auth, require('./routes/tribeProposals'));
 app.use('/api/auth', require('./routes/auth'));
 

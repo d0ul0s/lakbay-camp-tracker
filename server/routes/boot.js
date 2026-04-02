@@ -5,6 +5,7 @@ const Registrant = require('../models/Registrant');
 const Expense = require('../models/Expense');
 const Solicitation = require('../models/Solicitation');
 const Announcement = require('../models/Announcement');
+const WorshipSession = require('../models/WorshipSession');
 const PointLog = require('../models/PointLog');
 const Settings = require('../models/Settings');
 const { DEFAULT_MATRIX } = require('../models/Settings');
@@ -41,7 +42,7 @@ const mergePermissions = (defaults, saved) => {
 
 router.get('/', auth, async (req, res) => {
   try {
-    const [registrants, expenses, solicitations, announcements, points, rawSettings] = await Promise.all([
+    const [registrants, expenses, solicitations, announcements, points, worshipSessions, rawSettings] = await Promise.all([
       Registrant.find(),
       Expense.find(),
       Solicitation.find(),
@@ -51,6 +52,7 @@ router.get('/', auth, async (req, res) => {
         .populate('createdBy', 'church role')
         .populate('verifiedBy', 'role')
         .sort({ createdAt: -1 }),
+      WorshipSession.find({ isActive: true }).sort({ sessionDate: 1, order: 1 }),
       Settings.findOne({}, null, { strict: false }).lean()
     ]);
 
@@ -60,7 +62,7 @@ router.get('/', auth, async (req, res) => {
     }
     settings.permissionMatrix = mergePermissions(DEFAULT_MATRIX, settings.permissionMatrix);
 
-    res.json({ registrants, expenses, solicitations, announcements, points, settings });
+    res.json({ registrants, expenses, solicitations, announcements, points, worship: worshipSessions, settings });
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
