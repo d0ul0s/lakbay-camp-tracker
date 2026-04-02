@@ -17,13 +17,16 @@ import {
 import api from '../api/axios';
 import { toast } from 'react-hot-toast';
 import { format } from 'date-fns';
-import type { Registrant, Award } from '../types';
+import type { Registrant } from '../types';
 
 export default function Awards() {
   const { 
     awards, 
     registrants, 
-    currentUser
+    currentUser,
+    toggleAwardVote,
+    lockEntity,
+    unlockEntity
   } = useAppStore();
 
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
@@ -93,26 +96,20 @@ export default function Awards() {
   };
 
   const toggleVote = async (awardId: string, nominationId: string) => {
-    const award = awards.find(a => a.id === awardId);
-    if (!award) return;
+    if (!currentUser?._id) return;
     
     // Optimistic Update
-    const updatedAward = JSON.parse(JSON.stringify(award)) as Award;
-    const nomination = updatedAward.nominations.find((n: any) => (n.id || n._id) === nominationId);
-    if (nomination && currentUser?._id) {
-      const idx = nomination.votes.indexOf(currentUser._id);
-      if (idx === -1) nomination.votes.push(currentUser._id);
-      else nomination.votes.splice(idx, 1);
-      
-      useAppStore.getState().syncAward('updated', updatedAward);
-    }
-
+    toggleAwardVote(awardId, nominationId, currentUser._id);
+    lockEntity('awards', awardId);
+    
     try {
       await api.post(`/api/awards/${awardId}/vote/${nominationId}`);
     } catch (err: any) {
+      // Rollback on error (by toggling back)
+      toggleAwardVote(awardId, nominationId, currentUser._id);
       toast.error(err.response?.data?.message || 'Failed to vote');
-      // Rollback on error if needed - but syncAward will eventually get the real data
-      useAppStore.getState().fetchAwards(true);
+    } finally {
+      unlockEntity('awards', awardId);
     }
   };
 

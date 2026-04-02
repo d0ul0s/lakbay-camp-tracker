@@ -148,7 +148,7 @@ router.post('/:id/vote/:nominationId', auth, async (req, res) => {
     if (!nomination) return res.status(404).json({ message: 'Nomination not found' });
     
     const userId = req.user.id;
-    const voteIndex = nomination.votes.findIndex(v => v.toString() === userId);
+    const voteIndex = nomination.votes.findIndex(v => v.toString() === userId.toString());
     
     if (voteIndex === -1) {
       nomination.votes.push(userId);

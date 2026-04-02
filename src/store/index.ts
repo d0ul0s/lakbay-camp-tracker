@@ -103,6 +103,7 @@ interface AppState {
   awards: Award[];
   fetchAwards: (silent?: boolean) => Promise<void>;
   syncAward: (action: string, data: any) => void;
+  toggleAwardVote: (awardId: string, nominationId: string, userId: string) => void;
 
   // In-flight mutation lock — prevents WebSocket echoes from overriding optimistic UI
   pendingMutations: Set<string>;
@@ -425,6 +426,30 @@ export const useAppStore = create<AppState>()((set) => {
         const idToDelete = data._id || data.id;
         next = next.filter(a => (a._id || a.id) !== idToDelete);
       }
+
+      return { awards: next };
+    }),
+
+    toggleAwardVote: (awardId, nominationId, userId) => set(state => {
+      const next = state.awards.map(a => {
+        if ((a.id || (a as any)._id) !== awardId) return a;
+        
+        return {
+          ...a,
+          nominations: a.nominations.map(n => {
+            if ((n.id || (n as any)._id) !== nominationId) return n;
+            
+            const votes = n.votes || [];
+            const hasVoted = votes.some(v => v.toString() === userId.toString());
+            return {
+              ...n,
+              votes: hasVoted 
+                ? votes.filter(v => v.toString() !== userId.toString()) 
+                : [...votes, userId.toString()]
+            };
+          })
+        };
+      });
 
       return { awards: next };
     }),
