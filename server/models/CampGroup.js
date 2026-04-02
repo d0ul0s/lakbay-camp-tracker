@@ -9,6 +9,7 @@ const campGroupSchema = new mongoose.Schema({
   flagBearer: { type: String, default: '' },
   grabMasters: { type: [String], default: [] },
   members: { type: [String], default: [] },
+  color: { type: String, default: '#8B4513' }, // Custom Tribe Color (Hex)
   createdAt: { type: Date, default: Date.now }
 });
 
