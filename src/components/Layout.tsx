@@ -23,6 +23,7 @@ export default function Layout() {
     syncAnnouncement, 
     syncWorship,
     syncSettings,
+    syncAward,
     activeExport,
     clearExport
   } = useAppStore();
@@ -82,6 +83,7 @@ export default function Layout() {
         case 'announcements': syncAnnouncement(action, data); break;
         case 'worship': syncWorship(action, data); break;
         case 'settings': syncSettings(data); break;
+        case 'awards': syncAward(action, data); break;
       }
     });
 
@@ -145,6 +147,8 @@ export default function Layout() {
   if (hasAccess('org')) navigation.push({ name: 'Organization', href: '/org', icon: Map });
   if (hasAccess('reports')) navigation.push({ name: 'Reports', href: '/reports', icon: FileDown });
   
+  navigation.push({ name: 'Awards', href: '/awards', icon: Trophy });
+
   if (isAdmin || currentUser?.role?.toLowerCase().trim() === 'coordinator') {
     navigation.push({ name: 'Docs & Printing', href: '/docs', icon: FileDown });
     navigation.push({ name: 'Worship Lineup', href: '/worship/manage', icon: Music });

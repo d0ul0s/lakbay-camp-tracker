@@ -1,6 +1,7 @@
 import { createBrowserRouter, RouterProvider, Navigate } from 'react-router-dom';
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
+import Awards from './pages/Awards';
 import Registrants from './pages/Registrants';
 import Expenses from './pages/Expenses';
 import Solicitations from './pages/Solicitations';
@@ -74,6 +75,7 @@ const router = createBrowserRouter([
           { path: "/tribe-sorter", element: <TribeSorter /> },
           { path: "/announcements/manage", element: <ManageAnnouncements /> },
           { path: "/worship/manage", element: <ManageWorship /> },
+          { path: "/awards", element: <Awards /> },
         ]
       }
     ]

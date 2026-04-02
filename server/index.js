@@ -115,6 +115,7 @@ app.use('/api/org', require('./routes/org'));
 app.use('/api/announcements', require('./routes/announcements'));
 app.use('/api/worship', require('./routes/worship'));
 app.use('/api/tribe-proposals', auth, require('./routes/tribeProposals'));
+app.use('/api/awards', auth, require('./routes/awards'));
 app.use('/api/auth', require('./routes/auth'));
 
 const connectDB = (attempt = 0) => {

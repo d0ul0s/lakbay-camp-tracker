@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { UserRole, PermissionMatrix, AppSettings, Registrant, Expense, Solicitation, Announcement, PointLog } from '../types';
+import type { UserRole, PermissionMatrix, AppSettings, Registrant, Expense, Solicitation, Announcement, PointLog, Award } from '../types';
 import api from '../api/axios';
 
 // Mirror of DEFAULT_MATRIX from Settings model — ensures any missing DB key always has a valid fallback
@@ -100,6 +100,10 @@ interface AppState {
   fetchPointLogs: (silent?: boolean) => Promise<void>;
   syncPointLog: (action: string, data: any) => void;
 
+  awards: Award[];
+  fetchAwards: (silent?: boolean) => Promise<void>;
+  syncAward: (action: string, data: any) => void;
+
   // In-flight mutation lock — prevents WebSocket echoes from overriding optimistic UI
   pendingMutations: Set<string>;
   lockEntity: (type: string, id: string) => void;
@@ -164,6 +168,7 @@ export const useAppStore = create<AppState>()((set) => {
     solicitations: initialCache?.solicitations || [],
     announcements: initialCache?.announcements || [],
     pointLogs: initialCache?.pointLogs || [],
+    awards: initialCache?.awards || [],
     users: [],
     isLoading: false,
     globalError: null,
@@ -393,6 +398,37 @@ export const useAppStore = create<AppState>()((set) => {
       return { pointLogs: next };
     }),
 
+    fetchAwards: async (silent = false) => {
+      if (!silent) set({ isLoading: true });
+      try {
+        const res = await api.get('/api/awards');
+        if (Array.isArray(res.data)) {
+          set({ awards: res.data });
+        }
+      } catch (err) {
+        console.error("Failed to fetch awards", err);
+      } finally {
+        if (!silent) set({ isLoading: false });
+      }
+    },
+
+    syncAward: (action, data) => set(state => {
+      if (state.pendingMutations.has(`awards:${data.id || data._id}`)) return state;
+      
+      let next = [...state.awards];
+      if (action === 'added') {
+        const exists = next.find(a => (a.id || a._id) === (data.id || data._id));
+        if (!exists) next = [data, ...next];
+      } else if (action === 'updated') {
+        next = next.map(a => (a.id === data.id || a.id === data._id || (a as any)._id === data.id || (a as any)._id === data._id) ? data : a);
+      } else if (action === 'deleted') {
+        const idToDelete = data._id || data.id;
+        next = next.filter(a => (a._id || a.id) !== idToDelete);
+      }
+
+      return { awards: next };
+    }),
+
     fetchRegistrants: async (silent = false) => {
       if (!silent) set({ isLoading: true });
       try {
@@ -594,7 +630,7 @@ export const useAppStore = create<AppState>()((set) => {
 
       try {
         const res = await api.get('/api/boot');
-        const { registrants, expenses, solicitations, announcements, points: pointLogs, settings } = res.data;
+        const { registrants, expenses, solicitations, announcements, points: pointLogs, settings, awards } = res.data;
         const newSettings = {
           ...settings,
           churches: settings.churchList || settings.churches || [],
@@ -613,6 +649,7 @@ export const useAppStore = create<AppState>()((set) => {
           solicitations,
           announcements,
           pointLogs: pointLogs || [],
+          awards: awards || [],
           appSettings: newSettings,
         };
         

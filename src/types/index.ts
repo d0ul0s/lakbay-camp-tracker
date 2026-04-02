@@ -179,3 +179,24 @@ export interface WorshipSession {
   createdAt: string;
   updatedAt: string;
 }
+
+export interface Nomination {
+  id: string;
+  _id?: string;
+  camperId: Registrant;
+  nominatedBy: AppUser;
+  votes: string[]; // Array of User IDs
+  reason: string;
+  createdAt: string;
+}
+
+export interface Award {
+  id: string;
+  _id?: string;
+  title: string;
+  description: string;
+  createdBy: string;
+  nominations: Nomination[];
+  status: 'nominating' | 'voting' | 'closed';
+  createdAt: string;
+}
