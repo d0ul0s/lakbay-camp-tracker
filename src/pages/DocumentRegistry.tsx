@@ -298,7 +298,7 @@ I understand that this event involves various physical activities, spiritual ses
         <div style={{ borderColor: '#8B4513' }} className="border-b-2 pb-8 mb-10 shrink-0 flex items-center justify-between">
           <div className="flex items-center gap-4">
             {branding.logoUrl ? (
-              <img src={branding.logoUrl} alt="Logo" className="h-16 w-auto max-w-[120px] object-contain" />
+              <img src={branding.logoUrl} alt="Logo" crossOrigin="anonymous" className="h-16 w-auto max-w-[120px] object-contain" />
             ) : (
               <div style={{ backgroundColor: '#8B4513' }} className="w-14 h-14 flex items-center justify-center font-display text-white text-3xl">J</div>
             )}
@@ -366,6 +366,7 @@ I understand that this event involves various physical activities, spiritual ses
                     <img
                       src={item?.eSignatureUrl || currentUser?.eSignatureUrl}
                       alt="Signature"
+                      crossOrigin="anonymous"
                       className="h-full w-auto object-contain mix-blend-multiply opacity-95 filter contrast-125"
                     />
                   </div>

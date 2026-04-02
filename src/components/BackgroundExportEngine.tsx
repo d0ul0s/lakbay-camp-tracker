@@ -52,6 +52,10 @@ export default function BackgroundExportEngine() {
       try {
         const { ids, fileName, isManual, separateFiles, manualData } = activeExport;
         
+        if (typeof html2pdf === 'undefined') {
+          throw new Error('PDF Engine (html2pdf) not loaded yet. Please wait a few seconds.');
+        }
+        
         // --- PREPARE OPT ---
         const opt = {
           margin: 0,
@@ -168,8 +172,10 @@ export default function BackgroundExportEngine() {
         }
         updateExportETC(null);
         clearExport();
-      } catch (err) {
+      } catch (err: any) {
         console.error('Background Export Failed:', err);
+        const msg = err.message || 'Unknown export error';
+        useAppStore.getState().setGlobalError(`Export Failed: ${msg}`);
         updateExportETC(null);
         clearExport();
       }
@@ -236,7 +242,7 @@ export default function BackgroundExportEngine() {
           <div style={{ borderColor: '#8B4513' }} className="border-b-2 pb-8 mb-10 shrink-0 flex items-center justify-between">
             <div className="flex items-center gap-4">
               {branding.logoUrl ? (
-                <img src={branding.logoUrl} alt="Logo" className="h-16 w-auto max-w-[120px] object-contain" />
+                <img src={branding.logoUrl} alt="Logo" crossOrigin="anonymous" className="h-16 w-auto max-w-[120px] object-contain" />
               ) : (
                 <div style={{ backgroundColor: '#8B4513' }} className="w-14 h-14 flex items-center justify-center font-display text-white text-3xl">J</div>
               )}
@@ -290,7 +296,7 @@ export default function BackgroundExportEngine() {
                 <div className="w-full max-w-[320px]">
                   {(currentItem?.eSignatureUrl || currentUser?.eSignatureUrl) && (
                     <div className="h-14 flex items-center justify-start ml-6 mb-[-1rem] relative z-20 overflow-visible">
-                      <img src={currentItem?.eSignatureUrl || currentUser?.eSignatureUrl} alt="Signature" className="h-full w-auto object-contain mix-blend-multiply opacity-95 filter contrast-125" />
+                      <img src={currentItem?.eSignatureUrl || currentUser?.eSignatureUrl} alt="Signature" crossOrigin="anonymous" className="h-full w-auto object-contain mix-blend-multiply opacity-95 filter contrast-125" />
                     </div>
                   )}
                   <div style={{ borderColor: '#8B4513', color: '#8B4513' }} className="border-b-2 pb-1 text-xl font-display relative z-10 text-left">
