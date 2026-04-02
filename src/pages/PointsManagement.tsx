@@ -9,9 +9,7 @@ import {
   Trash2,
   Check,
   Edit3,
-  X,
-  Plus,
-  Minus
+  X
 } from 'lucide-react';
 import { useAppStore } from '../store';
 import api from '../api/axios';
@@ -39,7 +37,7 @@ export default function PointsManagement() {
   const [formData, setFormData] = useState({
     groupId: '',
     type: 'merit' as 'merit' | 'demerit',
-    points: 100,
+    points: 0,
     reason: ''
   });
 
@@ -87,7 +85,7 @@ export default function PointsManagement() {
       const res = await api.post('/api/points', formData);
       syncPointLog('added', res.data);
       toast.success(isAdmin ? 'Verified!' : 'Submitted');
-      setFormData(prev => ({ ...prev, reason: '', points: 100 }));
+      setFormData(prev => ({ ...prev, reason: '', points: 0 }));
     } catch (err: any) {
       toast.error(err.response?.data?.message || 'Failed');
     } finally {
@@ -202,20 +200,35 @@ export default function PointsManagement() {
                  >DEMERIT</button>
                </div>
 
+               <div className="flex-[1.5] w-full space-y-1">
+                 <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest ml-1 block">Point Increments (Additive)</label>
+                 <div className="flex flex-wrap gap-1.5">
+                    {[20, 50, 100, 200, 500, 1000].map(val => (
+                      <button
+                        key={val}
+                        type="button"
+                        onClick={() => setFormData(p => ({ ...p, points: p.points + val }))}
+                        className="px-2.5 py-1.5 bg-gray-50 hover:bg-gray-100 border border-gray-200 rounded-lg text-[10px] font-black text-brand-brown transition-all active:scale-95"
+                      >
+                        +{val}
+                      </button>
+                    ))}
+                    <button
+                      type="button"
+                      onClick={() => setFormData(p => ({ ...p, points: 0 }))}
+                      className="px-2.5 py-1.5 bg-red-50 text-red-500 hover:bg-red-500 hover:text-white border border-red-100 rounded-lg text-[10px] font-black transition-all"
+                    >
+                      CLEAR
+                    </button>
+                 </div>
+               </div>
+
                <div className="w-full md:w-32 space-y-1">
-                 <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest ml-1 text-center block">Points</label>
-                 <div className="flex items-center gap-2">
-                    <button 
-                      type="button"
-                      onClick={() => setFormData(p => ({...p, points: Math.max(100, p.points - 100)}))}
-                      className="p-2 bg-gray-50 rounded-lg hover:bg-gray-100 border border-gray-200"
-                    ><Minus size={12} /></button>
-                    <span className="flex-1 text-center font-display text-sm text-brand-brown">{formData.points}</span>
-                    <button 
-                      type="button"
-                      onClick={() => setFormData(p => ({...p, points: p.points + 100}))}
-                      className="p-2 bg-gray-50 rounded-lg hover:bg-gray-100 border border-gray-200"
-                    ><Plus size={12} /></button>
+                 <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest ml-1 text-center block">Total Points</label>
+                 <div className="flex items-center justify-center p-2 bg-brand-cream/20 border border-brand-sand/30 rounded-xl">
+                    <span className={`text-xl font-display leading-none ${formData.type === 'merit' ? 'text-green-500' : 'text-red-500'}`}>
+                      {formData.type === 'merit' ? '+' : '-'}{formData.points}
+                    </span>
                  </div>
                </div>
 

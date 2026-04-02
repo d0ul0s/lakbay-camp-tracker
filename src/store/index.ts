@@ -97,6 +97,7 @@ interface AppState {
   syncWorship: (action: string, data: any) => void;
 
   pointLogs: PointLog[];
+  fetchPointLogs: (silent?: boolean) => Promise<void>;
   syncPointLog: (action: string, data: any) => void;
   groups: any[];
   syncGroup: (action: string, data: any) => void;
