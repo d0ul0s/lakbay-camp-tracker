@@ -10,6 +10,7 @@ import {
 } from 'lucide-react';
 import api from '../api/axios';
 import { useAppStore } from '../store';
+import CampCountdown from '../components/CampCountdown';
 
 export default function Login() {
   const [pin, setPin] = useState('');
@@ -83,6 +84,14 @@ export default function Login() {
           </div>
         </div>
       )}
+
+      {/* 
+          CAMP COUNTDOWN
+          Positioned above the main card to build immediate anticipation.
+      */}
+      <div className="max-w-sm w-full mb-6">
+        <CampCountdown />
+      </div>
 
       {/* LOGIN CARD */}
       <div className="max-w-sm w-full bg-white rounded-[2rem] shadow-2xl p-6 md:p-8 border border-brand-beige relative z-10 transition-all duration-700">

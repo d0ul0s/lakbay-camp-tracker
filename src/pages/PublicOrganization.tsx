@@ -4,7 +4,6 @@ import { Link } from 'react-router-dom';
 import { Users, Shield, Tent, Star, Flag, Target, Loader2, Info, ArrowLeft, Printer } from 'lucide-react';
 import api from '../api/axios';
 import { getChurchColor, getChurchVibrantColor } from '../utils/churchColorUtils';
-import CampCountdown from '../components/CampCountdown';
 
 interface CampLeader {
   _id?: string;
@@ -184,7 +183,6 @@ export default function PublicOrganization() {
           </button>
         </div>
 
-        <CampCountdown />
 
         <div className="flex items-center gap-1 p-1 bg-brand-sand/10 backdrop-blur-sm rounded-2xl w-full sm:w-fit border border-brand-sand/10">
           {[
