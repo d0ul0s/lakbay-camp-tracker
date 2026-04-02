@@ -65,7 +65,7 @@ export default function DocumentGenerator() {
     const dateStr = format(new Date(), 'MMMM dd, yyyy');
 
     return (
-      <div className="bg-white p-12 md:p-16 min-h-[1055px] w-[816px] shadow-2xl mx-auto border border-gray-100 flex flex-col font-serif relative overflow-hidden print:shadow-none print:border-none print:m-0 print:w-full print:min-h-0 print:h-auto">
+      <div className="bg-white p-12 md:p-16 min-h-[1122px] w-[794px] shadow-2xl mx-auto border border-gray-100 flex flex-col font-serif relative overflow-hidden print:shadow-none print:border-none print:m-0 print:w-full print:min-h-0 print:h-auto">
 
         {/* OFFICIAL HEADER */}
         <div className="text-center border-b-2 border-brand-brown pb-6 mb-8 shrink-0">
@@ -349,7 +349,7 @@ export default function DocumentGenerator() {
                       activeTab
                     )
                   ) : (
-                    <div className="bg-white p-16 min-h-[1055px] w-[816px] shadow-2xl mx-auto flex flex-col items-center justify-center text-center opacity-30">
+                    <div className="bg-white p-16 min-h-[1122px] w-[794px] shadow-2xl mx-auto flex flex-col items-center justify-center text-center opacity-30">
                       <Printer size={80} className="mb-6 text-brand-sand" />
                       <h3 className="text-3xl font-display text-brand-brown">Select Records</h3>
                       <p className="text-sm font-bold uppercase tracking-widest text-gray-400 mt-2">A preview will appear here</p>

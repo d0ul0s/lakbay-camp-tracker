@@ -292,7 +292,7 @@ I understand that this event involves various physical activities, spiritual ses
       : (appSettings?.solicitationTemplate || getDefaultSolicitation());
 
     return (
-      <div key={item?.id || item?._id} className="bg-white shadow-none mx-auto border border-gray-100 flex flex-col overflow-hidden w-[816px] h-[1055px] p-16 printable-document">
+      <div key={item?.id || item?._id} className="bg-white shadow-none mx-auto border border-gray-100 flex flex-col overflow-hidden w-[794px] h-[1122px] p-16 printable-document">
 
         {/* HEADER */}
         <div style={{ borderColor: '#8B4513' }} className="border-b-2 pb-8 mb-10 shrink-0 flex items-center justify-between">
@@ -775,7 +775,7 @@ I understand that this event involves various physical activities, spiritual ses
         {(activeTab === 'solicitation' && isManualExporting) && (
           <div
             ref={manualPrintRef}
-            className="bg-white font-serif text-gray-800 w-[816px] fixed top-[-9999px] left-[-9999px] print:static print:block"
+            className="bg-white font-serif text-gray-800 w-[794px] fixed top-[-9999px] left-[-9999px] print:static print:block"
           >
             {renderDocument({
               sourceName: manualSponsorName,
@@ -787,7 +787,7 @@ I understand that this event involves various physical activities, spiritual ses
 
         {/* NATIVE BATCH PRINT STAGING - Only visible to the printer */}
         {isPrintingSelected && (
-          <div className="bg-white font-serif w-[816px] fixed top-[-9999px] left-[-9999px] print:static print:block">
+          <div className="bg-white font-serif w-[794px] fixed top-[-9999px] left-[-9999px] print:static print:block">
             {selectedIds.size > 0 ? (
               Array.from(selectedIds).map((id, index) => {
                 const item = activeTab === 'waiver'

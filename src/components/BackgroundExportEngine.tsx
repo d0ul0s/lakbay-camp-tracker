@@ -128,8 +128,8 @@ export default function BackgroundExportEngine() {
                 .flex-1 { flex: 1 1 0% !important; }
                 .gap-4 { gap: 16px !important; }
                 .gap-8 { gap: 32px !important; }
-                .w-[816px] { width: 816px !important; }
-                .min-h-[1055px] { min-height: 1055px !important; }
+                .w-[794px] { width: 794px !important; }
+                .min-h-[1122px] { min-height: 1122px !important; }
                 .h-16 { height: 64px !important; }
                 .h-14 { height: 56px !important; }
                 .w-14 { width: 56px !important; }
@@ -162,7 +162,7 @@ export default function BackgroundExportEngine() {
               if (root.hasAttribute('style')) root.setAttribute('style', sanitizeStyle(root.getAttribute('style') || ''));
             }
           },
-          jsPDF: { unit: 'in', format: 'letter', orientation: 'portrait' as const }
+          jsPDF: { unit: 'in', format: 'a4', orientation: 'portrait' as const }
         };
 
         // --- LIBRARY PROBING & PRIMING ---
@@ -319,9 +319,9 @@ export default function BackgroundExportEngine() {
     <div className="absolute top-[-10000px] left-[-10000px] pointer-events-none">
       <div 
         ref={printRef}
-        className="bg-white font-serif w-[816px] text-black"
+        className="bg-white font-serif w-[794px] text-black"
       >
-        <div key={currentId} className="bg-white mx-auto flex flex-col w-[816px] min-h-[1055px] p-16">
+        <div key={currentId} className="bg-white mx-auto flex flex-col w-[794px] min-h-[1122px] p-16">
           <div style={{ borderColor: '#8B4513' }} className="border-b-2 pb-8 mb-10 shrink-0 flex items-center justify-between">
             <div className="flex items-center gap-4">
               {branding.logoUrl ? (
