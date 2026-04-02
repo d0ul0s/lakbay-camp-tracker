@@ -127,8 +127,9 @@ export default function DocumentRegistry() {
     // Wait for render
     setTimeout(() => {
       window.print();
-      setIsManualExporting(false);
-    }, 600);
+      // Keep it active for 5s post-print so mobile Safari/Chrome can "grab" the content for preview
+      setTimeout(() => setIsManualExporting(false), 5000);
+    }, 2000);
   };
 
   const replaceTags = (text: string, item: any) => {
@@ -206,8 +207,9 @@ export default function DocumentRegistry() {
     // Buffer for full document render in the hidden staging area
     setTimeout(() => {
       window.print();
-      setIsPrintingSelected(false);
-    }, 600);
+      // Keep it active for 5s post-print so mobile Safari/Chrome can "grab" the content for preview
+      setTimeout(() => setIsPrintingSelected(false), 5000);
+    }, 2000);
   };
 
   const handleDownloadPDF = async () => {
@@ -618,11 +620,20 @@ I understand that this event involves various physical activities, spiritual ses
                             if (manualRecipients.length > 0) handlePrint();
                             else handleManualPrint();
                           }}
-                          disabled={isManualExporting || activeExport?.isProcessing}
+                          disabled={isManualExporting || activeExport?.isProcessing || isPrintingSelected}
                           className="flex-1 sm:flex-none bg-brand-brown text-white px-5 py-2.5 rounded-xl shadow-lg hover:bg-brand-light-brown active:scale-[0.98] disabled:opacity-50 transition-all flex items-center justify-center gap-2 font-black uppercase text-[10px] tracking-[0.2em]"
                         >
-                          {isManualExporting ? <Loader2 size={16} className="animate-spin" /> : <Printer size={16} />}
-                          Print
+                          {isManualExporting || isPrintingSelected ? (
+                            <>
+                              <Loader2 size={16} className="animate-spin" />
+                              Prep...
+                            </>
+                          ) : (
+                            <>
+                              <Printer size={16} />
+                              Print
+                            </>
+                          )}
                         </button>
                       </div>
                     </div>
@@ -736,11 +747,20 @@ I understand that this event involves various physical activities, spiritual ses
                       </button>
                       <button
                         onClick={handlePrint}
-                        disabled={selectedIds.size === 0 || activeExport?.isProcessing}
+                        disabled={selectedIds.size === 0 || activeExport?.isProcessing || isPrintingSelected}
                         className="flex-1 bg-brand-brown text-white px-5 py-2.5 rounded-xl shadow-lg hover:bg-brand-light-brown active:scale-[0.98] transition-all font-black uppercase text-[10px] tracking-[0.2em] disabled:opacity-40 flex items-center justify-center gap-2"
                       >
-                        <Printer size={16} />
-                        Print
+                        {isPrintingSelected ? (
+                          <>
+                            <Loader2 size={16} className="animate-spin" />
+                            Prep...
+                          </>
+                        ) : (
+                          <>
+                            <Printer size={16} />
+                            Print
+                          </>
+                        )}
                       </button>
                     </div>
                   </div>
@@ -754,7 +774,7 @@ I understand that this event involves various physical activities, spiritual ses
         {(activeTab === 'solicitation' && isManualExporting) && (
           <div
             ref={manualPrintRef}
-            className="bg-white font-serif text-gray-800 w-[816px] print:block hidden"
+            className="bg-white font-serif text-gray-800 w-[816px] fixed top-[-9999px] left-[-9999px] print:static print:block"
           >
             {renderDocument({
               sourceName: manualSponsorName,
@@ -766,7 +786,7 @@ I understand that this event involves various physical activities, spiritual ses
 
         {/* NATIVE BATCH PRINT STAGING - Only visible to the printer */}
         {isPrintingSelected && (
-          <div className="bg-white font-serif w-[816px] print:block hidden">
+          <div className="bg-white font-serif w-[816px] fixed top-[-9999px] left-[-9999px] print:static print:block">
             {selectedIds.size > 0 ? (
               Array.from(selectedIds).map((id, index) => {
                 const item = activeTab === 'waiver'
