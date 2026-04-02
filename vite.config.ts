@@ -9,8 +9,8 @@ export default defineConfig({
     transformer: 'lightningcss',
     lightningcss: {
       targets: {
-        safari: (12 << 16), // Safari 12 does not support lab/oklch
-        chrome: (80 << 16) // Chrome 80 does not support lab/oklch
+        safari: (10 << 16), // Safari 10 does not support any modern color functions
+        chrome: (60 << 16) // Chrome 60 does not support any modern color functions
       }
     }
   },

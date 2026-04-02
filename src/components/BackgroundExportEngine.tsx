@@ -71,36 +71,95 @@ export default function BackgroundExportEngine() {
             windowWidth: 1200,
             windowHeight: 1200, // Ensure headroom for capture
             onclone: (clonedDoc: Document) => {
-              const sanitizeStyle = (css: string) => {
-                if (!css) return css;
-                // Specifically target modern color functions that html2canvas fails to parse (lab, oklch, etc.)
-                return css.replace(/(lab|oklab|lch|oklch|color)\([^)]+\)/g, '#000000');
-              };
+              // --- THE NUCLEAR OPTION: STYLESHEET ISOLATION ---
+              // In production, html2canvas crashes while parsing modern color functions (lab, oklch)
+              // located in external Tailwind v4 stylesheets. We clear all original styles
+              // and inject a minimal, "safe" version using only standard hex/rgb colors.
 
-              // 1. Sanitize all <style> tags (especially Tailwind v4 injected styles)
-              clonedDoc.querySelectorAll('style').forEach(tag => {
-                if (tag.innerHTML) {
-                  tag.innerHTML = sanitizeStyle(tag.innerHTML);
-                }
-              });
+              // 1. Remove all original stylesheets from the clone
+              clonedDoc.querySelectorAll('link[rel="stylesheet"], style').forEach(el => el.remove());
 
-              // 2. Sanitize all inline style attributes on ALL elements
+              // 2. Inject a Minimal "Safe" CSS block for the PDF layout (converted to hex)
+              const safeCSS = `
+                *, ::before, ::after { box-sizing: border-box; border-width: 0; border-style: solid; border-color: #e5e7eb; }
+                .bg-white { background-color: #ffffff !important; }
+                .text-black { color: #000000 !important; }
+                .text-gray-800 { color: #1F2937 !important; }
+                .text-gray-600 { color: #4B5563 !important; }
+                .text-gray-400 { color: #9CA3AF !important; }
+                .flex { display: flex !important; }
+                .flex-col { flex-direction: column !important; }
+                .items-center { align-items: center !important; }
+                .items-end { align-items: flex-end !important; }
+                .justify-between { justify-content: space-between !important; }
+                .font-serif { font-family: ui-serif, Georgia, Cambria, "Times New Roman", Times, serif !important; }
+                .font-sans { font-family: ui-sans-serif, system-ui, sans-serif !important; }
+                .font-display { font-family: "Barlow Condensed", "Bebas Neue", sans-serif !important; }
+                .text-4xl { font-size: 36px !important; line-height: 40px !important; }
+                .text-3xl { font-size: 30px !important; line-height: 36px !important; }
+                .text-2xl { font-size: 24px !important; line-height: 32px !important; }
+                .text-xl { font-size: 20px !important; line-height: 28px !important; }
+                .text-lg { font-size: 18px !important; line-height: 28px !important; }
+                .text-sm { font-size: 14px !important; line-height: 20px !important; }
+                .text-[11px] { font-size: 11px !important; }
+                .text-[9px] { font-size: 9px !important; }
+                .text-[10px] { font-size: 10px !important; }
+                .font-bold { font-weight: 700 !important; }
+                .font-black { font-weight: 900 !important; }
+                .italic { font-style: italic !important; }
+                .uppercase { text-transform: uppercase !important; }
+                .tracking-tighter { letter-spacing: -0.05em !important; }
+                .tracking-widest { letter-spacing: 0.1em !important; }
+                .tracking-[0.25em] { letter-spacing: 0.25em !important; }
+                .tracking-[0.3em] { letter-spacing: 0.3em !important; }
+                .tracking-[0.2em] { letter-spacing: 0.2em !important; }
+                .p-16 { padding: 64px !important; }
+                .p-4 { padding: 16px !important; }
+                .px-4 { padding-left: 16px !important; padding-right: 16px !important; }
+                .pb-8 { padding-bottom: 32px !important; }
+                .pb-6 { padding-bottom: 24px !important; }
+                .pb-4 { padding-bottom: 16px !important; }
+                .mb-10 { margin-bottom: 40px !important; }
+                .mb-8 { margin-bottom: 32px !important; }
+                .mb-6 { margin-bottom: 24px !important; }
+                .mt-12 { margin-top: 48px !important; }
+                .mb-[-1rem] { margin-bottom: -16px !important; }
+                .shrink-0 { flex-shrink: 0 !important; }
+                .flex-1 { flex: 1 1 0% !important; }
+                .gap-4 { gap: 16px !important; }
+                .gap-8 { gap: 32px !important; }
+                .w-[816px] { width: 816px !important; }
+                .min-h-[1055px] { min-height: 1055px !important; }
+                .h-16 { height: 64px !important; }
+                .h-14 { height: 56px !important; }
+                .w-14 { width: 56px !important; }
+                .w-auto { width: auto !important; }
+                .max-w-[120px] { max-width: 120px !important; }
+                .max-w-[320px] { max-width: 320px !important; }
+                .max-w-sm { max-width: 384px !important; }
+                .border-b-2 { border-bottom-width: 2px !important; }
+                .border-b { border-bottom-width: 1px !important; }
+                .border-brand-brown { border-color: #8B4513 !important; }
+                .whitespace-pre-wrap { white-space: pre-wrap !important; }
+                .object-contain { object-fit: contain !important; }
+                .relative { position: relative !important; }
+                .z-20 { z-index: 20 !important; }
+                .z-10 { z-index: 10 !important; }
+                .opacity-95 { opacity: 0.95 !important; }
+                .mix-blend-multiply { mix-blend-mode: multiply !important; }
+              `;
+              const style = clonedDoc.createElement('style');
+              style.innerHTML = safeCSS;
+              clonedDoc.head.appendChild(style);
+
+              // 3. Clear any remaining style and root attributes that might contain lab/oklch
+              const sanitizeStyle = (css: string) => css.replace(/(lab|oklab|lch|oklch|color)\([^)]+\)/g, '#000000');
               clonedDoc.querySelectorAll('[style]').forEach(el => {
-                const style = el.getAttribute('style');
-                if (style && /(lab|oklab|lch|oklch|color)\(/.test(style)) {
-                  el.setAttribute('style', sanitizeStyle(style));
-                }
+                const s = el.getAttribute('style');
+                if (s) el.setAttribute('style', sanitizeStyle(s));
               });
-
-              // 3. Sanitize root and body styles (where Tailwind v4 often stores theme variables)
               const root = clonedDoc.documentElement;
-              if (root.hasAttribute('style')) {
-                root.setAttribute('style', sanitizeStyle(root.getAttribute('style') || ''));
-              }
-              const body = clonedDoc.body;
-              if (body && body.hasAttribute('style')) {
-                body.setAttribute('style', sanitizeStyle(body.getAttribute('style') || ''));
-              }
+              if (root.hasAttribute('style')) root.setAttribute('style', sanitizeStyle(root.getAttribute('style') || ''));
             }
           },
           jsPDF: { unit: 'in', format: 'letter', orientation: 'portrait' as const }

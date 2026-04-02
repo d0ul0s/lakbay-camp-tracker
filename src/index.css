@@ -75,6 +75,13 @@
   visibility: visible !important;
 }
 
+/* Force hex colors for common Tailwind utilities used in PDF/Print to bypass lab/oklch parser errors in html2canvas */
+.printable-document .text-gray-800, .printable-document .text-gray-800 * { color: #1F2937 !important; }
+.printable-document .text-gray-700, .printable-document .text-gray-700 * { color: #374151 !important; }
+.printable-document .text-gray-600, .printable-document .text-gray-600 * { color: #4B5563 !important; }
+.printable-document .text-gray-500, .printable-document .text-gray-500 * { color: #6B7280 !important; }
+.printable-document .text-gray-400, .printable-document .text-gray-400 * { color: #9CA3AF !important; }
+
 .print-area .bg-white, .printable-document.bg-white {
   background-color: #ffffff !important;
 }
