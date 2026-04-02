@@ -70,13 +70,37 @@ export default function BackgroundExportEngine() {
             scrollY: 0,
             windowWidth: 1200,
             windowHeight: 1200, // Ensure headroom for capture
-            onclone: (clonedDoc: HTMLDocument) => {
-              const styleTags = clonedDoc.querySelectorAll('style');
-              styleTags.forEach((style) => {
-                if (style.innerHTML && /(oklch|oklab|lab|lch|color)\(/.test(style.innerHTML)) {
-                  style.innerHTML = style.innerHTML.replace(/(oklch|oklab|lab|lch|color)\([^)]+\)/g, '#000000');
+            onclone: (clonedDoc: Document) => {
+              const sanitizeStyle = (css: string) => {
+                if (!css) return css;
+                // Specifically target modern color functions that html2canvas fails to parse (lab, oklch, etc.)
+                return css.replace(/(lab|oklab|lch|oklch|color)\([^)]+\)/g, '#000000');
+              };
+
+              // 1. Sanitize all <style> tags (especially Tailwind v4 injected styles)
+              clonedDoc.querySelectorAll('style').forEach(tag => {
+                if (tag.innerHTML) {
+                  tag.innerHTML = sanitizeStyle(tag.innerHTML);
                 }
               });
+
+              // 2. Sanitize all inline style attributes on ALL elements
+              clonedDoc.querySelectorAll('[style]').forEach(el => {
+                const style = el.getAttribute('style');
+                if (style && /(lab|oklab|lch|oklch|color)\(/.test(style)) {
+                  el.setAttribute('style', sanitizeStyle(style));
+                }
+              });
+
+              // 3. Sanitize root and body styles (where Tailwind v4 often stores theme variables)
+              const root = clonedDoc.documentElement;
+              if (root.hasAttribute('style')) {
+                root.setAttribute('style', sanitizeStyle(root.getAttribute('style') || ''));
+              }
+              const body = clonedDoc.body;
+              if (body && body.hasAttribute('style')) {
+                body.setAttribute('style', sanitizeStyle(body.getAttribute('style') || ''));
+              }
             }
           },
           jsPDF: { unit: 'in', format: 'letter', orientation: 'portrait' as const }
