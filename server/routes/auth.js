@@ -107,6 +107,7 @@ router.post('/login', loginLimiter, async (req, res) => {
       return res.json({ 
         role: matchedUser.role, 
         church: matchedUser.church, 
+        voteLimit: matchedUser.voteLimit,
         permissionMatrix: permissionMatrix,
         _id: matchedUser._id,
         token: token  // also return token in body for cross-origin Bearer auth (mobile)
@@ -174,7 +175,7 @@ router.post('/register', auth, async (req, res) => {
 // UPDATE USER (Admin only)
 router.put('/users/:id', auth, async (req, res) => {
   if (req.user.role !== 'admin') return res.status(403).json({ message: 'Unauthorized' });
-  const { church, pin, role } = req.body;
+  const { church, pin, role, voteLimit } = req.body;
 
   try {
     const user = await User.findById(req.params.id);
@@ -183,7 +184,7 @@ router.put('/users/:id', auth, async (req, res) => {
     if (church) user.church = church;
     if (role) user.role = role;
     if (pin) user.pin = pin; 
-    if (voteLimit !== undefined) user.voteLimit = voteLimit;
+    if (voteLimit !== undefined) user.voteLimit = Number(voteLimit);
 
     await user.save();
     await cache.refreshUserCache();
