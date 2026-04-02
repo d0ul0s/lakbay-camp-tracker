@@ -11,6 +11,7 @@ router.get('/', auth, async (req, res) => {
       .populate('nominations.camperId', 'fullName church sex age')
       .populate('nominations.groupId', 'name color')
       .populate('nominations.nominatedBy', 'church role')
+      .populate('nominations.votes', 'church role')
       .sort({ createdAt: -1 });
     res.json(awards);
   } catch (err) {
@@ -59,7 +60,8 @@ router.patch('/:id/status', auth, async (req, res) => {
     const populatedAward = await Award.findById(updatedAward._id)
       .populate('nominations.camperId', 'fullName church sex age')
       .populate('nominations.groupId', 'name color')
-      .populate('nominations.nominatedBy', 'church role');
+      .populate('nominations.nominatedBy', 'church role')
+      .populate('nominations.votes', 'church role');
 
     if (req.io) {
       req.io.emit('DATA_UPDATED', { type: 'awards', action: 'updated', data: populatedAward });
@@ -107,7 +109,8 @@ router.post('/:id/nominate', auth, async (req, res) => {
     const populatedAward = await Award.findById(updatedAward._id)
       .populate('nominations.camperId', 'fullName church sex age')
       .populate('nominations.groupId', 'name color')
-      .populate('nominations.nominatedBy', 'church role');
+      .populate('nominations.nominatedBy', 'church role')
+      .populate('nominations.votes', 'church role');
 
     if (req.io) {
       req.io.emit('DATA_UPDATED', { type: 'awards', action: 'updated', data: populatedAward });
@@ -139,7 +142,8 @@ router.delete('/:id/nominate/:nominationId', auth, async (req, res) => {
     const populatedAward = await Award.findById(updatedAward._id)
       .populate('nominations.camperId', 'fullName church sex age')
       .populate('nominations.groupId', 'name color')
-      .populate('nominations.nominatedBy', 'church role');
+      .populate('nominations.nominatedBy', 'church role')
+      .populate('nominations.votes', 'church role');
 
     if (req.io) {
       req.io.emit('DATA_UPDATED', { type: 'awards', action: 'updated', data: populatedAward });
@@ -200,7 +204,8 @@ router.post('/:id/vote/:nominationId', auth, async (req, res) => {
     const populatedAward = await Award.findById(updatedAward._id)
       .populate('nominations.camperId', 'fullName church sex age')
       .populate('nominations.groupId', 'name color')
-      .populate('nominations.nominatedBy', 'church role');
+      .populate('nominations.nominatedBy', 'church role')
+      .populate('nominations.votes', 'church role');
 
     if (req.io) {
       req.io.emit('DATA_UPDATED', { type: 'awards', action: 'updated', data: populatedAward });
