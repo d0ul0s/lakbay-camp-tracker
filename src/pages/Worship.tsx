@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../api/axios';
-import type { WorshipSession, Song } from '../types';
+import type { WorshipSession } from '../types';
 import { 
   Music, 
   Mic2, 
