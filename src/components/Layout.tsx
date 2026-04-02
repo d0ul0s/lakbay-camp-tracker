@@ -1,6 +1,6 @@
 import { Outlet, Link, useLocation } from 'react-router-dom';
 import { useAppStore } from '../store';
-import { LayoutDashboard, Users, ShoppingBag, Receipt, Settings, FileDown, LogOut, Menu, UserCog, HeartHandshake, Loader2, AlertCircle, Activity, X, Map, Trophy, Megaphone, Music } from 'lucide-react';
+import { LayoutDashboard, Users, ShoppingBag, Receipt, Settings, FileDown, LogOut, Menu, UserCog, HeartHandshake, Loader2, AlertCircle, Activity, X, Map, Trophy, Megaphone, Music, Star } from 'lucide-react';
 import { useState, useEffect, useRef } from 'react';
 import { io } from 'socket.io-client';
 import { Toaster } from 'react-hot-toast';
@@ -147,7 +147,7 @@ export default function Layout() {
   if (hasAccess('org')) navigation.push({ name: 'Organization', href: '/org', icon: Map });
   if (hasAccess('reports')) navigation.push({ name: 'Reports', href: '/reports', icon: FileDown });
   
-  navigation.push({ name: 'Awards', href: '/awards', icon: Trophy });
+  navigation.push({ name: 'Awards', href: '/awards', icon: Star });
 
   if (isAdmin || currentUser?.role?.toLowerCase().trim() === 'coordinator') {
     navigation.push({ name: 'Docs & Printing', href: '/docs', icon: FileDown });

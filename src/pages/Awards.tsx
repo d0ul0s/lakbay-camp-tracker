@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react';
 import { useAppStore } from '../store';
 import { 
-  Trophy, 
+  Star, 
   Plus, 
   Users, 
   Vote, 
@@ -17,7 +17,7 @@ import {
 import api from '../api/axios';
 import { toast } from 'react-hot-toast';
 import { format } from 'date-fns';
-import type { Registrant } from '../types';
+import type { Registrant, Award } from '../types';
 
 export default function Awards() {
   const { 
@@ -93,10 +93,26 @@ export default function Awards() {
   };
 
   const toggleVote = async (awardId: string, nominationId: string) => {
+    const award = awards.find(a => a.id === awardId);
+    if (!award) return;
+    
+    // Optimistic Update
+    const updatedAward = JSON.parse(JSON.stringify(award)) as Award;
+    const nomination = updatedAward.nominations.find((n: any) => (n.id || n._id) === nominationId);
+    if (nomination && currentUser?._id) {
+      const idx = nomination.votes.indexOf(currentUser._id);
+      if (idx === -1) nomination.votes.push(currentUser._id);
+      else nomination.votes.splice(idx, 1);
+      
+      useAppStore.getState().syncAward('updated', updatedAward);
+    }
+
     try {
       await api.post(`/api/awards/${awardId}/vote/${nominationId}`);
     } catch (err: any) {
       toast.error(err.response?.data?.message || 'Failed to vote');
+      // Rollback on error if needed - but syncAward will eventually get the real data
+      useAppStore.getState().fetchAwards(true);
     }
   };
 
@@ -140,7 +156,7 @@ export default function Awards() {
           <div className="space-y-2">
             <div className="flex items-center gap-3 mb-2">
               <div className="p-3 bg-brand-sand/20 rounded-2xl text-brand-sand">
-                <Trophy size={32} strokeWidth={2.5} />
+                <Star size={32} strokeWidth={2.5} />
               </div>
               <span className="text-brand-sand font-display tracking-[0.3em] text-sm uppercase">Recognition System</span>
             </div>
@@ -362,7 +378,7 @@ export default function Awards() {
       {filteredAwards.length === 0 && (
         <div className="py-24 flex flex-col items-center justify-center text-center px-4">
            <div className="w-24 h-24 bg-brand-beige/20 rounded-[2rem] flex items-center justify-center text-brand-beige mb-6">
-              <Trophy size={48} strokeWidth={1.5} />
+              <Star size={48} strokeWidth={1.5} />
            </div>
            <h3 className="text-2xl font-display text-brand-brown mb-2 tracking-tight">No reward categories found</h3>
            <p className="text-brand-brown/50 max-w-sm mx-auto font-medium">
