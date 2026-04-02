@@ -161,6 +161,7 @@ export interface Song {
   artist?: string;
   key?: string;
   lyricsUrl?: string;
+  content?: string;
   notes?: string;
   order: number;
 }
@@ -171,6 +172,7 @@ export interface WorshipSession {
   title: string;
   sessionDate?: string;
   description?: string;
+  playlistUrl?: string;
   songs: Song[];
   isActive: boolean;
   order: number;

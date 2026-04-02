@@ -276,6 +276,17 @@ export default function ManageWorship() {
                       />
                    </div>
 
+                   <div className="space-y-2">
+                      <label className="text-[10px] font-bold text-brand-brown/40 uppercase tracking-widest ml-1">Spotify Playlist URL</label>
+                      <input 
+                         type="text" 
+                         value={editingSession.playlistUrl}
+                         onChange={(e) => setEditingSession({ ...editingSession, playlistUrl: e.target.value })}
+                         className="w-full bg-brand-cream/20 border border-brand-sand/20 rounded-2xl px-5 py-3.5 outline-none focus:border-brand-brown transition-all text-sm font-bold text-brand-brown"
+                         placeholder="e.g. https://open.spotify.com/playlist/..."
+                      />
+                   </div>
+
                    <div className="flex items-center gap-3 bg-brand-cream/20 p-3 rounded-2xl border border-brand-sand/10">
                       <input 
                          type="checkbox" 
@@ -368,7 +379,17 @@ export default function ManageWorship() {
                                             </div>
                                             
                                             <div className="space-y-1.5">
-                                                <label className="text-[8px] font-black uppercase tracking-widest text-brand-brown/40 ml-1">Notes</label>
+                                                <label className="text-[8px] font-black uppercase tracking-widest text-brand-brown/40 ml-1">Lyrics & Chords</label>
+                                                <textarea 
+                                                    value={song.content}
+                                                    onChange={(e) => updateSong(sIdx, 'content', e.target.value)}
+                                                    className="w-full bg-brand-cream/10 border border-brand-sand/10 rounded-xl px-3 py-2 outline-none focus:border-brand-brown transition-all text-[10px] font-mono leading-relaxed h-32 resize-y"
+                                                    placeholder="Paste lyrics with chords here..."
+                                                />
+                                            </div>
+                                            
+                                            <div className="space-y-1.5">
+                                                <label className="text-[8px] font-black uppercase tracking-widest text-brand-brown/40 ml-1">Private Notes</label>
                                                 <input 
                                                     type="text" 
                                                     value={song.notes}

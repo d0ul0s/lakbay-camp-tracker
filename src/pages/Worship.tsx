@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../api/axios';
-import type { WorshipSession } from '../types';
+import type { WorshipSession, Song } from '../types';
 import { 
   Music, 
   Mic2, 
@@ -12,14 +12,21 @@ import {
   Hash,
   ChevronDown,
   ExternalLink,
-  Disc
+  Disc,
+  FileText,
+  Copy,
+  Check,
+  X
 } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
+import toast from 'react-hot-toast';
 
 export default function Worship() {
   const [sessions, setSessions] = useState<WorshipSession[]>([]);
   const [loading, setLoading] = useState(true);
   const [expandedSession, setExpandedSession] = useState<string | null>(null);
+  const [activeLyrics, setActiveLyrics] = useState<Song | null>(null);
+  const [copied, setCopied] = useState(false);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -27,7 +34,6 @@ export default function Worship() {
       try {
         const res = await api.get('/api/worship');
         setSessions(res.data);
-        // Expand the first session by default if available
         if (res.data.length > 0) {
           setExpandedSession(res.data[0].id);
         }
@@ -51,6 +57,13 @@ export default function Worship() {
 
   const toggleSession = (id: string) => {
     setExpandedSession(expandedSession === id ? null : id);
+  };
+
+  const copyToClipboard = (text: string) => {
+    navigator.clipboard.writeText(text);
+    setCopied(true);
+    toast.success('Lyrics copied to clipboard');
+    setTimeout(() => setCopied(false), 2000);
   };
 
   return (
@@ -152,6 +165,17 @@ export default function Worship() {
                                             <Clock size={10} /> {safeFormat(session.sessionDate, 'h:mm a')}
                                         </span>
                                     )}
+                                    {session.playlistUrl && (
+                                        <a 
+                                            href={session.playlistUrl}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            onClick={(e) => e.stopPropagation()}
+                                            className="flex items-center gap-1.5 px-2.5 py-1 bg-green-500 text-white rounded-full text-[8px] font-black uppercase tracking-[0.2em] shadow-lg shadow-green-500/20 hover:bg-green-600 transition-all hover:scale-105 active:scale-95"
+                                        >
+                                            <Disc size={8} className="animate-spin-slow" /> Spotify Playlist
+                                        </a>
+                                    )}
                                 </div>
                             </div>
                         </div>
@@ -161,7 +185,7 @@ export default function Worship() {
                     </button>
 
                     {/* Session Songs */}
-                    <div className={`transition-all duration-500 ease-in-out ${isExpanded ? 'max-h-[1000px] opacity-100' : 'max-h-0 opacity-0'} overflow-hidden`}>
+                    <div className={`transition-all duration-500 ease-in-out ${isExpanded ? 'max-h-[2000px] opacity-100' : 'max-h-0 opacity-0'} overflow-hidden`}>
                         <div className="px-5 pb-6 pt-0 space-y-3">
                             {session.description && (
                                 <p className="text-gray-400 text-[11px] font-bold uppercase tracking-widest px-4 border-l-2 border-brand-sand mb-6 mx-2 leading-relaxed">
@@ -174,39 +198,56 @@ export default function Worship() {
                                     session.songs.sort((a,b) => (a.order || 0) - (b.order || 0)).map((song, sIdx) => (
                                         <div 
                                             key={song.id || sIdx}
-                                            className="group relative flex items-center justify-between p-4 bg-brand-cream/40 border border-brand-sand/10 rounded-2xl transition-all hover:bg-white hover:shadow-md hover:-translate-y-0.5"
+                                            className="group relative flex flex-col p-4 bg-brand-cream/40 border border-brand-sand/10 rounded-2xl transition-all hover:bg-white hover:shadow-md hover:-translate-y-0.5"
                                         >
-                                            <div className="flex flex-col min-w-0">
-                                                <div className="flex items-center gap-2 mb-0.5">
-                                                    <span className="text-[10px] font-black text-brand-brown/20 w-4 font-mono">{sIdx + 1}</span>
-                                                    <h4 className="text-brand-brown font-bold text-sm md:text-base truncate tracking-tight">{song.title}</h4>
-                                                </div>
-                                                <div className="flex items-center gap-3 pl-6">
-                                                    <span className="text-[10px] font-black uppercase tracking-wider text-brand-brown/40">
-                                                        {song.artist || 'Unknown Artist'}
-                                                    </span>
-                                                    {song.key && (
-                                                        <span className="flex items-center gap-1.5 px-2 py-0.5 bg-brand-brown/5 rounded-md border border-brand-brown/10 text-[9px] font-black text-brand-brown/60 uppercase">
-                                                            <Hash size={8} /> Key: {song.key}
+                                            <div className="flex items-center justify-between gap-4">
+                                                <div className="flex flex-col min-w-0">
+                                                    <div className="flex items-center gap-2 mb-0.5">
+                                                        <span className="text-[10px] font-black text-brand-brown/20 w-4 font-mono">{sIdx + 1}</span>
+                                                        <h4 className="text-brand-brown font-bold text-sm md:text-base truncate tracking-tight">{song.title}</h4>
+                                                    </div>
+                                                    <div className="flex items-center gap-3 pl-6">
+                                                        <span className="text-[10px] font-black uppercase tracking-wider text-brand-brown/40">
+                                                            {song.artist || 'Unknown Artist'}
                                                         </span>
+                                                        {song.key && (
+                                                            <span className="flex items-center gap-1.5 px-2 py-0.5 bg-brand-brown/5 rounded-md border border-brand-brown/10 text-[9px] font-black text-brand-brown/60 uppercase">
+                                                                <Hash size={8} /> Key: {song.key}
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                </div>
+
+                                                <div className="flex items-center gap-2 shrink-0">
+                                                    {song.content && (
+                                                        <button 
+                                                            onClick={() => setActiveLyrics(song)}
+                                                            className="flex items-center gap-2 px-3 py-2 bg-brand-brown text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-brand-light-brown transition-all shadow-md active:scale-95 group/btn"
+                                                        >
+                                                            <FileText size={14} className="group-hover/btn:rotate-12 transition-transform" />
+                                                            <span className="hidden sm:inline">Lyrics</span>
+                                                        </button>
+                                                    )}
+                                                    {song.lyricsUrl && (
+                                                        <a 
+                                                            href={song.lyricsUrl} 
+                                                            target="_blank" 
+                                                            rel="noopener noreferrer"
+                                                            className="p-2 bg-white rounded-xl border border-brand-brown/5 text-brand-brown/40 hover:text-brand-brown hover:bg-brand-sand/10 transition-all shadow-sm group/ext shrink-0"
+                                                            title="External Resource"
+                                                        >
+                                                            <ExternalLink size={16} className="group-hover/ext:scale-110 transition-transform" />
+                                                        </a>
                                                     )}
                                                 </div>
-                                                {song.notes && (
-                                                    <p className="mt-2 pl-6 text-[10px] text-brand-brown/50 italic leading-relaxed">
+                                            </div>
+                                            
+                                            {song.notes && (
+                                                <div className="mt-3 pl-6 pr-4 py-2 bg-brand-brown/5 rounded-xl border border-brand-brown/5">
+                                                    <p className="text-[10px] text-brand-brown/60 italic leading-relaxed">
                                                         "{song.notes}"
                                                     </p>
-                                                )}
-                                            </div>
-
-                                            {song.lyricsUrl && (
-                                                <a 
-                                                    href={song.lyricsUrl} 
-                                                    target="_blank" 
-                                                    rel="noopener noreferrer"
-                                                    className="p-3 bg-white rounded-xl border border-brand-brown/5 text-brand-brown/40 hover:text-brand-brown hover:bg-brand-sand/10 transition-all shadow-sm group/btn shrink-0"
-                                                >
-                                                    <ExternalLink size={18} className="group-hover/btn:scale-110 transition-transform" />
-                                                </a>
+                                                </div>
                                             )}
                                         </div>
                                     ))
@@ -254,6 +295,56 @@ export default function Worship() {
             </div>
         </div>
       </div>
+
+      {/* Lyrics Modal */}
+      {activeLyrics && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6 bg-brand-brown/60 backdrop-blur-md animate-in fade-in duration-300">
+            <div className="bg-white rounded-[2.5rem] shadow-2xl w-full max-w-xl max-h-[85dvh] flex flex-col overflow-hidden border border-white/20 select-text">
+                {/* Modal Header */}
+                <div className="p-6 md:p-8 bg-brand-cream/30 border-b border-brand-sand/10 flex items-center justify-between">
+                    <div className="flex items-center gap-4">
+                        <div className="w-12 h-12 rounded-2xl bg-brand-brown text-white flex items-center justify-center shadow-lg">
+                            <Mic2 size={24} />
+                        </div>
+                        <div>
+                            <h2 className="text-2xl font-display text-brand-brown leading-none mb-1">{activeLyrics.title}</h2>
+                            <p className="text-[10px] font-black uppercase tracking-widest text-brand-brown/40">{activeLyrics.artist || 'Unknown Artist'} • Key: {activeLyrics.key || 'TBA'}</p>
+                        </div>
+                    </div>
+                    <button 
+                        onClick={() => setActiveLyrics(null)}
+                        className="p-2 text-brand-brown/40 hover:text-brand-brown hover:bg-brand-brown/5 rounded-xl transition-all"
+                    >
+                        <X size={24} />
+                    </button>
+                </div>
+
+                {/* Lyrics Content */}
+                <div className="flex-1 overflow-y-auto p-6 md:p-10 scrollbar-hide bg-white relative group">
+                    <pre className="text-brand-brown font-mono text-sm md:text-base leading-relaxed whitespace-pre-wrap selection:bg-brand-sand selection:text-brand-brown">
+                        {activeLyrics.content}
+                    </pre>
+                </div>
+
+                {/* Modal Footer */}
+                <div className="p-6 bg-brand-cream/30 border-t border-brand-sand/10 flex items-center justify-between gap-4">
+                    <button 
+                        onClick={() => setActiveLyrics(null)}
+                        className="px-6 py-3 rounded-2xl font-bold text-xs text-brand-brown/60 hover:bg-brand-brown/5 transition-all text-center uppercase tracking-widest"
+                    >
+                        Close
+                    </button>
+                    <button 
+                        onClick={() => copyToClipboard(activeLyrics.content || '')}
+                        className="flex-1 sm:flex-none flex items-center justify-center gap-2 bg-brand-brown text-white px-8 py-3.5 rounded-2xl font-bold text-xs hover:bg-brand-light-brown transition-all shadow-xl active:scale-95 uppercase tracking-widest"
+                    >
+                        {copied ? <Check size={16} /> : <Copy size={16} />}
+                        {copied ? 'Copied!' : 'Copy to Clipboard'}
+                    </button>
+                </div>
+            </div>
+        </div>
+      )}
     </div>
   );
 }
