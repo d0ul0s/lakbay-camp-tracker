@@ -84,7 +84,8 @@ router.post('/login', loginLimiter, async (req, res) => {
         user: {
           id: matchedUser._id,
           role: matchedUser.role,
-          church: matchedUser.church
+          church: matchedUser.church,
+          voteLimit: matchedUser.voteLimit || 1
         }
       };
 

@@ -168,88 +168,96 @@ export default function PointsManagement() {
       <div className="space-y-4">
         {/* TOP: FORM (Condensed Row) */}
         {canAdd && (
-          <div className="bg-white rounded-2xl p-4 border border-brand-sand shadow-sm transition-all hover:shadow-md">
-             <form onSubmit={handleSubmit} className="flex flex-col md:flex-row gap-4 items-end">
-               <div className="flex-1 w-full space-y-1">
-                 <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest ml-1">Tribe / Category</label>
-                 <select 
-                  required
-                  className="w-full px-3 py-2 text-xs rounded-xl border border-brand-beige focus:border-brand-brown outline-none bg-gray-50/50 font-bold"
-                  value={formData.groupId}
-                  onChange={e => setFormData({...formData, groupId: e.target.value})}
-                >
-                  <option value="" disabled>Select Tribe...</option>
-                  {tribeList.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
-                </select>
-               </div>
+          <div className="bg-white rounded-2xl p-6 border border-brand-sand shadow-sm transition-all hover:shadow-md">
+            <form onSubmit={handleSubmit} className="flex flex-col gap-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-brand-brown/40 uppercase tracking-[0.2em] ml-1">Target Tribe</label>
+                  <select 
+                    required
+                    className="w-full bg-brand-cream/40 border-2 border-brand-beige rounded-2xl px-5 py-4 focus:ring-2 focus:ring-brand-brown focus:border-transparent outline-none font-bold text-sm shadow-sm transition-all"
+                    value={formData.groupId}
+                    onChange={e => setFormData({...formData, groupId: e.target.value})}
+                  >
+                    <option value="" disabled>Select Tribe...</option>
+                    {tribeList.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+                  </select>
+                </div>
 
-               <div className="flex-1 w-full flex items-center gap-2">
-                 <button 
-                  type="button"
-                  onClick={() => setFormData({...formData, type: 'merit'})}
-                  className={`flex-1 py-2 rounded-xl text-[10px] font-black border-2 transition-all ${
-                    formData.type === 'merit' ? 'border-brand-brown bg-brand-brown text-white shadow-sm' : 'border-gray-100 text-gray-400 opacity-50'
-                  }`}
-                 >MERIT</button>
-                 <button 
-                  type="button"
-                  onClick={() => setFormData({...formData, type: 'demerit'})}
-                  className={`flex-1 py-2 rounded-xl text-[10px] font-black border-2 transition-all ${
-                    formData.type === 'demerit' ? 'border-red-500 bg-red-500 text-white shadow-sm' : 'border-gray-100 text-gray-400 opacity-50'
-                  }`}
-                 >DEMERIT</button>
-               </div>
-
-               <div className="flex-[1.5] w-full space-y-1">
-                 <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest ml-1 block">Point Increments (Additive)</label>
-                 <div className="flex flex-wrap gap-1.5">
-                    {[20, 50, 100, 200, 500, 1000].map(val => (
-                      <button
-                        key={val}
-                        type="button"
-                        onClick={() => setFormData(p => ({ ...p, points: p.points + val }))}
-                        className="px-2.5 py-1.5 bg-gray-50 hover:bg-gray-100 border border-gray-200 rounded-lg text-[10px] font-black text-brand-brown transition-all active:scale-95"
-                      >
-                        +{val}
-                      </button>
-                    ))}
-                    <button
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-brand-brown/40 uppercase tracking-[0.2em] ml-1">Adjustment Type</label>
+                  <div className="flex items-center gap-3">
+                    <button 
                       type="button"
-                      onClick={() => setFormData(p => ({ ...p, points: 0 }))}
-                      className="px-2.5 py-1.5 bg-red-50 text-red-500 hover:bg-red-500 hover:text-white border border-red-100 rounded-lg text-[10px] font-black transition-all"
+                      onClick={() => setFormData({...formData, type: 'merit'})}
+                      className={`flex-1 py-4 rounded-2xl text-xs font-black border-2 transition-all shadow-sm ${
+                        formData.type === 'merit' ? 'border-brand-brown bg-brand-brown text-white shadow-brand-brown/20' : 'border-gray-100 text-gray-400 bg-gray-50/50'
+                      }`}
+                    >MERIT (+)</button>
+                    <button 
+                      type="button"
+                      onClick={() => setFormData({...formData, type: 'demerit'})}
+                      className={`flex-1 py-4 rounded-2xl text-xs font-black border-2 transition-all shadow-sm ${
+                        formData.type === 'demerit' ? 'border-red-500 bg-red-500 text-white shadow-red-500/20' : 'border-gray-100 text-gray-400 bg-gray-50/50'
+                      }`}
+                    >DEMERIT (-)</button>
+                  </div>
+                </div>
+              </div>
+
+              <div className="space-y-3">
+                <label className="text-[10px] font-black text-brand-brown/40 uppercase tracking-[0.2em] ml-1 block">Point Chips (Tap to Stack)</label>
+                <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
+                  {[20, 50, 100, 200, 500, 1000].map(val => (
+                    <button
+                      key={val}
+                      type="button"
+                      onClick={() => setFormData(p => ({ ...p, points: p.points + val }))}
+                      className="py-4 bg-white hover:bg-brand-brown hover:text-white border-2 border-brand-beige rounded-2xl text-sm font-black text-brand-brown transition-all active:scale-95 shadow-sm"
                     >
-                      CLEAR
+                      +{val}
                     </button>
-                 </div>
-               </div>
+                  ))}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setFormData(p => ({ ...p, points: 0 }))}
+                  className="w-full py-3 bg-red-50 text-red-500 hover:bg-red-500 hover:text-white border-2 border-red-100 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all"
+                >
+                  Reset Current Selection
+                </button>
+              </div>
 
-               <div className="w-full md:w-32 space-y-1">
-                 <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest ml-1 text-center block">Total Points</label>
-                 <div className="flex items-center justify-center p-2 bg-brand-cream/20 border border-brand-sand/30 rounded-xl">
-                    <span className={`text-xl font-display leading-none ${formData.type === 'merit' ? 'text-green-500' : 'text-red-500'}`}>
-                      {formData.type === 'merit' ? '+' : '-'}{formData.points}
-                    </span>
-                 </div>
-               </div>
-
-               <div className="flex-[1.5] w-full space-y-1">
+              <div className="flex flex-col md:flex-row gap-6 items-center bg-brand-sand/5 p-6 rounded-[2.5rem] border border-brand-sand/10">
+                <div className="flex-1 w-full space-y-2">
+                  <label className="text-[10px] font-black text-brand-brown/40 uppercase tracking-[0.2em] ml-1">Reason / Context</label>
                   <input 
                     required
-                    placeholder="Short justification of action..."
-                    className="w-full px-3 py-2 text-xs rounded-xl border border-brand-beige focus:border-brand-brown outline-none"
+                    placeholder="Why is this point being logged?"
+                    className="w-full bg-white border-2 border-brand-beige rounded-2xl px-6 py-4 focus:ring-2 focus:ring-brand-brown focus:border-transparent outline-none text-sm font-medium shadow-sm"
                     value={formData.reason}
                     onChange={e => setFormData({...formData, reason: e.target.value})}
                   />
-               </div>
+                </div>
 
-               <button 
-                 type="submit"
-                 disabled={isSubmitting}
-                 className="px-6 py-2 bg-brand-brown text-white text-xs font-black rounded-xl hover:bg-brand-light-brown active:scale-95 transition-all shadow-md h-[38px] min-w-[80px]"
-               >
-                 {isSubmitting ? '...' : (isAdmin ? 'GRANT' : 'POST')}
-               </button>
-             </form>
+                <div className="shrink-0 flex flex-col items-center">
+                  <label className="text-[10px] font-black text-brand-brown/40 uppercase tracking-[0.2em] mb-2">Final Change</label>
+                  <div className="bg-white border-2 border-brand-sand rounded-3xl px-8 py-4 shadow-inner">
+                    <span className={`text-4xl font-display leading-none ${formData.type === 'merit' ? 'text-green-600' : 'text-red-500'}`}>
+                      {formData.type === 'merit' ? '+' : '-'}{formData.points}
+                    </span>
+                  </div>
+                </div>
+
+                <button 
+                  type="submit"
+                  disabled={isSubmitting || formData.points === 0}
+                  className="w-full md:w-auto px-10 py-5 bg-brand-brown text-white text-sm font-black rounded-3xl hover:bg-brand-light-brown active:scale-95 transition-all shadow-xl shadow-brand-brown/20 disabled:opacity-30 disabled:grayscale h-auto"
+                >
+                  {isSubmitting ? 'SAVING...' : (isAdmin ? 'APPROVE LOG' : 'POST ENTRY')}
+                </button>
+              </div>
+            </form>
           </div>
         )}
 
