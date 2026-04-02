@@ -8,6 +8,7 @@ router.get('/', auth, async (req, res) => {
   try {
     const awards = await Award.find()
       .populate('nominations.camperId', 'fullName church sex age')
+      .populate('nominations.groupId', 'name color')
       .populate('nominations.nominatedBy', 'church role')
       .sort({ createdAt: -1 });
     res.json(awards);
@@ -22,6 +23,7 @@ router.post('/', auth, async (req, res) => {
     const award = new Award({
       title: req.body.title,
       description: req.body.description,
+      awardType: req.body.awardType || 'individual',
       createdBy: req.user.id,
       status: 'nominating'
     });
@@ -55,6 +57,7 @@ router.patch('/:id/status', auth, async (req, res) => {
     // Populate before broadcasting
     const populatedAward = await Award.findById(updatedAward._id)
       .populate('nominations.camperId', 'fullName church sex age')
+      .populate('nominations.groupId', 'name color')
       .populate('nominations.nominatedBy', 'church role');
 
     if (req.io) {
@@ -77,20 +80,32 @@ router.post('/:id/nominate', auth, async (req, res) => {
       return res.status(400).json({ message: 'Nominations are closed' });
     }
     
-    // Check if duplicate nomination for this camper
-    const exists = award.nominations.some(n => n.camperId.toString() === req.body.camperId);
-    if (exists) return res.status(400).json({ message: 'Camper already nominated' });
-    
-    award.nominations.push({
-      camperId: req.body.camperId,
-      nominatedBy: req.user.id,
-      reason: req.body.reason
-    });
+    // Check if duplicate nomination
+    if (award.awardType === 'individual') {
+      const exists = award.nominations.some(n => n.camperId && n.camperId.toString() === req.body.camperId);
+      if (exists) return res.status(400).json({ message: 'Camper already nominated' });
+      
+      award.nominations.push({
+        camperId: req.body.camperId,
+        nominatedBy: req.user.id,
+        reason: req.body.reason
+      });
+    } else {
+      const exists = award.nominations.some(n => n.groupId && n.groupId.toString() === req.body.groupId);
+      if (exists) return res.status(400).json({ message: 'Tribe already nominated' });
+      
+      award.nominations.push({
+        groupId: req.body.groupId,
+        nominatedBy: req.user.id,
+        reason: req.body.reason
+      });
+    }
     
     const updatedAward = await award.save();
     
     const populatedAward = await Award.findById(updatedAward._id)
       .populate('nominations.camperId', 'fullName church sex age')
+      .populate('nominations.groupId', 'name color')
       .populate('nominations.nominatedBy', 'church role');
 
     if (req.io) {
@@ -122,6 +137,7 @@ router.delete('/:id/nominate/:nominationId', auth, async (req, res) => {
 
     const populatedAward = await Award.findById(updatedAward._id)
       .populate('nominations.camperId', 'fullName church sex age')
+      .populate('nominations.groupId', 'name color')
       .populate('nominations.nominatedBy', 'church role');
 
     if (req.io) {
@@ -134,11 +150,16 @@ router.delete('/:id/nominate/:nominationId', auth, async (req, res) => {
   }
 });
 
-// Toggle vote for a nomination
+// Toggle/Add vote for a nomination
 router.post('/:id/vote/:nominationId', auth, async (req, res) => {
   try {
-    const award = await Award.findById(req.params.id);
+    const [award, user] = await Promise.all([
+      Award.findById(req.params.id),
+      User.findById(req.user.id)
+    ]);
+
     if (!award) return res.status(404).json({ message: 'Award not found' });
+    if (!user) return res.status(404).json({ message: 'User not found' });
     
     if (award.status !== 'voting') {
       return res.status(400).json({ message: 'Voting is not active' });
@@ -148,18 +169,36 @@ router.post('/:id/vote/:nominationId', auth, async (req, res) => {
     if (!nomination) return res.status(404).json({ message: 'Nomination not found' });
     
     const userId = req.user.id;
-    const voteIndex = nomination.votes.findIndex(v => v.toString() === userId.toString());
-    
-    if (voteIndex === -1) {
+    const action = req.body.action || 'add'; // 'add' or 'remove'
+
+    if (action === 'add') {
+      // Calculate total votes cast by this user for THIS award category
+      let totalCast = 0;
+      award.nominations.forEach(n => {
+        n.votes.forEach(v => {
+          if (v.toString() === userId.toString()) totalCast++;
+        });
+      });
+
+      const limit = user.voteLimit || 1;
+      if (totalCast >= limit) {
+        return res.status(400).json({ message: `You have reached your limit of ${limit} votes for this award.` });
+      }
+
       nomination.votes.push(userId);
     } else {
-      nomination.votes.splice(voteIndex, 1);
+      // Remove ONE vote for this specific nomination
+      const voteIndex = nomination.votes.findIndex(v => v.toString() === userId.toString());
+      if (voteIndex !== -1) {
+        nomination.votes.splice(voteIndex, 1);
+      }
     }
     
     const updatedAward = await award.save();
     
     const populatedAward = await Award.findById(updatedAward._id)
       .populate('nominations.camperId', 'fullName church sex age')
+      .populate('nominations.groupId', 'name color')
       .populate('nominations.nominatedBy', 'church role');
 
     if (req.io) {

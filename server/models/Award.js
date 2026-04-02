@@ -1,7 +1,8 @@
 const mongoose = require('mongoose');
 
 const nominationSchema = new mongoose.Schema({
-  camperId: { type: mongoose.Schema.Types.ObjectId, ref: 'Registrant', required: true },
+  camperId: { type: mongoose.Schema.Types.ObjectId, ref: 'Registrant' },
+  groupId: { type: mongoose.Schema.Types.ObjectId, ref: 'CampGroup' },
   nominatedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
   votes: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
   reason: { type: String, default: '' },
@@ -11,6 +12,11 @@ const nominationSchema = new mongoose.Schema({
 const awardSchema = new mongoose.Schema({
   title: { type: String, required: true },
   description: { type: String, default: '' },
+  awardType: { 
+    type: String, 
+    enum: ['individual', 'group'], 
+    default: 'individual' 
+  },
   createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
   nominations: [nominationSchema],
   status: { 

@@ -11,6 +11,7 @@ interface AppUser {
   pin: string;
   role: 'admin' | 'coordinator' | 'treasurer';
   church: string;
+  voteLimit?: number;
 }
 
 export default function Users() {
@@ -23,7 +24,8 @@ export default function Users() {
   const initialForm = {
     church: '',
     pin: '',
-    role: 'coordinator' as 'admin' | 'coordinator' | 'treasurer'
+    role: 'coordinator' as 'admin' | 'coordinator' | 'treasurer',
+    voteLimit: 1
   };
   const [formData, setFormData] = useState(initialForm);
 
@@ -89,7 +91,8 @@ export default function Users() {
     setFormData({
       church: usr.church,
       pin: '', // Do not display original PIN, leave blank unless changing
-      role: usr.role
+      role: usr.role,
+      voteLimit: usr.voteLimit || 1
     });
     setEditingId(usr._id);
     setIsModalOpen(true);
@@ -104,7 +107,8 @@ export default function Users() {
     e.preventDefault();
     const payload: any = {
       church: formData.church,
-      role: formData.role
+      role: formData.role,
+      voteLimit: formData.voteLimit
     };
     if (formData.pin.trim()) payload.pin = formData.pin.trim();
 
@@ -151,6 +155,9 @@ export default function Users() {
                     }`}>
                       {usr.role}
                     </span>
+                    <span className="px-2 py-0.5 rounded-lg text-[10px] font-black uppercase tracking-widest border bg-brand-sand/10 text-brand-brown border-brand-sand/20">
+                      VOTE LIMIT: {usr.voteLimit || 1}
+                    </span>
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
@@ -184,6 +191,7 @@ export default function Users() {
               <tr>
                 <th className="px-6 py-4 font-medium tracking-wider">Role</th>
                 <th className="px-6 py-4 font-medium tracking-wider">Church Assignment</th>
+                <th className="px-6 py-4 font-medium tracking-wider text-center">Vote Limit</th>
                 <th className="px-6 py-4 font-medium tracking-wider text-right">Actions</th>
               </tr>
             </thead>
@@ -199,6 +207,9 @@ export default function Users() {
                   </td>
                   <td className="px-6 py-4 font-medium text-gray-800">
                     {usr.role?.toLowerCase().trim() === 'admin' ? 'Global Access (Admin HQ)' : usr.church}
+                  </td>
+                  <td className="px-6 py-4 text-center">
+                    <span className="font-mono font-bold text-brand-brown">{usr.voteLimit || 1}</span>
                   </td>
                   <td className="px-6 py-4 text-right">
                     <div className="flex items-center justify-end gap-2">
@@ -285,6 +296,20 @@ export default function Users() {
                   </select>
                 )}
                 <p className="text-xs text-brand-light-brown mt-1">Warning: System allows only ONE active treasurer at a time.</p>
+              </div>
+
+              <div>
+                <label className="block text-sm text-gray-600 mb-1">Total Vote Limit (Per Award)</label>
+                <input 
+                  type="number" 
+                  min="1"
+                  max="100"
+                  required
+                  value={formData.voteLimit}
+                  onChange={(e) => setFormData({...formData, voteLimit: parseInt(e.target.value) || 1})}
+                  className="w-full px-3 py-2 rounded-lg border border-gray-200 focus:outline-none focus:border-brand-brown"
+                />
+                <p className="text-xs text-brand-light-brown mt-1">How many votes can this coordinator cast across all nominees in a single category?</p>
               </div>
 
 

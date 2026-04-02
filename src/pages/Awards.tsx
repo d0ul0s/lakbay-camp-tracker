@@ -24,17 +24,23 @@ export default function Awards() {
     awards, 
     registrants, 
     currentUser,
-    toggleAwardVote,
+    updateAwardVote,
     lockEntity,
-    unlockEntity
+    unlockEntity,
+    groups
   } = useAppStore();
 
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [isNominateModalOpen, setIsNominateModalOpen] = useState<string | null>(null); // Award ID
-  const [newAwardData, setNewAwardData] = useState({ title: '', description: '' });
+  const [newAwardData, setNewAwardData] = useState({ 
+    title: '', 
+    description: '',
+    awardType: 'individual' as 'individual' | 'group'
+  });
   const [nominationReason, setNominationReason] = useState('');
   const [searchCamper, setSearchCamper] = useState('');
   const [selectedCamper, setSelectedCamper] = useState<Registrant | null>(null);
+  const [selectedGroupId, setSelectedGroupId] = useState('');
   const [filterStatus, setFilterStatus] = useState<'all' | 'nominating' | 'voting' | 'closed'>('all');
 
   const isAdmin = currentUser?.role === 'admin';
@@ -71,23 +77,30 @@ export default function Awards() {
       await api.post('/api/awards', newAwardData);
       toast.success('Award category created!');
       setIsCreateModalOpen(false);
-      setNewAwardData({ title: '', description: '' });
+      setNewAwardData({ title: '', description: '', awardType: 'individual' });
     } catch (err: any) {
       toast.error(err.response?.data?.message || 'Failed to create award');
     }
   };
 
   const handleNominate = async () => {
-    if (!isNominateModalOpen || !selectedCamper) return;
+    if (!isNominateModalOpen) return;
+    const award = awards.find(a => a.id === isNominateModalOpen);
+    const isGroup = award?.awardType === 'group';
+    
+    if (isGroup && !selectedGroupId) return toast.error('Select a tribe');
+    if (!isGroup && !selectedCamper) return toast.error('Select a camper');
 
     try {
-      await api.post(`/api/awards/${isNominateModalOpen}/nominate`, {
-        camperId: selectedCamper.id || (selectedCamper as any)._id,
-        reason: nominationReason
-      });
-      toast.success(`${selectedCamper.fullName} nominated!`);
+      const payload = isGroup 
+        ? { groupId: selectedGroupId, reason: nominationReason }
+        : { camperId: selectedCamper!.id || (selectedCamper as any)._id, reason: nominationReason };
+
+      await api.post(`/api/awards/${isNominateModalOpen}/nominate`, payload);
+      toast.success('Nomination added!');
       setIsNominateModalOpen(null);
       setSelectedCamper(null);
+      setSelectedGroupId('');
       setNominationReason('');
       setSearchCamper('');
     } catch (err: any) {
@@ -95,18 +108,18 @@ export default function Awards() {
     }
   };
 
-  const toggleVote = async (awardId: string, nominationId: string) => {
+  const handleVote = async (awardId: string, nominationId: string, action: 'add' | 'remove') => {
     if (!currentUser?._id) return;
     
     // Optimistic Update
-    toggleAwardVote(awardId, nominationId, currentUser._id);
+    updateAwardVote(awardId, nominationId, currentUser._id, action);
     lockEntity('awards', awardId);
     
     try {
-      await api.post(`/api/awards/${awardId}/vote/${nominationId}`);
+      await api.post(`/api/awards/${awardId}/vote/${nominationId}`, { action });
     } catch (err: any) {
-      // Rollback on error (by toggling back)
-      toggleAwardVote(awardId, nominationId, currentUser._id);
+      // Rollback on error
+      updateAwardVote(awardId, nominationId, currentUser._id, action === 'add' ? 'remove' : 'add');
       toast.error(err.response?.data?.message || 'Failed to vote');
     } finally {
       unlockEntity('awards', awardId);
@@ -228,12 +241,23 @@ export default function Awards() {
                        </span>
                        <span className="text-[10px] text-gray-400 font-medium">Created {format(new Date(award.createdAt), 'MMM dd, h:mm a')}</span>
                     </div>
-                    <h3 className="text-3xl font-display text-brand-brown tracking-tight leading-none group-hover:text-brand-light-brown transition-colors">
-                      {award.title}
-                    </h3>
-                    <p className="text-gray-500 font-medium line-clamp-2 max-w-lg">
-                      {award.description || 'No description provided.'}
-                    </p>
+                    <div className="flex flex-col gap-2">
+                      <div className="flex items-center gap-3">
+                        <h3 className="text-3xl font-display text-brand-brown tracking-tight leading-none group-hover:text-brand-light-brown transition-colors">
+                          {award.title}
+                        </h3>
+                        <span className={`px-2.5 py-1 rounded-full text-[9px] font-black uppercase tracking-widest border shadow-sm shrink-0 ${
+                          award.awardType === 'group' 
+                            ? 'bg-amber-50 text-amber-600 border-amber-100' 
+                            : 'bg-brand-brown/5 text-brand-brown/40 border-brand-brown/10'
+                        }`}>
+                          {award.awardType === 'group' ? 'Group' : 'Individual'}
+                        </span>
+                      </div>
+                      <p className="text-gray-500 font-medium line-clamp-2 max-w-lg">
+                        {award.description || 'No description provided.'}
+                      </p>
+                    </div>
                   </div>
                   
                   <div className="flex items-center gap-2">
@@ -274,11 +298,21 @@ export default function Awards() {
 
             {/* Nominations List */}
             <div className="flex-1 p-8 pt-4">
-               <div className="mb-6 flex items-center justify-between">
+                <div className="mb-6 flex items-center justify-between">
                   <h4 className="text-sm font-black text-brand-brown/40 uppercase tracking-[0.2em] flex items-center gap-2">
                     <Activity size={14} className="text-brand-sand" />
                     Nominees ({award.nominations?.length || 0})
                   </h4>
+
+                  {award.status === 'voting' && (
+                    <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-brand-sand/10 border border-brand-sand/20">
+                      <Vote size={14} className="text-brand-sand" />
+                      <span className="text-xs font-black text-brand-brown uppercase tracking-tighter">
+                        Votes Left: {Math.max(0, (currentUser?.voteLimit || 1) - (award.nominations?.reduce((acc, n) => acc + (n.votes?.filter(v => v.toString() === (currentUser?._id || (currentUser as any)?.id)?.toString()).length || 0), 0) || 0))}
+                      </span>
+                    </div>
+                  )}
+
                   {award.status === 'nominating' && (
                     <button 
                       onClick={() => setIsNominateModalOpen(award.id)}
@@ -288,7 +322,7 @@ export default function Awards() {
                       Add Nominee
                     </button>
                   )}
-               </div>
+                </div>
 
                <div className="space-y-4">
                   {(award.nominations || []).length === 0 ? (
@@ -298,7 +332,6 @@ export default function Awards() {
                     </div>
                   ) : (
                     award.nominations.sort((a, b) => (b.votes?.length || 0) - (a.votes?.length || 0)).map((nomination) => {
-                      const hasVoted = nomination.votes?.includes(currentUser?._id || '');
                       const voteCount = nomination.votes?.length || 0;
                       const maxVotes = Math.max(...(award.nominations.map(n => n.votes?.length || 0)), 1);
                       const progressWidth = (voteCount / maxVotes) * 100;
@@ -322,12 +355,22 @@ export default function Awards() {
                                 <span className="text-[7px] font-black uppercase tracking-widest text-brand-brown/40">Votes</span>
                               </div>
 
-                              <div className="min-w-0 flex-1">
+                               <div className="min-w-0 flex-1">
                                  <div className="flex items-center gap-2 mb-0.5">
-                                    <h5 className="font-display text-lg text-brand-brown truncate">{nomination.camperId?.fullName}</h5>
-                                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-brand-brown/5 text-brand-brown/60 font-bold">
-                                      {nomination.camperId?.church}
-                                    </span>
+                                    <h5 className="font-display text-lg text-brand-brown truncate">
+                                      {award.awardType === 'group' ? nomination.groupId?.name : nomination.camperId?.fullName}
+                                    </h5>
+                                    {award.awardType === 'individual' && (
+                                      <span className="text-[10px] px-2 py-0.5 rounded-full bg-brand-brown/5 text-brand-brown/60 font-bold">
+                                        {nomination.camperId?.church}
+                                      </span>
+                                    )}
+                                    {award.awardType === 'group' && nomination.groupId?.color && (
+                                      <div 
+                                        className="w-3 h-3 rounded-full border border-white shadow-sm" 
+                                        style={{ backgroundColor: nomination.groupId.color }} 
+                                      />
+                                    )}
                                  </div>
                                  <div className="flex items-center gap-2">
                                    <p className="text-xs text-gray-500 italic truncate max-w-sm">"{nomination.reason || 'No reason specified'}"</p>
@@ -338,17 +381,32 @@ export default function Awards() {
 
                               <div className="flex items-center gap-2">
                                 {award.status === 'voting' && (
-                                  <button 
-                                    onClick={() => toggleVote(award.id, nomination.id)}
-                                    className={`flex items-center gap-2 px-4 py-2 rounded-xl font-bold transition-all ${
-                                      hasVoted 
-                                        ? 'bg-brand-brown text-white shadow-lg shadow-brand-brown/20' 
-                                        : 'bg-white text-brand-brown border border-brand-beige hover:border-brand-brown'
-                                    }`}
-                                  >
-                                    <Vote size={16} />
-                                    <span className="hidden sm:inline">{hasVoted ? 'Voted' : 'Vote'}</span>
-                                  </button>
+                                  <div className="flex items-center gap-1.5">
+                                    {(nomination.votes?.filter(v => v.toString() === (currentUser?._id || (currentUser as any)?.id)?.toString()).length || 0) > 0 && (
+                                      <button 
+                                        onClick={() => handleVote(award.id, nomination.id, 'remove')}
+                                        className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-xl border border-transparent hover:border-red-100 transition-all"
+                                        title="Remove one vote"
+                                      >
+                                        <X size={16} />
+                                      </button>
+                                    )}
+                                    <button 
+                                      onClick={() => handleVote(award.id, nomination.id, 'add')}
+                                      className={`flex items-center gap-2 px-4 py-2 rounded-xl font-bold transition-all ${
+                                        (nomination.votes?.filter(v => v.toString() === (currentUser?._id || (currentUser as any)?.id)?.toString()).length || 0) > 0
+                                          ? 'bg-brand-brown text-white shadow-lg shadow-brand-brown/20' 
+                                          : 'bg-white text-brand-brown border border-brand-beige hover:border-brand-brown'
+                                      }`}
+                                    >
+                                      <Vote size={16} />
+                                      <span className="hidden sm:inline">
+                                        {(nomination.votes?.filter(v => v.toString() === (currentUser?._id || (currentUser as any)?.id)?.toString()).length || 0) > 0 
+                                          ? `Vote (${nomination.votes?.filter(v => v.toString() === (currentUser?._id || (currentUser as any)?.id)?.toString()).length})` 
+                                          : 'Vote'}
+                                      </span>
+                                    </button>
+                                  </div>
                                 )}
                                 
                                 {(isAdmin || nomination.nominatedBy?._id === currentUser?._id) && (
@@ -409,10 +467,46 @@ export default function Awards() {
                 <h3 className="text-2xl font-display text-brand-brown mb-1 tracking-tight">Create Award Category</h3>
                 <p className="text-gray-500 text-sm font-medium">Define a new recognition for our delegates.</p>
               </div>
-
-              <div className="space-y-4">
+              
+              <div className="space-y-5">
                 <div>
-                  <label className="block text-xs font-black text-brand-brown/40 uppercase tracking-widest mb-2 ml-1">Award Title</label>
+                  <label className="block text-xs font-black text-brand-brown/40 uppercase tracking-widest mb-3 ml-1">Launch Scope</label>
+                  <div className="grid grid-cols-2 gap-3">
+                    <button 
+                      type="button"
+                      onClick={() => setNewAwardData(d => ({ ...d, awardType: 'individual' }))}
+                      className={`flex flex-col items-center gap-2 p-5 rounded-3xl border-2 transition-all group ${
+                        newAwardData.awardType === 'individual' 
+                          ? 'border-brand-brown bg-brand-brown text-white shadow-xl shadow-brand-brown/20' 
+                          : 'border-brand-beige text-gray-400 hover:border-brand-brown/20 hover:bg-brand-cream/30'
+                      }`}
+                    >
+                      <Star size={24} className={newAwardData.awardType === 'individual' ? '' : 'text-brand-beige group-hover:text-brand-brown/40'} />
+                      <div className="text-center">
+                        <p className="font-bold text-sm">Individual</p>
+                        <p className={`text-[9px] font-black uppercase tracking-tighter ${newAwardData.awardType === 'individual' ? 'text-white/60' : 'text-gray-300'}`}>Campers</p>
+                      </div>
+                    </button>
+                    <button 
+                      type="button"
+                      onClick={() => setNewAwardData(d => ({ ...d, awardType: 'group' }))}
+                      className={`flex flex-col items-center gap-2 p-5 rounded-3xl border-2 transition-all group ${
+                        newAwardData.awardType === 'group' 
+                          ? 'border-brand-brown bg-brand-brown text-white shadow-xl shadow-brand-brown/20' 
+                          : 'border-brand-beige text-gray-400 hover:border-brand-brown/20 hover:bg-brand-cream/30'
+                      }`}
+                    >
+                      <Users size={24} className={newAwardData.awardType === 'group' ? '' : 'text-brand-beige group-hover:text-brand-brown/40'} />
+                      <div className="text-center">
+                        <p className="font-bold text-sm">Group / Tribe</p>
+                        <p className={`text-[9px] font-black uppercase tracking-tighter ${newAwardData.awardType === 'group' ? 'text-white/60' : 'text-gray-300'}`}>Full Teams</p>
+                      </div>
+                    </button>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-black text-brand-brown/40 uppercase tracking-widest mb-3 ml-1">Award Title</label>
                   <input 
                     autoFocus
                     type="text" 
@@ -423,12 +517,12 @@ export default function Awards() {
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-black text-brand-brown/40 uppercase tracking-widest mb-2 ml-1">Description (Optional)</label>
+                  <label className="block text-xs font-black text-brand-brown/40 uppercase tracking-widest mb-3 ml-1">Description (Optional)</label>
                   <textarea 
                     value={newAwardData.description}
                     onChange={e => setNewAwardData(d => ({ ...d, description: e.target.value }))}
                     placeholder="Describe what this award is for..."
-                    rows={3}
+                    rows={2}
                     className="w-full bg-brand-cream/50 border border-brand-beige rounded-2xl px-5 py-4 focus:ring-2 focus:ring-brand-brown focus:border-transparent outline-none font-medium placeholder:text-gray-400 resize-none"
                   />
                 </div>
@@ -463,61 +557,93 @@ export default function Awards() {
                <button onClick={() => { setIsNominateModalOpen(null); setSelectedCamper(null); }} className="p-2 text-gray-400 hover:text-brand-brown">
                  <X size={24} />
                </button>
-            </div>
-
-            <div className="p-8 pt-0 space-y-6">
-               {!selectedCamper ? (
+             </div>
+             
+             <div className="p-8 pt-0 space-y-6">
+               {(awards.find(a => a.id === isNominateModalOpen)?.awardType === 'group' ? !selectedGroupId : !selectedCamper) ? (
                  <div className="space-y-4">
-                    <div className="relative">
-                      <Search className="absolute left-5 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
-                      <input 
-                        autoFocus
-                        type="text"
-                        value={searchCamper}
-                        onChange={e => setSearchCamper(e.target.value)}
-                        placeholder="Search by name or church..."
-                        className="w-full bg-brand-cream border border-brand-beige rounded-2xl pl-14 pr-6 py-4 focus:ring-2 focus:ring-brand-brown focus:border-transparent outline-none font-medium"
-                      />
-                    </div>
+                    {awards.find(a => a.id === isNominateModalOpen)?.awardType === 'group' ? (
+                      <div className="space-y-4">
+                         <label className="block text-xs font-black text-brand-brown/40 uppercase tracking-widest ml-1">Select Tribe from Camp Organization</label>
+                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-[300px] overflow-y-auto pr-2 custom-scrollbar">
+                           {groups.map((g: any) => (
+                             <button
+                               key={g.id || g._id}
+                               onClick={() => setSelectedGroupId(g.id || g._id)}
+                               className="flex items-center gap-3 p-4 rounded-2xl bg-brand-cream/50 border border-brand-beige hover:border-brand-brown hover:bg-white transition-all group/tribe"
+                             >
+                                <div className="w-10 h-10 rounded-xl shadow-sm border border-white" style={{ backgroundColor: g.color || '#8B4513' }} />
+                                <span className="font-bold text-brand-brown">{g.name}</span>
+                             </button>
+                           ))}
+                         </div>
+                      </div>
+                    ) : (
+                      <>
+                        <div className="relative">
+                          <Search className="absolute left-5 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
+                          <input 
+                            autoFocus
+                            type="text"
+                            value={searchCamper}
+                            onChange={e => setSearchCamper(e.target.value)}
+                            placeholder="Search by name or church..."
+                            className="w-full bg-brand-cream border border-brand-beige rounded-2xl pl-14 pr-6 py-4 focus:ring-2 focus:ring-brand-brown focus:border-transparent outline-none font-medium"
+                          />
+                        </div>
 
-                    <div className="space-y-2 max-h-[300px] overflow-y-auto pr-2 custom-scrollbar">
-                       {filteredRegistrants.map((r) => (
-                         <button
-                           key={r.id || (r as any)._id}
-                           onClick={() => setSelectedCamper(r)}
-                           className="w-full flex items-center justify-between p-4 rounded-2xl hover:bg-brand-cream border border-transparent hover:border-brand-beige transition-all group/item"
-                         >
-                            <div className="flex items-center gap-4">
-                               <div className="w-10 h-10 rounded-xl bg-brand-brown/5 flex items-center justify-center text-brand-brown font-display text-lg">
-                                 {r.fullName.charAt(0)}
-                               </div>
-                               <div className="text-left">
-                                  <p className="font-bold text-brand-brown">{r.fullName}</p>
-                                  <p className="text-xs text-gray-500">{r.church} • {r.sex} ({r.age || '?'})</p>
-                               </div>
-                            </div>
-                            <ChevronRight size={18} className="text-gray-300 group-hover/item:text-brand-brown transition-colors" />
-                         </button>
-                       ))}
-                       {filteredRegistrants.length === 0 && (
-                         <div className="py-8 text-center text-gray-400 font-medium italic">No matching delegates found</div>
-                       )}
-                    </div>
+                        <div className="space-y-2 max-h-[300px] overflow-y-auto pr-2 custom-scrollbar">
+                          {filteredRegistrants.map((r) => (
+                            <button
+                              key={r.id || (r as any)._id}
+                              onClick={() => setSelectedCamper(r)}
+                              className="w-full flex items-center justify-between p-4 rounded-2xl hover:bg-brand-cream border border-transparent hover:border-brand-beige transition-all group/item"
+                            >
+                                <div className="flex items-center gap-4">
+                                  <div className="w-10 h-10 rounded-xl bg-brand-brown/5 flex items-center justify-center text-brand-brown font-display text-lg">
+                                    {r.fullName.charAt(0)}
+                                  </div>
+                                  <div className="text-left">
+                                      <p className="font-bold text-brand-brown">{r.fullName}</p>
+                                      <p className="text-xs text-gray-500">{r.church} • {r.sex} ({r.age || '?'})</p>
+                                  </div>
+                                </div>
+                                <ChevronRight size={18} className="text-gray-300 group-hover/item:text-brand-brown transition-colors" />
+                            </button>
+                          ))}
+                          {filteredRegistrants.length === 0 && (
+                            <div className="py-8 text-center text-gray-400 font-medium italic">No matching delegates found</div>
+                          )}
+                        </div>
+                      </>
+                    )}
                  </div>
                ) : (
                  <div className="space-y-6 animate-in slide-in-from-right-4 duration-300">
                     <div className="bg-brand-cream border border-brand-beige p-6 rounded-3xl flex items-center justify-between">
                        <div className="flex items-center gap-4">
-                          <div className="w-14 h-14 rounded-2xl bg-brand-brown text-white flex items-center justify-center text-2xl font-display shadow-lg shadow-brand-brown/20">
-                            {selectedCamper.fullName.charAt(0)}
+                          <div className={`w-14 h-14 rounded-2xl flex items-center justify-center text-2xl font-display shadow-lg ${
+                            awards.find(a => a.id === isNominateModalOpen)?.awardType === 'group' 
+                              ? 'bg-white border border-brand-beige' 
+                              : 'bg-brand-brown text-white shadow-brand-brown/20'
+                          }`}>
+                            {awards.find(a => a.id === isNominateModalOpen)?.awardType === 'group' ? (
+                               <div className="w-8 h-8 rounded-lg" style={{ backgroundColor: groups.find(g => (g.id || g._id) === selectedGroupId)?.color || '#8B4513' }} />
+                            ) : selectedCamper?.fullName.charAt(0)}
                           </div>
                           <div>
-                            <p className="text-xl font-display text-brand-brown leading-tight">{selectedCamper.fullName}</p>
-                            <p className="text-sm text-brand-brown/60 font-bold uppercase tracking-widest">{selectedCamper.church}</p>
+                            <p className="text-xl font-display text-brand-brown leading-tight">
+                              {awards.find(a => a.id === isNominateModalOpen)?.awardType === 'group' 
+                                ? groups.find(g => (g.id || g._id) === selectedGroupId)?.name 
+                                : selectedCamper?.fullName}
+                            </p>
+                            <p className="text-sm text-brand-brown/60 font-bold uppercase tracking-widest">
+                               {awards.find(a => a.id === isNominateModalOpen)?.awardType === 'group' ? 'Selected Tribe' : selectedCamper?.church}
+                            </p>
                           </div>
                        </div>
                        <button 
-                         onClick={() => setSelectedCamper(null)}
+                         onClick={() => { setSelectedCamper(null); setSelectedGroupId(''); }}
                          className="text-brand-brown/40 hover:text-brand-brown font-bold text-xs uppercase tracking-widest px-3 py-1.5 rounded-lg border border-brand-beige/50 hover:border-brand-brown/20 transition-all"
                        >
                          Change

@@ -66,8 +66,8 @@ function updateCache(state: any, updates: any) {
 
 interface AppState {
   // Auth State
-  currentUser: { _id?: string; role: UserRole; church: string | null; permissionMatrix?: PermissionMatrix; eSignatureUrl?: string } | null;
-  login: (user: { _id?: string; role: UserRole; church: string | null; permissionMatrix?: PermissionMatrix }) => void;
+  currentUser: { _id?: string; role: UserRole; church: string | null; permissionMatrix?: PermissionMatrix; eSignatureUrl?: string; voteLimit?: number } | null;
+  login: (user: { _id?: string; role: UserRole; church: string | null; permissionMatrix?: PermissionMatrix; voteLimit?: number }) => void;
   logout: () => void;
   refreshPermissions: () => Promise<void>;
 
@@ -97,13 +97,15 @@ interface AppState {
   syncWorship: (action: string, data: any) => void;
 
   pointLogs: PointLog[];
-  fetchPointLogs: (silent?: boolean) => Promise<void>;
   syncPointLog: (action: string, data: any) => void;
+  groups: any[];
+  syncGroup: (action: string, data: any) => void;
+  fetchGroups: () => Promise<void>;
 
   awards: Award[];
   fetchAwards: (silent?: boolean) => Promise<void>;
   syncAward: (action: string, data: any) => void;
-  toggleAwardVote: (awardId: string, nominationId: string, userId: string) => void;
+  updateAwardVote: (awardId: string, nominationId: string, userId: string, action: 'add' | 'remove') => void;
 
   // In-flight mutation lock — prevents WebSocket echoes from overriding optimistic UI
   pendingMutations: Set<string>;
@@ -170,6 +172,7 @@ export const useAppStore = create<AppState>()((set) => {
     announcements: initialCache?.announcements || [],
     pointLogs: initialCache?.pointLogs || [],
     awards: initialCache?.awards || [],
+    groups: initialCache?.groups || [],
     users: [],
     isLoading: false,
     globalError: null,
@@ -430,7 +433,7 @@ export const useAppStore = create<AppState>()((set) => {
       return { awards: next };
     }),
 
-    toggleAwardVote: (awardId, nominationId, userId) => set(state => {
+    updateAwardVote: (awardId, nominationId, userId, action) => set(state => {
       const next = state.awards.map(a => {
         if ((a.id || (a as any)._id) !== awardId) return a;
         
@@ -439,14 +442,15 @@ export const useAppStore = create<AppState>()((set) => {
           nominations: a.nominations.map(n => {
             if ((n.id || (n as any)._id) !== nominationId) return n;
             
-            const votes = n.votes || [];
-            const hasVoted = votes.some(v => v.toString() === userId.toString());
-            return {
-              ...n,
-              votes: hasVoted 
-                ? votes.filter(v => v.toString() !== userId.toString()) 
-                : [...votes, userId.toString()]
-            };
+            const votes = [...(n.votes || [])];
+            if (action === 'add') {
+              votes.push(userId);
+            } else {
+              const idx = votes.findIndex(v => v.toString() === userId.toString());
+              if (idx !== -1) votes.splice(idx, 1);
+            }
+
+            return { ...n, votes };
           })
         };
       });
@@ -649,13 +653,28 @@ export const useAppStore = create<AppState>()((set) => {
         if (!silent) set({ isLoading: false });
       }
     },
+    syncGroup: (action, data) => {
+      set(state => {
+        let next = [...state.groups];
+        if (action === 'added') next = [...next, data];
+        else if (action === 'updated') next = next.map(g => (g.id || g._id) === (data.id || data._id) ? data : g);
+        else if (action === 'deleted') next = next.filter(g => (g.id || g._id) !== (data.id || data._id));
+        return { groups: next };
+      });
+    },
+    fetchGroups: async () => {
+      try {
+        const res = await api.get('/api/org/groups');
+        set({ groups: res.data });
+      } catch (err) { console.error(err); }
+    },
     fetchBootData: async (retryCount = 0) => {
       const { hasBooted } = useAppStore.getState();
       if (!hasBooted) set({ isLoading: true, globalError: null });
 
       try {
         const res = await api.get('/api/boot');
-        const { registrants, expenses, solicitations, announcements, points: pointLogs, settings, awards } = res.data;
+        const { registrants, expenses, solicitations, announcements, points: pointLogs, settings, awards, groups } = res.data;
         const newSettings = {
           ...settings,
           churches: settings.churchList || settings.churches || [],
@@ -675,6 +694,7 @@ export const useAppStore = create<AppState>()((set) => {
           announcements,
           pointLogs: pointLogs || [],
           awards: awards || [],
+          groups: groups || [],
           appSettings: newSettings,
         };
         

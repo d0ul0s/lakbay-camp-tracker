@@ -6,9 +6,10 @@ const userSchema = new mongoose.Schema({
   pin: { type: String, required: true },
   role: {
     type: String,
-    enum: ['admin', 'coordinator'],
+    enum: ['admin', 'coordinator', 'treasurer'],
     required: true
   },
+  voteLimit: { type: Number, default: 1 },
   eSignatureUrl: { type: String }
 });
 

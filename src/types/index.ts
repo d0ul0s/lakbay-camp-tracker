@@ -101,7 +101,7 @@ export interface AppSettings {
   permissionMatrix?: PermissionMatrix;
 }
 
-export type UserRole = 'admin' | 'coordinator';
+export type UserRole = 'admin' | 'coordinator' | 'treasurer';
 
 export interface PermissionMatrixRole {
   dashboard: { view: boolean };
@@ -120,9 +120,11 @@ export type PermissionMatrix = Record<string, PermissionMatrixRole>;
 
 export interface AppUser {
   _id: string;
+  id?: string;
   pin: string;
   role: UserRole;
   church: string;
+  voteLimit?: number;
   eSignatureUrl?: string;
 }
 
@@ -183,7 +185,8 @@ export interface WorshipSession {
 export interface Nomination {
   id: string;
   _id?: string;
-  camperId: Registrant;
+  camperId?: Registrant;
+  groupId?: { id: string; _id: string; name: string; color: string };
   nominatedBy: AppUser;
   votes: string[]; // Array of User IDs
   reason: string;
@@ -195,6 +198,7 @@ export interface Award {
   _id?: string;
   title: string;
   description: string;
+  awardType: 'individual' | 'group';
   createdBy: string;
   nominations: Nomination[];
   status: 'nominating' | 'voting' | 'closed';

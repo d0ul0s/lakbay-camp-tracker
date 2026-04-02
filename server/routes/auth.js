@@ -141,10 +141,15 @@ router.get('/users', auth, async (req, res) => {
 // REGISTER (Admin only)
 router.post('/register', auth, async (req, res) => {
   if (req.user.role !== 'admin') return res.status(403).json({ message: 'Unauthorized' });
-  const { church, pin, role } = req.body;
+  const { church, pin, role, voteLimit } = req.body;
 
   try {
-    const user = new User({ church, pin, role });
+    const user = new User({ 
+      church, 
+      pin, 
+      role, 
+      voteLimit: voteLimit || 1 
+    });
     await user.save();
     
     await cache.refreshUserCache();
@@ -178,6 +183,7 @@ router.put('/users/:id', auth, async (req, res) => {
     if (church) user.church = church;
     if (role) user.role = role;
     if (pin) user.pin = pin; 
+    if (voteLimit !== undefined) user.voteLimit = voteLimit;
 
     await user.save();
     await cache.refreshUserCache();
