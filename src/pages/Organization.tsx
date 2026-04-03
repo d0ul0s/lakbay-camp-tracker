@@ -181,8 +181,9 @@ export default function Organization() {
   const [leaderForm, setLeaderForm] = useState<Partial<CampLeader>>({ categories: ['Registration'], name: '', roleTitle: '', churchRef: '', image: '', socialLink: '' });
   const [groupForm, setGroupForm] = useState<Partial<CampGroup>>({ name: '', leader: '', assistantLeader: '', pointKeeper: '', flagBearer: '', facilitators: [], grabMasters: [], members: [], color: '#8B4513' });
 
-  // Local raw input state for manual member entry
+  // Local raw input state for manual member/facilitator entry
   const [manualName, setManualName] = useState('');
+  const [manualFacilName, setManualFacilName] = useState('');
 
   // Local search filter states for modal
   const [facilSearch, setFacilSearch] = useState('');
@@ -193,6 +194,7 @@ export default function Organization() {
   useEffect(() => {
     if (groupModal.isOpen && !groupModal.group) {
       setManualName('');
+      setManualFacilName('');
       setFacilSearch('');
       setRegistrySearch('');
     } else if (!groupModal.isOpen) {
@@ -200,6 +202,7 @@ export default function Organization() {
       setRegistrySearch('');
       setFacilSearch('');
       setManualName('');
+      setManualFacilName('');
     }
   }, [groupModal.isOpen]);
 
@@ -1069,6 +1072,76 @@ export default function Organization() {
                     />
                   </div>
                 </div>
+
+                {/* Active Facilitators Chip List */}
+                {(groupForm.facilitators || []).length > 0 && (
+                  <div className="flex flex-wrap gap-2 p-3 bg-indigo-50/5 rounded-xl border border-indigo-100/20 shadow-inner">
+                    <p className="w-full text-[8px] font-black uppercase text-indigo-400 tracking-widest mb-1 px-1">Selected Facilitators ({(groupForm.facilitators || []).length})</p>
+                    {(groupForm.facilitators || []).map((facil, i) => {
+                      const isStaff = leaders.some(l => l.name === facil);
+                      return (
+                        <div
+                          key={i}
+                          className={`flex items-center gap-1.5 py-1 pl-3 pr-1.5 rounded-xl text-[10px] font-bold border shadow-sm ${
+                            isStaff ? 'bg-indigo-600 border-indigo-600 text-white' : 'bg-white border-indigo-400 text-indigo-900 border-dashed animate-in zoom-in-95'
+                          }`}
+                        >
+                          <span className="truncate max-w-[120px]">{facil}</span>
+                          {!isStaff && <span className="text-[7px] bg-indigo-200 text-indigo-700 px-1 py-0.5 rounded font-black uppercase tracking-tighter">Manual</span>}
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const next = (groupForm.facilitators || []).filter(n => n !== facil);
+                              setGroupForm({ ...groupForm, facilitators: next });
+                            }}
+                            className={`w-5 h-5 flex items-center justify-center rounded-lg transition-colors ${
+                              isStaff ? 'hover:bg-white/20 text-white/50 hover:text-white' : 'hover:bg-indigo-100 text-indigo-400 hover:text-red-500'
+                            }`}
+                          >
+                            <X size={10} />
+                          </button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+
+                {/* Manual Facilitator Entry Row */}
+                <div className="flex gap-2 p-1.5 bg-indigo-50/10 rounded-xl border border-indigo-100/30 group-focus-within:border-indigo-400/40 transition-all">
+                  <input
+                    type="text"
+                    value={manualFacilName}
+                    onChange={e => setManualFacilName(e.target.value)}
+                    onKeyDown={e => {
+                      if (e.key === 'Enter' && manualFacilName.trim()) {
+                        e.preventDefault();
+                        const current = (groupForm.facilitators || []);
+                        if (!current.includes(manualFacilName.trim())) {
+                          setGroupForm({ ...groupForm, facilitators: [...current, manualFacilName.trim()] });
+                        }
+                        setManualFacilName('');
+                      }
+                    }}
+                    placeholder="Type facilitator name (custom)..."
+                    className="flex-1 bg-transparent border-none outline-none text-xs font-bold px-2 placeholder:text-gray-300 placeholder:font-normal"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (manualFacilName.trim()) {
+                        const current = (groupForm.facilitators || []);
+                        if (!current.includes(manualFacilName.trim())) {
+                          setGroupForm({ ...groupForm, facilitators: [...current, manualFacilName.trim()] });
+                        }
+                        setManualFacilName('');
+                      }
+                    }}
+                    className="bg-indigo-600 text-white px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest hover:bg-indigo-700 transition-all active:scale-95"
+                  >
+                    Add Manually
+                  </button>
+                </div>
+
                 <div className="flex flex-wrap gap-1.5 p-3 bg-indigo-50/30 rounded-xl border border-indigo-100/50 max-h-32 overflow-y-auto">
                   {leaders
                     .filter(l => l.name.toLowerCase().includes(facilSearch.toLowerCase()))
@@ -1094,7 +1167,7 @@ export default function Organization() {
                         </div>
                       </button>
                     ))}
-                  {leaders.filter(l => !getCategories(l).includes('Youth Leader') && l.name.toLowerCase().includes(facilSearch.toLowerCase())).length === 0 && (
+                  {leaders.filter(l => l.name.toLowerCase().includes(facilSearch.toLowerCase())).length === 0 && (
                     <p className="text-[10px] text-gray-400 italic py-1 px-2">{leaders.length === 0 ? 'No personnel added yet. Add staff roles in the Departments tab first.' : 'No matching personnel found.'}</p>
                   )}
                 </div>
