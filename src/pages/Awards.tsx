@@ -44,6 +44,7 @@ export default function Awards() {
   const [filterStatus, setFilterStatus] = useState<'all' | 'nominating' | 'voting' | 'closed'>('all');
 
   const isAdmin = currentUser?.role === 'admin';
+  const currentUserId = currentUser?._id || (currentUser as any)?.id || '';
 
   // Stats
   const stats = useMemo(() => {
@@ -85,7 +86,7 @@ export default function Awards() {
 
   const handleNominate = async () => {
     if (!isNominateModalOpen) return;
-    const award = awards.find(a => a.id === isNominateModalOpen);
+    const award = awards.find(a => (a.id || (a as any)._id) === isNominateModalOpen);
     const isGroup = award?.awardType === 'group';
     
     if (isGroup && !selectedGroupId) return toast.error('Select a tribe');
@@ -109,17 +110,30 @@ export default function Awards() {
   };
 
   const handleVote = async (awardId: string, nominationId: string, action: 'add' | 'remove') => {
-    if (!currentUser?._id) return;
-    
+    if (!currentUserId) return;
+
+    // Frontend validation
+    if (action === 'add') {
+      const award = awards.find(a => (a.id || (a as any)._id) === awardId);
+      const limit = currentUser?.voteLimit || 1;
+      const totalCast = award?.nominations?.reduce((acc: number, n: any) => 
+        acc + (n.votes?.filter((v: any) => (v._id || v || '').toString() === currentUserId).length || 0)
+      , 0) || 0;
+      
+      if (totalCast >= limit) {
+        return toast.error(`You have reached your limit of ${limit} vote${limit > 1 ? 's' : ''} for this award.`);
+      }
+    }
+
     // Optimistic Update
-    updateAwardVote(awardId, nominationId, currentUser._id, action);
+    updateAwardVote(awardId, nominationId, currentUserId, action);
     lockEntity('awards', awardId);
     
     try {
       await api.post(`/api/awards/${awardId}/vote/${nominationId}`, { action });
     } catch (err: any) {
       // Rollback on error
-      updateAwardVote(awardId, nominationId, currentUser._id, action === 'add' ? 'remove' : 'add');
+      updateAwardVote(awardId, nominationId, currentUserId, action === 'add' ? 'remove' : 'add');
       toast.error(err.response?.data?.message || 'Failed to vote');
     } finally {
       unlockEntity('awards', awardId);
@@ -222,227 +236,235 @@ export default function Awards() {
 
       {/* Awards Grid */}
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-8">
-        {filteredAwards.map((award) => (
-          <div 
-            key={award.id || (award as any)._id}
-            className="group bg-white rounded-3xl border border-brand-brown/5 overflow-hidden shadow-sm hover:shadow-xl transition-all duration-300 flex flex-col"
-          >
-            {/* Award Card Header */}
-            <div className="p-5 pb-2 relative">
-               <div className="flex items-start justify-between gap-4 mb-4">
-                  <div className="space-y-1">
-                    <div className="flex items-center gap-2">
-                       <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-tighter border ${
-                         award.status === 'nominating' ? 'bg-yellow-50 text-yellow-600 border-yellow-200' :
-                         award.status === 'voting' ? 'bg-green-50 text-green-600 border-green-200' :
-                         'bg-gray-50 text-gray-400 border-gray-200'
-                       }`}>
-                         {award.status} 
-                       </span>
-                       <span className="text-[10px] text-gray-400 font-medium">Created {format(new Date(award.createdAt), 'MMM dd, h:mm a')}</span>
-                    </div>
-                    <div className="flex flex-col gap-2">
+        {filteredAwards.map((award) => {
+          const awardId = award.id || (award as any)._id;
+          return (
+            <div 
+              key={awardId}
+              className="group bg-white rounded-3xl border border-brand-brown/5 overflow-hidden shadow-sm hover:shadow-xl transition-all duration-300 flex flex-col"
+            >
+              {/* Award Card Header */}
+              <div className="p-5 pb-2 relative">
+                 <div className="flex items-start justify-between gap-4 mb-4">
+                    <div className="space-y-1">
                       <div className="flex items-center gap-2">
-                        <h3 className="text-xl md:text-2xl font-display text-brand-brown tracking-tight leading-none group-hover:text-brand-light-brown transition-colors">
-                          {award.title}
-                        </h3>
-                        <span className={`px-2 py-0.5 rounded-full text-[8px] font-black uppercase tracking-widest border shadow-sm shrink-0 ${
-                          award.awardType === 'group' 
-                            ? 'bg-amber-50 text-amber-600 border-amber-100' 
-                            : 'bg-brand-brown/5 text-brand-brown/40 border-brand-brown/10'
-                        }`}>
-                          {award.awardType === 'group' ? 'Group' : 'Indiv'}
+                         <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-tighter border ${
+                           award.status === 'nominating' ? 'bg-yellow-50 text-yellow-600 border-yellow-200' :
+                           award.status === 'voting' ? 'bg-green-50 text-green-600 border-green-200' :
+                           'bg-gray-50 text-gray-400 border-gray-200'
+                         }`}>
+                           {award.status} 
+                         </span>
+                         <span className="text-[10px] text-gray-400 font-medium">Created {format(new Date(award.createdAt), 'MMM dd, h:mm a')}</span>
+                      </div>
+                      <div className="flex flex-col gap-2">
+                        <div className="flex items-center gap-2">
+                          <h3 className="text-xl md:text-2xl font-display text-brand-brown tracking-tight leading-none group-hover:text-brand-light-brown transition-colors">
+                            {award.title}
+                          </h3>
+                          <span className={`px-2 py-0.5 rounded-full text-[8px] font-black uppercase tracking-widest border shadow-sm shrink-0 ${
+                            award.awardType === 'group' 
+                              ? 'bg-amber-50 text-amber-600 border-amber-100' 
+                              : 'bg-brand-brown/5 text-brand-brown/40 border-brand-brown/10'
+                          }`}>
+                            {award.awardType === 'group' ? 'Group' : 'Indiv'}
+                          </span>
+                        </div>
+                        <p className="text-xs text-gray-500 font-medium line-clamp-1 opacity-70">
+                          {award.description || 'No description provided.'}
+                        </p>
+                      </div>
+                    </div>
+                    
+                    <div className="flex items-center gap-2">
+                      {isAdmin && (
+                        <div className="flex items-center gap-1 bg-brand-cream/50 p-1 rounded-xl border border-brand-beige">
+                          <button 
+                            onClick={() => updateStatus(awardId, 'nominating')}
+                            className={`p-2 rounded-lg transition-all ${award.status === 'nominating' ? 'bg-white text-yellow-600 shadow-sm' : 'text-gray-400 hover:text-brand-brown'}`}
+                            title="Set to Nominating"
+                          >
+                            <Users size={16} />
+                          </button>
+                          <button 
+                            onClick={() => updateStatus(awardId, 'voting')}
+                            className={`p-2 rounded-lg transition-all ${award.status === 'voting' ? 'bg-white text-green-600 shadow-sm' : 'text-gray-400 hover:text-brand-brown'}`}
+                            title="Set to Voting"
+                          >
+                            <Vote size={16} />
+                          </button>
+                          <button 
+                            onClick={() => updateStatus(awardId, 'closed')}
+                            className={`p-2 rounded-lg transition-all ${award.status === 'closed' ? 'bg-white text-gray-600 shadow-sm' : 'text-gray-400 hover:text-brand-brown'}`}
+                            title="Set to Closed"
+                          >
+                            <CheckCircle2 size={16} />
+                          </button>
+                        </div>
+                      )}
+                      {(isAdmin || award.createdBy === currentUserId) && (
+                        <button 
+                          onClick={() => deleteAward(awardId)}
+                          className="p-2.5 text-gray-300 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all"
+                        >
+                          <Trash2 size={20} />
+                        </button>
+                      )}
+                    </div>
+                 </div>
+              </div>
+
+              {/* Nominations List */}
+              <div className="flex-1 p-5 pt-2">
+                  <div className="mb-6 flex items-center justify-between">
+                    <h4 className="text-sm font-black text-brand-brown/40 uppercase tracking-[0.2em] flex items-center gap-2">
+                      <Activity size={14} className="text-brand-sand" />
+                      Nominees ({award.nominations?.length || 0})
+                    </h4>
+
+                    {award.status === 'voting' && (
+                      <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-brand-sand/10 border border-brand-sand/20">
+                        <Vote size={14} className="text-brand-sand" />
+                        <span className="text-xs font-black text-brand-brown uppercase tracking-tighter">
+                          Votes Left: {Math.max(0, (currentUser?.voteLimit || 1) - (award.nominations?.reduce((acc: number, n: any) => acc + (n.votes?.filter((v: any) => (v._id || v || '').toString() === currentUserId).length || 0), 0) || 0))}
                         </span>
                       </div>
-                      <p className="text-xs text-gray-500 font-medium line-clamp-1 opacity-70">
-                        {award.description || 'No description provided.'}
-                      </p>
-                    </div>
-                  </div>
-                  
-                  <div className="flex items-center gap-2">
-                    {isAdmin && (
-                      <div className="flex items-center gap-1 bg-brand-cream/50 p-1 rounded-xl border border-brand-beige">
-                        <button 
-                          onClick={() => updateStatus(award.id, 'nominating')}
-                          className={`p-2 rounded-lg transition-all ${award.status === 'nominating' ? 'bg-white text-yellow-600 shadow-sm' : 'text-gray-400 hover:text-brand-brown'}`}
-                          title="Set to Nominating"
-                        >
-                          <Users size={16} />
-                        </button>
-                        <button 
-                          onClick={() => updateStatus(award.id, 'voting')}
-                          className={`p-2 rounded-lg transition-all ${award.status === 'voting' ? 'bg-white text-green-600 shadow-sm' : 'text-gray-400 hover:text-brand-brown'}`}
-                          title="Set to Voting"
-                        >
-                          <Vote size={16} />
-                        </button>
-                        <button 
-                          onClick={() => updateStatus(award.id, 'closed')}
-                          className={`p-2 rounded-lg transition-all ${award.status === 'closed' ? 'bg-white text-gray-600 shadow-sm' : 'text-gray-400 hover:text-brand-brown'}`}
-                          title="Set to Closed"
-                        >
-                          <CheckCircle2 size={16} />
-                        </button>
-                      </div>
                     )}
-                    <button 
-                      onClick={() => deleteAward(award.id)}
-                      className="p-2.5 text-gray-300 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all"
-                    >
-                      <Trash2 size={20} />
-                    </button>
+
+                    {award.status === 'nominating' && (
+                      <button 
+                        onClick={() => setIsNominateModalOpen(awardId)}
+                        className="text-xs font-bold text-brand-brown hover:text-brand-sand flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-brand-cream hover:bg-brand-beige border border-brand-beige transition-all"
+                      >
+                        <Plus size={14} />
+                        Add Nominee
+                      </button>
+                    )}
                   </div>
-               </div>
-            </div>
 
-            {/* Nominations List */}
-            <div className="flex-1 p-5 pt-2">
-                <div className="mb-6 flex items-center justify-between">
-                  <h4 className="text-sm font-black text-brand-brown/40 uppercase tracking-[0.2em] flex items-center gap-2">
-                    <Activity size={14} className="text-brand-sand" />
-                    Nominees ({award.nominations?.length || 0})
-                  </h4>
+                 <div className="space-y-4">
+                    {(award.nominations || []).length === 0 ? (
+                      <div className="py-12 border-2 border-dashed border-brand-beige rounded-3xl flex flex-col items-center justify-center text-gray-400">
+                         <AwardIcon size={40} className="mb-3 opacity-20" />
+                         <p className="font-medium italic">Waiting for nominations...</p>
+                      </div>
+                    ) : (
+                      award.nominations.sort((a, b) => (b.votes?.length || 0) - (a.votes?.length || 0)).map((nomination) => {
+                        const nominationId = nomination.id || (nomination as any)._id;
+                        const voteCount = nomination.votes?.length || 0;
+                        const maxVotes = Math.max(...(award.nominations.map(n => n.votes?.length || 0)), 1);
+                        const progressWidth = (voteCount / maxVotes) * 100;
+                        const userVotes = nomination.votes?.filter((v: any) => (v._id || v || '').toString() === currentUserId).length || 0;
+                        
+                        return (
+                          <div 
+                            key={nominationId}
+                            className="relative group/nominee p-3 rounded-2xl bg-brand-cream/30 border border-brand-beige/50 hover:bg-white hover:border-brand-brown/10 transition-all duration-300"
+                          >
+                             {/* Vote Progress Bar */}
+                             <div className="absolute inset-x-0 bottom-0 h-1 overflow-hidden rounded-b-full">
+                                <div 
+                                  className={`h-full transition-all duration-1000 ease-out ${award.status === 'closed' ? 'bg-gray-300' : 'bg-brand-sand'}`}
+                                  style={{ width: `${progressWidth}%` }}
+                                />
+                             </div>
 
-                  {award.status === 'voting' && (
-                    <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-brand-sand/10 border border-brand-sand/20">
-                      <Vote size={14} className="text-brand-sand" />
-                      <span className="text-xs font-black text-brand-brown uppercase tracking-tighter">
-                        Votes Left: {Math.max(0, (currentUser?.voteLimit || 1) - (award.nominations?.reduce((acc: number, n: any) => acc + (n.votes?.filter((v: any) => (v._id || v).toString() === (currentUser?._id || (currentUser as any)?.id)?.toString()).length || 0), 0) || 0))}
-                      </span>
-                    </div>
-                  )}
-
-                  {award.status === 'nominating' && (
-                    <button 
-                      onClick={() => setIsNominateModalOpen(award.id)}
-                      className="text-xs font-bold text-brand-brown hover:text-brand-sand flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-brand-cream hover:bg-brand-beige border border-brand-beige transition-all"
-                    >
-                      <Plus size={14} />
-                      Add Nominee
-                    </button>
-                  )}
-                </div>
-
-               <div className="space-y-4">
-                  {(award.nominations || []).length === 0 ? (
-                    <div className="py-12 border-2 border-dashed border-brand-beige rounded-3xl flex flex-col items-center justify-center text-gray-400">
-                       <AwardIcon size={40} className="mb-3 opacity-20" />
-                       <p className="font-medium italic">Waiting for nominations...</p>
-                    </div>
-                  ) : (
-                    award.nominations.sort((a, b) => (b.votes?.length || 0) - (a.votes?.length || 0)).map((nomination) => {
-                      const voteCount = nomination.votes?.length || 0;
-                      const maxVotes = Math.max(...(award.nominations.map(n => n.votes?.length || 0)), 1);
-                      const progressWidth = (voteCount / maxVotes) * 100;
-                      
-                      return (
-                        <div 
-                          key={nomination.id || (nomination as any)._id}
-                          className="relative group/nominee p-3 rounded-2xl bg-brand-cream/30 border border-brand-beige/50 hover:bg-white hover:border-brand-brown/10 transition-all duration-300"
-                        >
-                           {/* Vote Progress Bar */}
-                           <div className="absolute inset-x-0 bottom-0 h-1 overflow-hidden rounded-b-full">
-                              <div 
-                                className={`h-full transition-all duration-1000 ease-out ${award.status === 'closed' ? 'bg-gray-300' : 'bg-brand-sand'}`}
-                                style={{ width: `${progressWidth}%` }}
-                              />
-                           </div>
-
-                           <div className="flex items-center gap-4 relative z-10">
-                              <div className="w-10 h-10 rounded-xl bg-white border border-brand-beige flex flex-col items-center justify-center shrink-0 shadow-sm relative group/voters">
-                                <span className={`text-lg font-display leading-none ${award.status === 'closed' ? 'text-gray-400' : 'text-brand-brown'}`}>{voteCount}</span>
-                                <span className="text-[6px] font-black uppercase tracking-widest text-brand-brown/40">Votes</span>
-                                
-                                {/* Voters Popover */}
-                                {nomination.votes && nomination.votes.length > 0 && (
-                                  <div className="absolute left-full ml-2 top-0 invisible group-hover/voters:visible z-[100] w-max max-w-[200px] bg-brand-brown text-white p-2.5 rounded-xl shadow-xl shadow-brand-brown/20 text-left">
-                                    <p className="text-[7px] font-black uppercase tracking-[0.2em] mb-1.5 opacity-50 border-b border-white/10 pb-1">Voters</p>
-                                    <div className="space-y-1">
-                                      {nomination.votes.map((v: any, i: number) => (
-                                        <div key={i} className="flex flex-col">
-                                          <span className="text-[10px] font-bold leading-tight truncate">{v.church || 'Unknown Voter'}</span>
-                                          <span className="text-[8px] opacity-60 leading-none">{v.role}</span>
-                                        </div>
-                                      ))}
+                             <div className="flex items-center gap-4 relative z-10">
+                                <div className="w-10 h-10 rounded-xl bg-white border border-brand-beige flex flex-col items-center justify-center shrink-0 shadow-sm relative group/voters">
+                                  <span className={`text-lg font-display leading-none ${award.status === 'closed' ? 'text-gray-400' : 'text-brand-brown'}`}>{voteCount}</span>
+                                  <span className="text-[6px] font-black uppercase tracking-widest text-brand-brown/40">Votes</span>
+                                  
+                                  {/* Voters Popover */}
+                                   {nomination.votes && nomination.votes.length > 0 && (
+                                    <div className="absolute left-full ml-2 top-0 invisible group-hover/voters:visible z-[100] w-max max-w-[200px] bg-brand-brown text-white p-2.5 rounded-xl shadow-xl shadow-brand-brown/20 text-left overflow-hidden">
+                                      <p className="text-[7px] font-black uppercase tracking-[0.2em] mb-1.5 opacity-50 border-b border-white/10 pb-1">Voters</p>
+                                      <div className="space-y-1.5 max-h-[150px] overflow-y-auto pr-1 custom-scrollbar">
+                                        {nomination.votes.map((v: any, i: number) => {
+                                          const isObject = typeof v === 'object' && v !== null;
+                                          return (
+                                            <div key={i} className="flex flex-col border-l-2 border-brand-sand/30 pl-1.5">
+                                              <span className="text-[9px] font-bold leading-tight truncate">{isObject ? v.church : 'Anonymous Voter'}</span>
+                                              <span className="text-[7px] opacity-60 leading-tight uppercase font-black tracking-tighter">{isObject ? (v.role || 'Member') : 'Voter'}</span>
+                                            </div>
+                                          );
+                                        })}
+                                      </div>
+                                      <div className="absolute right-full top-4 translate-x-1 border-[6px] border-transparent border-r-brand-brown" />
                                     </div>
-                                    <div className="absolute right-full top-4 translate-x-1 border-[6px] border-transparent border-r-brand-brown" />
-                                  </div>
-                                )}
-                              </div>
+                                  )}
+                                </div>
 
-                               <div className="min-w-0 flex-1">
-                                 <div className="flex items-center gap-1.5 mb-0.5">
-                                    <h5 className="font-display text-base text-brand-brown truncate">
-                                      {award.awardType === 'group' ? nomination.groupId?.name : nomination.camperId?.fullName}
-                                    </h5>
-                                    {award.awardType === 'individual' && (
-                                      <span className="text-[8px] px-1.5 py-0.5 rounded-full bg-brand-brown/5 text-brand-brown/60 font-bold truncate max-w-[80px]">
-                                        {nomination.camperId?.church}
-                                      </span>
-                                    )}
-                                    {award.awardType === 'group' && nomination.groupId?.color && (
-                                      <div 
-                                        className="w-2.5 h-2.5 rounded-full border border-white shadow-sm" 
-                                        style={{ backgroundColor: nomination.groupId.color }} 
-                                      />
-                                    )}
-                                 </div>
-                                 <div className="flex flex-col sm:flex-row sm:items-center gap-1">
-                                   <p className="text-[11px] text-gray-500 italic truncate max-w-[200px]">"{nomination.reason || 'No reason specified'}"</p>
-                                   <span className="hidden sm:inline text-[10px] text-gray-300">•</span>
-                                   <span className="text-[9px] text-gray-400 font-medium">By {nomination.nominatedBy?.church}</span>
-                                 </div>
-                              </div>
+                                 <div className="min-w-0 flex-1">
+                                   <div className="flex items-center gap-1.5 mb-0.5">
+                                      <h5 className="font-display text-base text-brand-brown truncate">
+                                        {award.awardType === 'group' ? nomination.groupId?.name : nomination.camperId?.fullName}
+                                      </h5>
+                                      {award.awardType === 'individual' && (
+                                        <span className="text-[8px] px-1.5 py-0.5 rounded-full bg-brand-brown/5 text-brand-brown/60 font-bold truncate max-w-[80px]">
+                                          {nomination.camperId?.church}
+                                        </span>
+                                      )}
+                                      {award.awardType === 'group' && nomination.groupId?.color && (
+                                        <div 
+                                          className="w-2.5 h-2.5 rounded-full border border-white shadow-sm" 
+                                          style={{ backgroundColor: nomination.groupId.color }} 
+                                        />
+                                      )}
+                                   </div>
+                                   <div className="flex flex-col sm:flex-row sm:items-center gap-1">
+                                     <p className="text-[11px] text-gray-500 italic truncate max-w-[200px]">"{nomination.reason || 'No reason specified'}"</p>
+                                     <span className="hidden sm:inline text-[10px] text-gray-300">•</span>
+                                     <span className="text-[9px] text-gray-400 font-medium">By {nomination.nominatedBy?.church}</span>
+                                   </div>
+                                </div>
 
-                              <div className="flex items-center gap-2">
-                                {award.status === 'voting' && (
-                                  <div className="flex items-center gap-1.5">
-                                    {(nomination.votes?.filter((v: any) => (v._id || v).toString() === (currentUser?._id || (currentUser as any)?.id)?.toString()).length || 0) > 0 && (
+                                <div className="flex items-center gap-2">
+                                  {award.status === 'voting' && (
+                                    <div className="flex items-center gap-1.5">
+                                      {userVotes > 0 && (
+                                        <button 
+                                          onClick={() => handleVote(awardId, nominationId, 'remove')}
+                                          className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-xl border border-transparent hover:border-red-100 transition-all"
+                                          title="Remove one vote"
+                                        >
+                                          <X size={16} />
+                                        </button>
+                                      )}
                                       <button 
-                                        onClick={() => handleVote(award.id, nomination.id, 'remove')}
-                                        className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-xl border border-transparent hover:border-red-100 transition-all"
-                                        title="Remove one vote"
+                                        onClick={() => handleVote(awardId, nominationId, 'add')}
+                                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-bold transition-all text-xs ${
+                                          userVotes > 0
+                                            ? 'bg-brand-brown text-white' 
+                                            : 'bg-white text-brand-brown border border-brand-beige'
+                                        }`}
                                       >
-                                        <X size={16} />
+                                        <Vote size={14} />
+                                        <span>
+                                          {userVotes > 0 ? `Voted (${userVotes})` : 'Vote'}
+                                        </span>
                                       </button>
-                                    )}
+                                    </div>
+                                  )}
+                                  
+                                  {(isAdmin || (nomination.nominatedBy?._id || nomination.nominatedBy?.id || nomination.nominatedBy) === currentUserId) && (
                                     <button 
-                                      onClick={() => handleVote(award.id, nomination.id, 'add')}
-                                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-bold transition-all text-xs ${
-                                        (nomination.votes?.filter((v: any) => (v._id || v).toString() === (currentUser?._id || (currentUser as any)?.id)?.toString()).length || 0) > 0
-                                          ? 'bg-brand-brown text-white' 
-                                          : 'bg-white text-brand-brown border border-brand-beige'
-                                      }`}
+                                      onClick={() => deleteNomination(awardId, nominationId)}
+                                      className="p-2 text-gray-300 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all"
                                     >
-                                      <Vote size={14} />
-                                      <span>
-                                        {(nomination.votes?.filter((v: any) => (v._id || v).toString() === (currentUser?._id || (currentUser as any)?.id)?.toString()).length || 0) > 0 
-                                          ? `Voted (${nomination.votes?.filter((v: any) => (v._id || v).toString() === (currentUser?._id || (currentUser as any)?.id)?.toString()).length})` 
-                                          : 'Vote'}
-                                      </span>
+                                      <X size={16} />
                                     </button>
-                                  </div>
-                                )}
-                                
-                                {(isAdmin || nomination.nominatedBy?._id === currentUser?._id) && (
-                                  <button 
-                                    onClick={() => deleteNomination(award.id, nomination.id)}
-                                    className="p-2 text-gray-300 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all"
-                                  >
-                                    <X size={16} />
-                                  </button>
-                                )}
-                              </div>
-                           </div>
-                        </div>
-                      )
-                    })
-                  )}
-               </div>
+                                  )}
+                                </div>
+                             </div>
+                          </div>
+                        )
+                      })
+                    )}
+                 </div>
+              </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
 
       {/* Empty State */}
@@ -576,9 +598,9 @@ export default function Awards() {
              </div>
              
              <div className="p-6 pt-0 space-y-5">
-               {(awards.find(a => a.id === isNominateModalOpen)?.awardType === 'group' ? !selectedGroupId : !selectedCamper) ? (
+               {(awards.find(a => (a.id || (a as any)._id) === isNominateModalOpen)?.awardType === 'group' ? !selectedGroupId : !selectedCamper) ? (
                  <div className="space-y-4">
-                    {awards.find(a => a.id === isNominateModalOpen)?.awardType === 'group' ? (
+                    {awards.find(a => (a.id || (a as any)._id) === isNominateModalOpen)?.awardType === 'group' ? (
                       <div className="space-y-4">
                          <label className="block text-xs font-black text-brand-brown/40 uppercase tracking-widest ml-1">Select Tribe from Camp Organization</label>
                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 max-h-[250px] overflow-y-auto pr-2 custom-scrollbar">
@@ -639,22 +661,22 @@ export default function Awards() {
                     <div className="bg-brand-cream border border-brand-beige p-6 rounded-3xl flex items-center justify-between">
                        <div className="flex items-center gap-4">
                           <div className={`w-14 h-14 rounded-2xl flex items-center justify-center text-2xl font-display shadow-lg ${
-                            awards.find(a => a.id === isNominateModalOpen)?.awardType === 'group' 
+                            awards.find(a => (a.id || (a as any)._id) === isNominateModalOpen)?.awardType === 'group' 
                               ? 'bg-white border border-brand-beige' 
                               : 'bg-brand-brown text-white shadow-brand-brown/20'
                           }`}>
-                            {awards.find(a => a.id === isNominateModalOpen)?.awardType === 'group' ? (
+                            {awards.find(a => (a.id || (a as any)._id) === isNominateModalOpen)?.awardType === 'group' ? (
                                <div className="w-8 h-8 rounded-lg" style={{ backgroundColor: groups.find(g => (g.id || g._id) === selectedGroupId)?.color || '#8B4513' }} />
                             ) : selectedCamper?.fullName.charAt(0)}
                           </div>
                           <div>
                             <p className="text-xl font-display text-brand-brown leading-tight">
-                              {awards.find(a => a.id === isNominateModalOpen)?.awardType === 'group' 
+                              {awards.find(a => (a.id || (a as any)._id) === isNominateModalOpen)?.awardType === 'group' 
                                 ? groups.find(g => (g.id || g._id) === selectedGroupId)?.name 
                                 : selectedCamper?.fullName}
                             </p>
                             <p className="text-sm text-brand-brown/60 font-bold uppercase tracking-widest">
-                               {awards.find(a => a.id === isNominateModalOpen)?.awardType === 'group' ? 'Selected Tribe' : selectedCamper?.church}
+                                {awards.find(a => (a.id || (a as any)._id) === isNominateModalOpen)?.awardType === 'group' ? 'Selected Tribe' : selectedCamper?.church}
                             </p>
                           </div>
                        </div>

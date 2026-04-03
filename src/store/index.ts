@@ -425,10 +425,10 @@ export const useAppStore = create<AppState>()((set) => {
         const exists = next.find(a => (a.id || a._id) === (data.id || data._id));
         if (!exists) next = [data, ...next];
       } else if (action === 'updated') {
-        next = next.map(a => (a.id === data.id || a.id === data._id || (a as any)._id === data.id || (a as any)._id === data._id) ? data : a);
+        next = next.map(a => ((a.id || (a as any)._id) === (data.id || data._id)) ? data : a);
       } else if (action === 'deleted') {
-        const idToDelete = data._id || data.id;
-        next = next.filter(a => (a._id || a.id) !== idToDelete);
+        const idToDelete = data.id || data._id;
+        next = next.filter(a => (a.id || (a as any)._id) !== idToDelete);
       }
 
       return { awards: next };
@@ -447,7 +447,7 @@ export const useAppStore = create<AppState>()((set) => {
             if (action === 'add') {
               votes.push(userId);
             } else {
-              const idx = votes.findIndex(v => v.toString() === userId.toString());
+              const idx = votes.findIndex(v => (typeof v === 'string' ? v : (v as any)._id || (v as any).id || v).toString() === userId.toString());
               if (idx !== -1) votes.splice(idx, 1);
             }
 

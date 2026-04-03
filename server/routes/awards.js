@@ -136,7 +136,7 @@ router.delete('/:id/nominate/:nominationId', auth, async (req, res) => {
        return res.status(403).json({ message: 'Unauthorized removal' });
     }
 
-    nomination.remove();
+    award.nominations.pull(req.params.nominationId);
     const updatedAward = await award.save();
 
     const populatedAward = await Award.findById(updatedAward._id)
@@ -185,9 +185,9 @@ router.post('/:id/vote/:nominationId', auth, async (req, res) => {
         });
       });
 
-      const limit = req.user.voteLimit || 1;
+      const limit = user.voteLimit || 1;
       if (totalCast >= limit) {
-        return res.status(400).json({ message: `You have reached your limit of ${limit} votes for this award.` });
+        return res.status(400).json({ message: `You have reached your limit of ${limit} vote${limit > 1 ? 's' : ''} for this award.` });
       }
 
       nomination.votes.push(userId);
