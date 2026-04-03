@@ -1071,7 +1071,6 @@ export default function Organization() {
                 </div>
                 <div className="flex flex-wrap gap-1.5 p-3 bg-indigo-50/30 rounded-xl border border-indigo-100/50 max-h-32 overflow-y-auto">
                   {leaders
-                    .filter(l => !getCategories(l).includes('Youth Leader') && l.churchRef !== 'JAM')
                     .filter(l => l.name.toLowerCase().includes(facilSearch.toLowerCase()))
                     .map(l => (
                       <button
