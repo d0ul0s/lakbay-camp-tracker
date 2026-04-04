@@ -738,18 +738,18 @@ export default function Organization() {
                         </div>
 
                         {isAdmin && (
-                          <div className="absolute top-3 right-12 opacity-0 group-hover:opacity-100 transition-all flex gap-1 bg-white/90 backdrop-blur shadow-sm rounded-lg p-0.5 border border-brand-sand/10 z-20">
+                          <div className="absolute top-3 right-16 sm:opacity-0 sm:group-hover:opacity-100 transition-all flex gap-1 bg-white/90 backdrop-blur shadow-sm rounded-lg p-0.5 border border-black/5 z-20">
                             <button
                               onClick={() => { setGroupForm(g); setGroupModal({ isOpen: true, group: g }); }}
-                              className="p-1 text-gray-400 hover:text-brand-brown hover:bg-white rounded transition-colors"
+                              className="p-1 px-1.5 text-gray-500 hover:text-brand-brown hover:bg-white rounded transition-colors"
                             >
-                              <Edit2 size={9} />
+                              <Edit2 size={10} />
                             </button>
                             <button
                               onClick={() => handleDeleteGroup(g._id || g.id as string)}
-                              className="p-1 text-gray-400 hover:text-red-500 hover:bg-white rounded transition-colors"
+                              className="p-1 px-1.5 text-gray-500 hover:text-red-500 hover:bg-white rounded transition-colors"
                             >
-                              <X size={9} />
+                              <X size={10} />
                             </button>
                           </div>
                         )}
