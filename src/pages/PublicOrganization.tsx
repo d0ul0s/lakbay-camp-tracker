@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react';
 import { useAppStore } from '../store';
 import { Link } from 'react-router-dom';
-import { Users, Shield, Tent, Star, Flag, Target, Loader2, Info, ArrowLeft, Printer } from 'lucide-react';
+import { Users, Shield, Tent, Star, Flag, Target, Loader2, ArrowLeft, Printer, Hand } from 'lucide-react';
 import api from '../api/axios';
-import { getChurchColor, getChurchVibrantColor } from '../utils/churchColorUtils';
+import { getChurchVibrantColor } from '../utils/churchColorUtils';
 
 interface CampLeader {
   _id?: string;
@@ -294,143 +294,252 @@ export default function PublicOrganization() {
           {/* TRIBES VIEW */}
           {activeTab === 'groups' && (
             <div className="animate-in fade-in slide-in-from-bottom-2 duration-500">
-               <div className="flex flex-wrap gap-2 mb-8 p-4 bg-white/40 backdrop-blur-md rounded-3xl border border-white/50 shadow-xl shadow-brand-brown/[0.02]">
-                  <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest mr-2 self-center flex items-center gap-2"><Info size={14} className="text-brand-sand" /> Church Legend:</span>
-                  {effectiveChurches.map(church => (
-                    <div key={church} className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-white/60 border border-white shadow-sm">
-                       <div className={`w-3 h-3 rounded-full border-2 border-white shadow-sm ${getChurchVibrantColor(church.trim(), appSettings?.churchColors)}`}></div>
-                       <span className="text-[10px] font-bold text-gray-600 uppercase tracking-tight">{church.trim()}</span>
-                    </div>
-                  ))}
-               </div>
-
                <div className="columns-1 md:columns-2 xl:columns-3 gap-6 space-y-6">
-                {groups.map(g => (
-                  <div 
-                    key={g._id || g.id} 
-                    className="break-inside-avoid relative group transition-all duration-500 hover:-translate-y-1 overflow-hidden rounded-[3rem] border border-white shadow-2xl shadow-brand-brown/5"
-                    style={{ 
-                      background: `linear-gradient(135deg, rgba(255,255,255,0.9) 0%, ${g.color || '#8B4513'}10 100%)`,
-                      boxShadow: `0 30px 60px -20px ${g.color || '#8B4513'}20`
-                    }}
-                  >
-                    {/* Interactive Glow Backdrop */}
-                    <div className="absolute top-0 right-0 w-64 h-64 rounded-full blur-[100px] opacity-0 group-hover:opacity-30 transition-opacity duration-1000 pointer-events-none" style={{ backgroundColor: g.color || '#8B4513' }}></div>
-                    
-                    {/* Brand Banner */}
-                    <div className="absolute top-0 left-0 right-0 h-3" style={{ backgroundColor: g.color || '#8B4513' }}></div>
+                {groups.map((g, idx) => {
+                  const isWhite = g.color?.toLowerCase() === '#ffffff' || g.color?.toLowerCase() === 'white' || g.color?.toLowerCase() === '#fff';
+                  const tribeColor = g.color || '#8B4513';
+                  
+                  // Solid black 1px outline for white tribes (8-direction technique)
+                  const solidOutline = '1px 1px 0 #000, -1px 1px 0 #000, 1px -1px 0 #000, -1px -1px 0 #000, 0 1px 0 #000, 0 -1px 0 #000, 1px 0 0 #000, -1px 0 0 #000';
 
-                    <div className="p-8 pt-10 relative z-10">
-                      <div className="flex items-center justify-between mb-8">
-                        <div>
-                          <p className="text-[10px] font-black uppercase tracking-[0.4em] text-gray-400 mb-2">Tribe Unit</p>
-                          <h4 className="text-5xl font-display tracking-tight leading-none uppercase transition-transform group-hover:scale-[1.03] origin-left" style={{ color: g.color || '#8B4513' }}>
-                            {g.name}
-                          </h4>
-                        </div>
-                        <div className="w-16 h-16 rounded-[2rem] bg-white shadow-xl flex items-center justify-center transition-transform group-hover:rotate-12" style={{ color: g.color || '#8B4513' }}>
-                          <Tent size={32} />
+                  return (
+                    <div 
+                      key={g._id || g.id} 
+                      className={`break-inside-avoid relative group transition-all duration-500 hover:-translate-y-1.5 overflow-hidden rounded-[1.75rem] border shadow-xl bg-white/40 backdrop-blur-md mb-6 ${isWhite ? 'border-black/10' : 'border-white/60'}`}
+                      style={{ 
+                        boxShadow: isWhite 
+                          ? '0 20px 40px -15px rgba(0, 0, 0, 0.15), 0 10px 20px -10px rgba(0, 0, 0, 0.1)' 
+                          : `0 15px 35px -12px ${tribeColor}15`
+                      }}
+                    >
+                      {/* Premium Aura Glow - Adaptive Fallback */}
+                      <div 
+                        className="absolute -top-20 -right-20 w-64 h-64 rounded-full blur-[70px] transition-all duration-1000 pointer-events-none group-hover:scale-110" 
+                        style={{ 
+                          background: isWhite 
+                            ? 'linear-gradient(135deg, rgba(0, 0, 0, 0.1) 0%, rgba(0, 0, 0, 0.05) 50%, transparent 100%)' 
+                            : tribeColor,
+                          opacity: isWhite ? '1' : '0.2',
+                        }}
+                      ></div>
+
+                      {/* Tribe ID Badge & Decorative Header - Compact */}
+                      <div className="relative p-5 pb-1">
+                        <div className="flex items-start justify-between mb-3">
+                           <div className="flex flex-col">
+                              <span className="text-[9px] font-black uppercase tracking-[0.3em] text-gray-400 mb-0.5 opacity-50">Unit Division</span>
+                              <h4 className="text-3xl font-display tracking-tight leading-none uppercase transition-transform group-hover:scale-[1.01] origin-left" 
+                                style={{ 
+                                  color: tribeColor,
+                                  textShadow: isWhite ? solidOutline : '0 0 1px rgba(0,0,0,0.1)'
+                                }}>
+                                {g.name}
+                              </h4>
+                           </div>
+                            <div 
+                             className="w-10 h-10 rounded-xl flex items-center justify-center font-display text-xl shadow-sm border"
+                             style={{ 
+                               backgroundColor: isWhite ? 'rgba(255,255,255,0.95)' : `${tribeColor}15`, 
+                               color: tribeColor,
+                               textShadow: isWhite ? solidOutline : 'none',
+                               borderColor: isWhite ? 'rgba(0,0,0,0.2)' : 'rgba(255,255,255,0.5)'
+                             }}
+                           >
+                             {String(idx + 1).padStart(2, '0')}
+                           </div>
                         </div>
                       </div>
 
-                      <div className="space-y-6">
-                        {/* Command Hierarchy */}
-                        <div className="grid grid-cols-1 gap-3">
+                      <div className="p-5 pt-1 space-y-3 relative z-10">
+                        {/* Command Deck: Elevated Capsules - Dense */}
+                        <div className="space-y-1.5">
                           {g.leader && (
-                            <div className="flex items-center gap-4 p-4 rounded-3xl bg-white/60 backdrop-blur-md border transition-all group/role hover:bg-white" style={{ borderColor: `${g.color || '#8B4513'}1A` }}>
-                              <div className="w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 shadow-lg transition-transform group-hover/role:scale-110" style={{ backgroundColor: g.color || '#8B4513', color: 'white' }}>
-                                <Star size={24} fill="currentColor" />
+                            <div className="flex items-center gap-2.5 p-2.5 rounded-[1rem] bg-white shadow-sm border border-brand-sand/10 group/role transition-all hover:shadow-md" style={{ borderLeft: `3px solid ${g.color || '#8B4513'}` }}>
+                              <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 transition-transform group-hover/role:scale-105 shadow-sm bg-gray-50" 
+                                style={{ 
+                                  color: tribeColor,
+                                  border: isWhite ? '1px solid rgba(0,0,0,0.05)' : 'none'
+                                }}>
+                                <Star 
+                                  size={14} 
+                                  fill="currentColor" 
+                                  stroke={isWhite ? "#000" : "currentColor"} 
+                                  strokeWidth={isWhite ? 2 : 1.5} 
+                                />
                               </div>
                               <div className="min-w-0">
-                                <p className="text-[9px] font-black uppercase text-gray-400 tracking-[0.2em] leading-none mb-1.5 flex items-center gap-2">
-                                   <div className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: g.color || '#8B4513' }}></div>
-                                   Commander
+                                <p className="text-[7px] font-black uppercase text-gray-400 tracking-widest leading-none mb-1 flex items-center gap-1">
+                                   Tribe Leader
                                 </p>
-                                <p className="text-lg font-bold text-gray-800 truncate leading-tight tracking-tight">{g.leader}</p>
+                                <p className="text-sm font-bold text-gray-800 truncate leading-none tracking-tight">{g.leader}</p>
                               </div>
                             </div>
                           )}
                           {g.assistantLeader && (
-                            <div className="flex items-center gap-4 p-4 rounded-3xl bg-white/40 backdrop-blur shadow-sm border transition-all group/role hover:bg-white" style={{ borderColor: `${g.color || '#8B4513'}10` }}>
-                              <div className="w-11 h-11 rounded-2xl flex items-center justify-center shrink-0 shadow-md" style={{ backgroundColor: `${g.color || '#8B4513'}15`, color: g.color || '#8B4513' }}>
-                                <Shield size={20} />
+                            <div className="flex items-center gap-2.5 p-2 rounded-[1rem] bg-white/60 backdrop-blur-sm border border-brand-sand/10 group/role transition-all hover:shadow-md" style={{ borderLeft: `3px solid ${g.color || '#8B4513'}80` }}>
+                              <div className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0 shadow-xs bg-gray-50/50" 
+                                style={{ 
+                                  color: tribeColor
+                                }}>
+                                <Shield 
+                                  size={12} 
+                                  stroke={isWhite ? "#000" : "currentColor"} 
+                                  strokeWidth={isWhite ? 3 : 2} 
+                                />
                               </div>
                               <div className="min-w-0">
-                                <p className="text-[9px] font-black uppercase text-gray-400 tracking-[0.2em] leading-none mb-1.5">Executive Officer</p>
-                                <p className="text-lg font-bold text-gray-700/80 truncate leading-tight tracking-tight">{g.assistantLeader}</p>
+                                <p className="text-[7px] font-black uppercase text-gray-400 tracking-widest leading-none mb-1">Alpha Assistant</p>
+                                <p className="text-xs font-bold text-gray-800 truncate leading-none">{g.assistantLeader}</p>
                               </div>
                             </div>
                           )}
                         </div>
 
-                        {/* Support Operations */}
-                        <div className="grid grid-cols-2 gap-3">
-                           <div className="flex items-center gap-3 p-3 rounded-2xl bg-gray-50/50 border border-gray-100/50 hover:bg-white transition-colors">
-                              <Target size={18} style={{ color: g.color || '#8B4513' }} />
-                              <div className="min-w-0">
-                                <p className="text-[7px] font-black uppercase text-gray-300 tracking-widest leading-none mb-1">Point Keeper</p>
-                                <p className="text-sm font-bold text-gray-600 truncate">{g.pointKeeper || '---'}</p>
+                        {/* Operational Support Pill Grid - Tighter */}
+                        <div className="grid grid-cols-2 gap-1.5">
+                          {g.pointKeeper && (
+                            <div className="flex items-center gap-2 p-2 rounded-xl bg-white/40 border border-white/60 shadow-sm">
+                              <div className="p-1 rounded-md bg-white/60 shadow-xs" 
+                                style={{ 
+                                  color: tribeColor,
+                                  border: isWhite ? '1px solid rgba(0,0,0,0.05)' : 'none'
+                                }}>
+                                <Target 
+                                  size={10} 
+                                  stroke={isWhite ? "#000" : "currentColor"} 
+                                  strokeWidth={isWhite ? 3 : 2} 
+                                />
                               </div>
-                           </div>
-                           <div className="flex items-center gap-3 p-3 rounded-2xl bg-gray-50/50 border border-gray-100/50 hover:bg-white transition-colors">
-                              <Flag size={18} style={{ color: g.color || '#8B4513' }} />
                               <div className="min-w-0">
-                                <p className="text-[7px] font-black uppercase text-gray-300 tracking-widest leading-none mb-1">Flag Bearer</p>
-                                <p className="text-sm font-bold text-gray-600 truncate">{g.flagBearer || '---'}</p>
+                                <p className="text-[6px] font-black uppercase text-gray-400 tracking-widest leading-none mb-0.5">PK</p>
+                                <p className="text-[10px] font-bold text-gray-700 truncate leading-none">{g.pointKeeper}</p>
                               </div>
-                           </div>
+                            </div>
+                          )}
+                          {g.flagBearer && (
+                            <div className="flex items-center gap-2 p-2 rounded-xl bg-white/40 border border-white/60 shadow-sm">
+                              <div className="p-1 rounded-md bg-white/60 shadow-xs" 
+                                style={{ 
+                                  color: tribeColor,
+                                  border: isWhite ? '1px solid rgba(0,0,0,0.05)' : 'none'
+                                }}>
+                                <Flag 
+                                  size={10} 
+                                  stroke={isWhite ? "#000" : "currentColor"} 
+                                  strokeWidth={isWhite ? 3 : 2} 
+                                />
+                              </div>
+                              <div className="min-w-0">
+                                <p className="text-[6px] font-black uppercase text-gray-400 tracking-widest leading-none mb-0.5">FB</p>
+                                <p className="text-[10px] font-bold text-gray-700 truncate leading-none">{g.flagBearer}</p>
+                              </div>
+                            </div>
+                          )}
                         </div>
 
-                        {/* Crew Manifest */}
-                        <div className="pt-8 mt-4 border-t border-gray-100/60">
-                          {(() => {
-                            const registered = g.members.filter(m => registrants.some(r => (r.fullName || '').toLowerCase().trim() === m.toLowerCase().trim()));
-                            const pending = g.members.filter(m => !registrants.some(r => (r.fullName || '').toLowerCase().trim() === m.toLowerCase().trim()));
-                            
-                            return (
-                              <div className="space-y-6">
-                                {registered.length > 0 && (
-                                  <div>
-                                    <div className="flex items-center justify-between mb-4 px-1">
-                                       <h5 className="text-[10px] font-black uppercase text-gray-400 tracking-[0.3em]">Operational Crew</h5>
-                                       <span className="text-[10px] font-bold px-3 py-1 rounded-full bg-gray-100 text-gray-400 border border-gray-200/50">{registered.length}</span>
-                                    </div>
-                                    <div className="flex flex-wrap gap-2">
-                                      {registered.map((m, i) => {
-                                        const reg = registrants.find(r => (r.fullName || '').toLowerCase().trim() === m.toLowerCase().trim());
-                                        const colorClass = getChurchColor((reg?.church || '').trim(), appSettings?.churchColors);
-                                        return (
-                                          <div key={i} className={`text-xs px-4 py-2 rounded-2xl font-bold border ${colorClass} shadow-sm backdrop-blur-xl transition-all hover:scale-110 cursor-default hover:shadow-lg`}>
-                                            {m}
-                                          </div>
-                                        );
-                                      })}
-                                    </div>
+                        {/* Specialized Logistics Team */}
+                        {(g.grabMasters?.some((m: string) => m) || g.facilitators?.length > 0) && (
+                          <div className="p-3 rounded-2xl bg-black/5 border border-black/5 space-y-2">
+                             {g.grabMasters?.some((m: string) => m) && (
+                               <div className="grid grid-cols-2 gap-1">
+                                 {g.grabMasters.slice(0, 4).map((m: string, i: number) => m && (
+                                   <div key={i} className="flex items-center gap-1 px-2 py-0.5 rounded-lg bg-white border border-gray-100 shadow-xs">
+                                      <Hand size={8} className="text-gray-400" />
+                                      <span className="text-[10px] font-bold text-gray-700 truncate">{m}</span>
+                                   </div>
+                                 ))}
+                               </div>
+                             )}
+                             {g.facilitators?.length > 0 && (
+                               <div className="flex items-center gap-1.5 overflow-x-auto pb-0.5 no-scrollbar">
+                                  <div className="flex gap-1">
+                                    {g.facilitators.map((facil: string, i: number) => (
+                                      <span key={i} className="shrink-0 text-[9.5px] font-black uppercase tracking-tight px-2 py-1 rounded-lg bg-indigo-500 text-white shadow-sm shadow-indigo-200/50">{facil}</span>
+                                    ))}
                                   </div>
-                                )}
-                                {pending.length > 0 && (
-                                  <div className="p-4 rounded-[2rem] border-2 border-dashed transition-colors" style={{ backgroundColor: `${g.color || '#8B4513'}05`, borderColor: `${g.color || '#8B4513'}10` }}>
-                                    <p className="text-[8px] font-black uppercase tracking-[0.2em] mb-3 flex items-center gap-2" style={{ color: g.color || '#8B4513', opacity: 0.5 }}>
-                                      <div className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ backgroundColor: g.color || '#8B4513' }} />
-                                      Deployment Pending
-                                    </p>
-                                    <div className="flex flex-wrap gap-1.5">
-                                      {pending.map((m, i) => (
-                                        <div key={i} className="text-[10px] px-3 py-1.5 rounded-xl font-bold bg-white text-gray-500 shadow-sm border border-gray-100">
-                                          {m}
+                               </div>
+                             )}
+                          </div>
+                        )}
+
+                        {/* Tactical Status Grid - Personnel */}
+                        {g.members?.length > 0 && (
+                          <div className="mt-3 pt-3 border-t border-gray-100/60">
+                            {(() => {
+                              const registered = g.members.filter(m => registrants.some(r => (r.fullName || '').toLowerCase().trim() === m.toLowerCase().trim()));
+                              const pending = g.members.filter(m => !registrants.some(r => (r.fullName || '').toLowerCase().trim() === m.toLowerCase().trim()));
+                              
+                              return (
+                                <div className="space-y-4">
+                                  {registered.length > 0 && (
+                                    <div className="bg-black/5 rounded-2xl p-3 border border-black/5 shadow-inner">
+                                      <div className="flex items-center justify-between mb-3 px-1">
+                                        <div className="flex flex-col">
+                                          <h5 className="text-[9px] font-black uppercase text-gray-500 tracking-[0.2em] mb-0.5">Unit Personnel</h5>
+                                          <p className="text-[7px] text-gray-400 font-bold uppercase tracking-wider">{registered.length} Verified Records</p>
                                         </div>
-                                      ))}
+                                      </div>
+                                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
+                                        {registered.map((m: string, i: number) => {
+                                          const reg = registrants.find(r => (r.fullName || '').toLowerCase().trim() === m.toLowerCase().trim());
+                                          const vColor = getChurchVibrantColor(reg?.church || '', appSettings?.churchColors);
+                                          return (
+                                            <div
+                                              key={i}
+                                              className="group/member relative bg-white border border-gray-100 rounded-xl p-2 transition-all hover:translate-y-[-2px] hover:shadow-lg hover:border-brand-sand/30 overflow-hidden"
+                                              title={`${m} • ${reg?.church || 'Unknown'}`}
+                                            >
+                                              {/* 4px Tactical Accent */}
+                                              <div className={`absolute top-0 left-0 bottom-0 w-1 ${vColor}`} />
+                                              
+                                              <div className="pl-1">
+                                                <p className="text-[11px] font-bold text-gray-800 truncate leading-none mb-2">{m}</p>
+                                                
+                                                {/* Micro-Church Badge */}
+                                                <div className="flex">
+                                                  <span className={`text-[7px] font-black px-1.5 py-0.5 rounded-full text-white tracking-widest uppercase ${vColor} shadow-sm truncate max-w-[80px]`}>
+                                                    {reg?.church || 'Unknown'}
+                                                  </span>
+                                                </div>
+                                              </div>
+                                            </div>
+                                          );
+                                        })}
+                                      </div>
                                     </div>
-                                  </div>
-                                )}
-                              </div>
-                            );
-                          })()}
-                        </div>
+                                  )}
+                                  
+                                  {pending.length > 0 && (
+                                    <div className="bg-amber-50/10 p-4 rounded-2xl border border-dashed border-amber-200/40 relative overflow-hidden">
+                                      <div className="absolute top-0 right-0 w-16 h-16 bg-amber-100/20 blur-2xl rounded-full" />
+                                      <div className="flex items-center justify-between mb-3 px-0.5">
+                                        <h5 className="text-[8px] font-black uppercase text-amber-700/60 tracking-widest flex items-center gap-1.5">
+                                          <div className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-ping shadow-[0_0_8px_rgba(245,158,11,0.5)]" />
+                                          Unverified ({pending.length})
+                                        </h5>
+                                      </div>
+                                      <div className="flex flex-wrap gap-1.5">
+                                        {pending.map((m: string, i: number) => (
+                                          <div
+                                            key={i}
+                                            className="relative flex items-center justify-between py-1.5 px-2.5 rounded-xl bg-white/80 border border-amber-200/50 group/pending transition-all hover:bg-white hover:border-amber-300"
+                                          >
+                                            <span className="text-[10px] font-bold text-amber-900/70 truncate mr-2">{m}</span>
+                                            <div className="w-1.5 h-1.5 rounded-full bg-amber-200 group-hover/pending:bg-amber-400 transition-colors" />
+                                          </div>
+                                        ))}
+                                      </div>
+                                    </div>
+                                  )}
+                                </div>
+                              );
+                            })()}
+                          </div>
+                        )}
                       </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
                </div>
 
                {ungrouped.length > 0 && (
