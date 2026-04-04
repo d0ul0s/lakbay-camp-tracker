@@ -1,10 +1,9 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect } from 'react';
 import { useAppStore } from '../store';
 import { Navigate } from 'react-router-dom';
 import { 
   Timer, 
   Lock, 
-  Unlock, 
   Coins, 
   ArrowRight, 
   RefreshCw, 
@@ -13,12 +12,11 @@ import {
   Rocket,
   History,
   AlertTriangle,
-  AlertCircle,
   Settings2,
   Save,
-  Trash2,
   Zap,
-  ShieldCheck
+  ShieldCheck,
+  Trash2
 } from 'lucide-react';
 import api from '../api/axios';
 import toast from 'react-hot-toast';
