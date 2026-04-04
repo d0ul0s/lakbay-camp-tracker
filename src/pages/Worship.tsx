@@ -95,9 +95,9 @@ export default function Worship() {
         <div className="mb-8 md:mb-12 flex flex-col items-center text-center">
             <button 
                 onClick={() => navigate('/login')}
-                className="mb-10 px-4 py-2 rounded-full bg-white/40 hover:bg-white/60 active:scale-95 border border-white/50 backdrop-blur-sm shadow-sm transition-all flex items-center gap-2 text-brand-brown/60 hover:text-brand-brown font-black text-[10px] uppercase tracking-widest group"
+                className="mb-8 md:mb-10 px-4 py-2 rounded-full bg-white/40 hover:bg-white/60 active:scale-95 border border-white/50 backdrop-blur-sm shadow-sm transition-all flex items-center gap-2 text-brand-brown/60 hover:text-brand-brown font-black text-[9px] md:text-[10px] uppercase tracking-widest group"
             >
-                <ArrowLeft size={12} className="group-hover:-translate-x-1 transition-transform" /> Back to Login
+                <ArrowLeft size={10} className="md:size-[12px] group-hover:-translate-x-1 transition-transform" /> Back to Login
             </button>
             
             <div className="relative mb-4">
@@ -110,7 +110,7 @@ export default function Worship() {
                 </div>
             </div>
             
-            <h1 className="text-4xl md:text-6xl font-display text-brand-brown tracking-tighter leading-[0.85] mb-4">
+            <h1 className="text-4xl md:text-6xl font-display text-brand-brown tracking-tighter leading-[0.9] md:leading-[0.85] mb-4">
                CAMP <br/> <span className="text-transparent bg-clip-text bg-gradient-to-br from-brand-brown to-brand-brown/40 uppercase">Lineup</span>
             </h1>
             
@@ -148,20 +148,20 @@ export default function Worship() {
                         onClick={() => toggleSession(session.id)}
                         className="w-full flex items-center justify-between p-5 md:p-6 text-left group"
                     >
-                        <div className="flex items-center gap-4">
-                            <div className={`w-12 h-12 rounded-2xl flex items-center justify-center transition-all ${isExpanded ? 'bg-brand-brown text-white' : 'bg-brand-brown/5 text-brand-brown group-hover:bg-brand-brown/10'}`}>
-                                <Disc size={24} className={isExpanded ? 'animate-spin-slow' : ''} />
+                        <div className="flex items-center gap-3 md:gap-4 min-w-0">
+                            <div className={`w-10 h-10 md:w-12 md:h-12 rounded-xl md:rounded-2xl flex items-center justify-center shrink-0 transition-all ${isExpanded ? 'bg-brand-brown text-white' : 'bg-brand-brown/5 text-brand-brown group-hover:bg-brand-brown/10'}`}>
+                                <Disc size={isExpanded ? 20 : 18} className={`md:size-[24px] ${isExpanded ? 'animate-spin-slow' : ''}`} />
                             </div>
-                            <div>
-                                <h3 className={`text-xl md:text-2xl font-display leading-none mb-1 ${isExpanded ? 'text-brand-brown' : 'text-brand-brown/80'}`}>
+                            <div className="min-w-0">
+                                <h3 className={`text-lg md:text-2xl font-display leading-none mb-1.5 md:mb-1 truncate ${isExpanded ? 'text-brand-brown' : 'text-brand-brown/80'}`}>
                                     {session.title}
                                 </h3>
-                                <div className="flex items-center gap-3">
-                                    <span className="flex items-center gap-1 text-[9px] font-black uppercase tracking-widest text-brand-brown/40">
+                                <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
+                                    <span className="flex items-center gap-1 text-[8px] md:text-[9px] font-black uppercase tracking-widest text-brand-brown/40 overflow-hidden whitespace-nowrap">
                                         <Calendar size={10} /> {safeFormat(session.sessionDate, 'MMM d, yyyy')}
                                     </span>
                                     {session.sessionDate && (
-                                        <span className="flex items-center gap-1 text-[9px] font-black uppercase tracking-widest text-brand-brown/40">
+                                        <span className="flex items-center gap-1 text-[8px] md:text-[9px] font-black uppercase tracking-widest text-brand-brown/40 overflow-hidden whitespace-nowrap">
                                             <Clock size={10} /> {safeFormat(session.sessionDate, 'h:mm a')}
                                         </span>
                                     )}
@@ -171,9 +171,9 @@ export default function Worship() {
                                             target="_blank"
                                             rel="noopener noreferrer"
                                             onClick={(e) => e.stopPropagation()}
-                                            className="flex items-center gap-1.5 px-2.5 py-1 bg-green-500 text-white rounded-full text-[8px] font-black uppercase tracking-[0.2em] shadow-lg shadow-green-500/20 hover:bg-green-600 transition-all hover:scale-105 active:scale-95"
+                                            className="flex items-center gap-1.5 px-2 py-0.5 md:px-2.5 md:py-1 bg-green-500 text-white rounded-full text-[7px] md:text-[8px] font-black uppercase tracking-[0.2em] shadow-lg shadow-green-500/20 hover:bg-green-600 transition-all hover:scale-105 active:scale-95"
                                         >
-                                            <Disc size={8} className="animate-spin-slow" /> Spotify Playlist
+                                            <Disc size={8} className="animate-spin-slow" /> Spotify
                                         </a>
                                     )}
                                 </div>
@@ -198,7 +198,7 @@ export default function Worship() {
                                     session.songs.sort((a,b) => (a.order || 0) - (b.order || 0)).map((song, sIdx) => (
                                         <div 
                                             key={song.id || sIdx}
-                                            className="group relative flex flex-col p-4 bg-brand-cream/40 border border-brand-sand/10 rounded-2xl transition-all hover:bg-white hover:shadow-md hover:-translate-y-0.5"
+                                            className="group relative flex flex-col p-3.5 md:p-4 bg-brand-cream/40 border border-brand-sand/10 rounded-2xl transition-all hover:bg-white hover:shadow-md hover:-translate-y-0.5"
                                         >
                                             <div className="flex items-center justify-between gap-4">
                                                 <div className="flex flex-col min-w-0">
@@ -222,10 +222,10 @@ export default function Worship() {
                                                     {song.content && (
                                                         <button 
                                                             onClick={() => setActiveLyrics(song)}
-                                                            className="flex items-center gap-2 px-3 py-2 bg-brand-brown text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-brand-light-brown transition-all shadow-md active:scale-95 group/btn"
+                                                            className="flex items-center gap-2 px-3 py-2.5 md:py-2 bg-brand-brown text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-brand-light-brown transition-all shadow-md active:scale-95 group/btn"
                                                         >
                                                             <FileText size={14} className="group-hover/btn:rotate-12 transition-transform" />
-                                                            <span className="hidden sm:inline">Lyrics</span>
+                                                            <span className="hidden md:inline">Lyrics</span>
                                                         </button>
                                                     )}
                                                     {song.lyricsUrl && (
@@ -233,7 +233,7 @@ export default function Worship() {
                                                             href={song.lyricsUrl} 
                                                             target="_blank" 
                                                             rel="noopener noreferrer"
-                                                            className="p-2 bg-white rounded-xl border border-brand-brown/5 text-brand-brown/40 hover:text-brand-brown hover:bg-brand-sand/10 transition-all shadow-sm group/ext shrink-0"
+                                                            className="p-2.5 md:p-2 bg-white rounded-xl border border-brand-brown/5 text-brand-brown/40 hover:text-brand-brown hover:bg-brand-sand/10 transition-all shadow-sm group/ext shrink-0"
                                                             title="External Resource"
                                                         >
                                                             <ExternalLink size={16} className="group-hover/ext:scale-110 transition-transform" />
@@ -299,16 +299,16 @@ export default function Worship() {
       {/* Lyrics Modal */}
       {activeLyrics && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6 bg-brand-brown/60 backdrop-blur-md animate-in fade-in duration-300">
-            <div className="bg-white rounded-[2.5rem] shadow-2xl w-full max-w-xl max-h-[85dvh] flex flex-col overflow-hidden border border-white/20 select-text">
+            <div className="bg-white rounded-[2rem] md:rounded-[2.5rem] shadow-2xl w-full max-w-xl max-h-[85dvh] md:max-h-[85dvh] flex flex-col overflow-hidden border border-white/20 select-text">
                 {/* Modal Header */}
-                <div className="p-6 md:p-8 bg-brand-cream/30 border-b border-brand-sand/10 flex items-center justify-between">
-                    <div className="flex items-center gap-4">
-                        <div className="w-12 h-12 rounded-2xl bg-brand-brown text-white flex items-center justify-center shadow-lg">
-                            <Mic2 size={24} />
+                <div className="p-5 md:p-8 bg-brand-cream/30 border-b border-brand-sand/10 flex items-center justify-between">
+                    <div className="flex items-center gap-3 md:gap-4">
+                        <div className="w-10 h-10 md:w-12 md:h-12 rounded-xl md:rounded-2xl bg-brand-brown text-white flex items-center justify-center shadow-lg">
+                            <Mic2 size={20} className="md:size-[24px]" />
                         </div>
-                        <div>
-                            <h2 className="text-2xl font-display text-brand-brown leading-none mb-1">{activeLyrics.title}</h2>
-                            <p className="text-[10px] font-black uppercase tracking-widest text-brand-brown/40">{activeLyrics.artist || 'Unknown Artist'} • Key: {activeLyrics.key || 'TBA'}</p>
+                        <div className="min-w-0">
+                            <h2 className="text-xl md:text-2xl font-display text-brand-brown leading-none mb-1 truncate">{activeLyrics.title}</h2>
+                            <p className="text-[9px] md:text-[10px] font-black uppercase tracking-widest text-brand-brown/40 truncate">{activeLyrics.artist || 'Unknown Artist'} • Key: {activeLyrics.key || 'TBA'}</p>
                         </div>
                     </div>
                     <button 
@@ -327,19 +327,19 @@ export default function Worship() {
                 </div>
 
                 {/* Modal Footer */}
-                <div className="p-6 bg-brand-cream/30 border-t border-brand-sand/10 flex items-center justify-between gap-4">
+                <div className="p-4 md:p-6 bg-brand-cream/30 border-t border-brand-sand/10 flex items-center justify-between gap-3 md:gap-4">
                     <button 
                         onClick={() => setActiveLyrics(null)}
-                        className="px-6 py-3 rounded-2xl font-bold text-xs text-brand-brown/60 hover:bg-brand-brown/5 transition-all text-center uppercase tracking-widest"
+                        className="px-4 md:px-6 py-3 rounded-2xl font-bold text-[10px] md:text-xs text-brand-brown/60 hover:bg-brand-brown/5 transition-all text-center uppercase tracking-widest"
                     >
                         Close
                     </button>
                     <button 
                         onClick={() => copyToClipboard(activeLyrics.content || '')}
-                        className="flex-1 sm:flex-none flex items-center justify-center gap-2 bg-brand-brown text-white px-8 py-3.5 rounded-2xl font-bold text-xs hover:bg-brand-light-brown transition-all shadow-xl active:scale-95 uppercase tracking-widest"
+                        className="flex-1 flex items-center justify-center gap-2 bg-brand-brown text-white px-5 md:px-8 py-3.5 rounded-2xl font-bold text-[10px] md:text-xs hover:bg-brand-light-brown transition-all shadow-xl active:scale-95 uppercase tracking-widest"
                     >
-                        {copied ? <Check size={16} /> : <Copy size={16} />}
-                        {copied ? 'Copied!' : 'Copy to Clipboard'}
+                        {copied ? <Check size={14} className="md:size-[16px]" /> : <Copy size={14} className="md:size-[16px]" />}
+                        {copied ? 'Copied!' : 'Copy Lyrics'}
                     </button>
                 </div>
             </div>
