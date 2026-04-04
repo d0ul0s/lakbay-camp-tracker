@@ -24,6 +24,7 @@ import ActivityLogs from './pages/ActivityLogs';
 import Reports from './pages/Reports';
 import DocumentRegistry from './pages/DocumentRegistry';
 import Users from './pages/Users';
+import Games from './pages/Games';
 
 import PointsManagement from './pages/PointsManagement';
 
@@ -76,6 +77,7 @@ const router = createBrowserRouter([
           { path: "/announcements/manage", element: <ManageAnnouncements /> },
           { path: "/worship/manage", element: <ManageWorship /> },
           { path: "/awards", element: <Awards /> },
+          { path: "/games", element: <Games /> },
         ]
       }
     ]

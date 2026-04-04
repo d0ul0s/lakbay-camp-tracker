@@ -115,30 +115,76 @@ export default function PointsManagement() {
     }
   };
 
-  const handleDelete = async (logId: string) => {
-    if (!window.confirm('Delete?')) return;
+  const [showConfirm, setShowConfirm] = useState(false);
+  const [confirmLogId, setConfirmLogId] = useState<string | null>(null);
+
+  const pendingCount = pointLogs.filter(p => !p.verified).length;
+
+  const handleDeleteClick = (id: string) => {
+    setConfirmLogId(id);
+    setShowConfirm(true);
+  };
+
+  const confirmDelete = async () => {
+    if (!confirmLogId) return;
     try {
-      await api.delete(`/api/points/${logId}`);
-      syncPointLog('deleted', { id: logId, _id: logId });
-      toast.success('Deleted');
+      await api.delete(`/api/points/${confirmLogId}`);
+      syncPointLog('deleted', { id: confirmLogId, _id: confirmLogId });
+      toast.success('Log Expunged');
     } catch (err: any) {
-      toast.error('Failed');
+      toast.error('Failed to Delete');
+    } finally {
+      setShowConfirm(false);
+      setConfirmLogId(null);
     }
   };
 
-  const filteredHistory = pointLogs.filter(log => {
+  const filteredHistory = useMemo(() => {
+    return pointLogs.filter(log => {
       const term = searchQuery.toLowerCase();
       return (
         log.groupId?.name.toLowerCase().includes(term) ||
         log.reason.toLowerCase().includes(term) ||
         log.createdBy?.church?.toLowerCase().includes(term)
       );
-  });
-
-  const pendingCount = pointLogs.filter(p => !p.verified).length;
+    });
+  }, [pointLogs, searchQuery]);
 
   return (
     <div className="max-w-6xl mx-auto space-y-4 animate-in fade-in duration-500 pb-10">
+      {/* CUSTOM CONFIRMATION MODAL */}
+      {showConfirm && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6">
+          <div className="absolute inset-0 bg-brand-brown/60 backdrop-blur-sm animate-in fade-in duration-300" onClick={() => setShowConfirm(false)} />
+          <div className="relative bg-white rounded-[2.5rem] shadow-2xl border-4 border-white w-full max-w-md p-8 animate-in zoom-in-95 duration-200">
+             <div className="flex flex-col items-center text-center space-y-6">
+                <div className="w-20 h-20 rounded-full bg-red-50 flex items-center justify-center text-red-500 shadow-inner">
+                   <Trash2 size={40} className="animate-bounce" />
+                </div>
+                <div className="space-y-2">
+                   <h3 className="text-2xl font-display text-brand-brown uppercase">Permanently Delete?</h3>
+                   <p className="text-xs font-black text-gray-400 uppercase tracking-widest leading-relaxed">
+                      This action will immediately remove this entry from the verified registry and audit logs.
+                   </p>
+                </div>
+                <div className="flex flex-col sm:flex-row gap-3 w-full">
+                   <button 
+                     onClick={() => setShowConfirm(false)}
+                     className="flex-1 py-4 rounded-2xl bg-gray-100 text-[10px] font-black uppercase text-gray-400 hover:bg-gray-200 transition-all"
+                   >
+                      Cancel Action
+                   </button>
+                   <button 
+                     onClick={confirmDelete}
+                     className="flex-1 py-4 rounded-2xl bg-red-500 text-[10px] font-black uppercase text-white hover:bg-red-600 shadow-xl shadow-red-500/20 active:scale-95 transition-all"
+                   >
+                      Expunge Entry
+                   </button>
+                </div>
+             </div>
+          </div>
+        </div>
+      )}
       {/* Mini Header (Unified Stream) */}
       <div className="flex items-center justify-between bg-white p-3 rounded-2xl border border-brand-sand/30 shadow-sm">
         <div className="flex items-center gap-3">
@@ -346,7 +392,7 @@ export default function PointsManagement() {
                         )}
                         {(isAdmin || rolePerms?.points?.delete) && (
                           <button 
-                            onClick={() => handleDelete(log.id || log._id!)}
+                            onClick={() => handleDeleteClick(log.id || log._id!)}
                             className="p-1.5 bg-red-50 text-red-500 hover:bg-red-500 hover:text-white rounded-md transition-all"
                           ><Trash2 size={14} /></button>
                         )}
