@@ -164,11 +164,11 @@ export default function ManageWorship() {
                         </p>
                      </div>
                   </div>
-                  <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <div className="flex items-center gap-2 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
                      <button onClick={() => handleOpenModal(session)} className="p-2 text-brand-brown/60 hover:text-brand-brown hover:bg-brand-brown/5 rounded-lg transition-all" title="Edit">
                         <Edit2 size={16} />
                      </button>
-                     <button onClick={() => handleDelete(session.id)} className="p-2 text-red-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all" title="Delete">
+                     <button onClick={() => handleDelete((session.id || session._id)!)} className="p-2 text-red-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all" title="Delete">
                         <Trash2 size={16} />
                      </button>
                   </div>

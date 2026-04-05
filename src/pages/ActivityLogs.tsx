@@ -81,11 +81,21 @@ export default function ActivityLogs() {
       case 'CLAIM_MERCH': return 'bg-green-50 text-green-600 border-green-200';
       case 'UNCLAIM_MERCH': return 'bg-red-50 text-red-600 border-red-200';
       case 'MERCH_UPDATE': return 'bg-brand-sand/20 text-brand-brown border-brand-sand';
+      case 'LOGIN': return 'bg-indigo-100 text-indigo-700 border-indigo-200';
+      case 'VISIT': return 'bg-brand-beige text-brand-brown border-brand-sand';
       default: return 'bg-gray-100 text-gray-700';
     }
   };
 
-  const parseDetails = (details: any) => {
+  const parseDetails = (log: Log) => {
+    const { details, action } = log;
+    if (action === 'VISIT') {
+      return `Page View: ${details?.path || '/'} (${details?.userAgent?.split(' ')[0] || 'Unknown'})`;
+    }
+    if (action === 'LOGIN') {
+      return details?.message || 'Authenticated successfully';
+    }
+
     if (!details) return '';
     if (typeof details === 'string') return details;
     
@@ -120,7 +130,7 @@ export default function ActivityLogs() {
         </div>
         {/* Legend */}
         <div className="flex flex-wrap items-center gap-1.5 text-[9px] md:text-xs">
-          {[['CREATE','bg-green-100 text-green-700'],['UPDATE','bg-blue-100 text-blue-700'],['DELETE','bg-red-100 text-red-700'],['VERIFY','bg-purple-100 text-purple-700'],['MERCH','bg-brand-sand/20 text-brand-brown'],['LOGIN','bg-gray-100 text-gray-700']].map(([label, cls]) => (
+          {[['CREATE','bg-green-100 text-green-700'],['UPDATE','bg-blue-100 text-blue-700'],['DELETE','bg-red-100 text-red-700'],['VERIFY','bg-purple-100 text-purple-700'],['VISIT','bg-brand-beige text-brand-brown'],['LOGIN','bg-indigo-100 text-indigo-700']].map(([label, cls]) => (
             <span key={label} className={`px-1.5 py-0.5 rounded font-black uppercase tracking-tighter ${cls}`}>{label}</span>
           ))}
         </div>
@@ -140,6 +150,8 @@ export default function ActivityLogs() {
                 className="w-full py-1.5 pl-2 pr-6 rounded-lg border border-gray-200 focus:outline-none focus:border-brand-brown text-[11px] font-bold"
               >
                 <option value="All">All Actions</option>
+                <option value="VISIT">VISIT</option>
+                <option value="LOGIN">LOGIN</option>
                 <option value="CREATE">CREATE</option>
                 <option value="UPDATE">UPDATE</option>
                 <option value="MERCH_UPDATE">MERCH</option>
@@ -160,6 +172,7 @@ export default function ActivityLogs() {
                 <option value="admin">Admin</option>
                 <option value="treasurer">Treasurer</option>
                 <option value="coordinator">Coordinator</option>
+                <option value="anonymous">Anonymous</option>
               </select>
             </div>
  
@@ -223,7 +236,7 @@ export default function ActivityLogs() {
                   </td>
                   <td className="px-6 py-4 font-medium text-gray-700">{log.entityType}</td>
                   <td className="px-6 py-4 text-gray-600">
-                    <div className="font-medium text-brand-brown">{parseDetails(log.details)}</div>
+                    <div className="font-medium text-brand-brown">{parseDetails(log)}</div>
                     {log.details?.amount !== undefined && (
                       <div className="text-xs text-gray-400 mt-0.5">₱{Number(log.details.amount).toLocaleString()}</div>
                     )}
@@ -275,7 +288,7 @@ export default function ActivityLogs() {
               <div className="flex flex-col gap-1 px-1">
                 <p className="text-[13px] font-black text-brand-brown leading-tight">
                   <span className="text-gray-300 font-black mr-1.5 text-[10px] uppercase">[{log.entityType}]</span> 
-                  {parseDetails(log.details)}
+                  {parseDetails(log)}
                 </p>
                 
                 {log.details?.changes && Array.isArray(log.details.changes) && (

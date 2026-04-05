@@ -4,7 +4,7 @@ const ActivityLogSchema = new mongoose.Schema({
   userId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
-    required: true
+    required: false
   },
   userRole: {
     type: String,
@@ -16,12 +16,12 @@ const ActivityLogSchema = new mongoose.Schema({
   action: {
     type: String,
     required: true,
-    enum: ['CREATE', 'UPDATE', 'DELETE', 'VERIFY', 'UNVERIFY', 'LOGIN', 'BACKUP_EXPORT', 'BACKUP_IMPORT', 'CLAIM_MERCH', 'UNCLAIM_MERCH', 'MERCH_UPDATE']
+    enum: ['CREATE', 'UPDATE', 'DELETE', 'VERIFY', 'UNVERIFY', 'LOGIN', 'VISIT', 'BACKUP_EXPORT', 'BACKUP_IMPORT', 'CLAIM_MERCH', 'UNCLAIM_MERCH', 'MERCH_UPDATE']
   },
   entityType: {
     type: String,
     required: true,
-    enum: ['Registrant', 'Expense', 'Solicitation', 'User', 'Settings', 'System']
+    enum: ['Registrant', 'Expense', 'Solicitation', 'User', 'Settings', 'System', 'Visit']
   },
   entityId: {
     type: mongoose.Schema.Types.ObjectId

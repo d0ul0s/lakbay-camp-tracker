@@ -1,4 +1,6 @@
+import { useEffect } from 'react';
 import { createBrowserRouter, RouterProvider, Navigate } from 'react-router-dom';
+import { trackVisit } from './utils/visitLogger';
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
 import Awards from './pages/Awards';
@@ -89,6 +91,10 @@ const router = createBrowserRouter([
 ]);
 
 export default function App() {
+  useEffect(() => {
+    trackVisit();
+  }, []);
+
   return (
     <AxiosInterceptor>
       <ColdStartLoader />

@@ -7,6 +7,7 @@ const { DEFAULT_MATRIX } = require('../models/Settings');
 const jwt = require('jsonwebtoken');
 const auth = require('../middleware/auth');
 const rateLimit = require('express-rate-limit');
+const ActivityLog = require('../models/ActivityLog');
 const cache = require('../utils/cache');
 
 // Initialize both caches on startup
@@ -104,6 +105,24 @@ router.post('/login', loginLimiter, async (req, res) => {
       const tokenTime = Date.now() - startToken;
 
       const totalTime = Date.now() - startTotal;
+
+      // 4. Trace Log (Async)
+      try {
+        new ActivityLog({
+          userId: matchedUser._id,
+          userRole: matchedUser.role,
+          userChurch: matchedUser.church,
+          action: 'LOGIN',
+          entityType: 'User',
+          entityId: matchedUser._id,
+          details: { 
+            message: `User logged in via PIN`,
+            performance: { totalMs: totalTime, bcryptMs: bcryptTime, settingsMs: settingsTime, tokenMs: tokenTime }
+          }
+        }).save();
+      } catch (logErr) {
+        console.error('Failed to log login:', logErr);
+      }
 
       return res.json({ 
         role: matchedUser.role, 
